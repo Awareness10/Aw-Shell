@@ -27,13 +27,20 @@ from widgets.wayland import WaylandWindow as Window
 
 class Notch(Window):
     def __init__(self, monitor_id: int = 0, **kwargs):
-        self.monitor_id = monitor_id
+        self.hypr_monitor_id = monitor_id
         self.monitor_manager = None
         
         # Get monitor manager
         try:
             from utils.monitor_manager import get_monitor_manager
             self.monitor_manager = get_monitor_manager()
+
+            # Find logical ID that matches this Hyprland monitor
+            self.logical_monitor_id = 0  # default
+            for mon in self.monitor_manager.get_monitors():
+                if mon.get('hypr_id') == monitor_id:
+                    self.logical_monitor_id = mon['id']
+                    break
         except ImportError:
             pass
         is_panel_vertical = False
@@ -823,7 +830,7 @@ class Notch(Window):
 
     def close_notch(self):
         if self.monitor_manager:
-            self.monitor_manager.set_notch_state(self.monitor_id, False)
+            self.monitor_manager.set_notch_state(self.logical_monitor_id, False)
             
         self.set_keyboard_mode("none")
         self.notch_box.remove_style_class("open")
@@ -845,33 +852,45 @@ class Notch(Window):
             else:
                 self.set_margin("-40px 8px 8px 8px")
 
+    def _hypr_id_to_logical_id(self, hypr_id):
+        """Convert Hyprland monitor ID to logical monitor ID."""
+        if not self.monitor_manager:
+            return hypr_id
+        
+        for mon in self.monitor_manager.get_monitors():
+            if mon.get('hypr_id') == hypr_id:
+                return mon['id']
+        return hypr_id  # fallback
+
     def open_notch(self, widget_name: str):
         # Debug info for troubleshooting
         if hasattr(self, '_debug_monitor_focus') and self._debug_monitor_focus:
-            print(f"DEBUG: open_notch called on monitor {self.monitor_id} for widget '{widget_name}'")
+            print(f"DEBUG: open_notch called on monitor {self.logical_monitor_id} for widget '{widget_name}'")
         
         # Handle monitor focus switching - always check real focused monitor from Hyprland
         if self.monitor_manager:
             # Get real focused monitor directly from Hyprland to ensure accuracy
-            real_focused_monitor_id = self._get_real_focused_monitor_id()
+            real_focused_hypr_id = self._get_real_focused_monitor_id()
             
             # Update monitor manager if we got a valid result
-            if real_focused_monitor_id is not None:
+            if real_focused_hypr_id is not None:
                 # Update the monitor manager's focused monitor
-                self.monitor_manager._focused_monitor_id = real_focused_monitor_id
+                real_focused_logical_id = self._hypr_id_to_logical_id(real_focused_hypr_id)
+                self.monitor_manager._focused_monitor_id = real_focused_logical_id
                 if hasattr(self, '_debug_monitor_focus') and self._debug_monitor_focus:
-                    print(f"DEBUG: Real focused monitor from Hyprland: {real_focused_monitor_id}")
+                    print(f"DEBUG: Real focused monitor - Hypr ID: {real_focused_hypr_id}, Logical ID: {real_focused_logical_id}")
             
-            focused_monitor_id = self.monitor_manager.get_focused_monitor_id()
-            focused_notch = self.monitor_manager.get_instance(focused_monitor_id, 'notch')
+            # Get focused monitor (now returns logical ID)
+            focused_logical_id = self.monitor_manager.get_focused_monitor_id()
+            focused_notch = self.monitor_manager.get_instance(focused_logical_id, 'notch')
 
             # Close notches on other monitors
-            self.monitor_manager.close_all_notches_except(focused_monitor_id)
+            self.monitor_manager.close_all_notches_except(focused_logical_id)
 
             if focused_notch and hasattr(focused_notch, 'open_notch'):
                 # Open notch on focused monitor
                 focused_notch._open_notch_internal(widget_name)
-                self.monitor_manager.set_notch_state(focused_monitor_id, True, widget_name)
+                self.monitor_manager.set_notch_state(focused_logical_id, True, widget_name)
 
     def _get_real_focused_monitor_id(self):
         """Get the real focused monitor ID directly from Hyprland."""

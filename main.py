@@ -93,10 +93,11 @@ if __name__ == "__main__":
     
     # Create components for each monitor
     for monitor in monitors:
-        monitor_id = monitor['id']
+        logical_id = monitor['id']
+        hypr_id = monitor.get('hypr_id', logical_id)  # Hyprland ID (1=DP-1, 2=DP-2, 0=HDMI-A-1)
         
         # Create corners only for the first monitor (shared across all)
-        if monitor_id == 0:
+        if logical_id == 0:
             corners = Corners()
             # Set corners visibility based on config
             corners_visible = config.get("corners_visible", True)
@@ -105,9 +106,9 @@ if __name__ == "__main__":
         
         # Create monitor-specific components
         if multi_monitor_enabled:
-            bar = Bar(monitor_id=monitor_id, hypr_monitor_id=monitor.get('hypr_id', monitor_id))
-            notch = Notch(monitor_id=monitor.get('hypr_id', monitor_id))  # Notch also needs Hyprland ID
-            dock = Dock(monitor_id=monitor.get('hypr_id', monitor_id))    # Dock also needs Hyprland ID
+            bar = Bar(monitor_id=logical_id, hypr_monitor_id=hypr_id)
+            notch = Notch(monitor_id=hypr_id)  # Notch also needs Hyprland ID
+            dock = Dock(monitor_id=hypr_id)    # Dock also needs Hyprland ID
         else:
             # Single monitor fallback
             bar = Bar()
@@ -119,17 +120,17 @@ if __name__ == "__main__":
         notch.bar = bar
         
         # Create notification popup for the first monitor only
-        if monitor_id == 0:
+        if logical_id == 0:
             notification = NotificationPopup(widgets=notch.dashboard.widgets)
             app_components.append(notification)
         
         # Register instances in monitor manager if available
         if multi_monitor_enabled and monitor_manager:
-            monitor_manager.register_monitor_instances(monitor_id, {
+            monitor_manager.register_monitor_instances(logical_id, {
                 'bar': bar,
                 'notch': notch,
                 'dock': dock,
-                'corners': corners if monitor_id == 0 else None
+                'corners': corners if logical_id == 0 else None
             })
         
         # Add components to app list
