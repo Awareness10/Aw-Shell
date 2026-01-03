@@ -16,6 +16,7 @@ from gi.repository import Gdk, GLib, Gtk
 
 import config.data as data
 import modules.icons as icons
+from utils.monitor_manager import get_monitor_manager
 from modules.controls import ControlSmall
 from modules.dock import Dock
 from modules.metrics import Battery, MetricsSmall, NetworkApplet
@@ -47,8 +48,11 @@ tooltip_overview = """<b>Overview</b>"""
 
 
 class Bar(Window):
-    def __init__(self, monitor_id: int = 0, **kwargs):
-        self.monitor_id = monitor_id
+    def __init__(self, monitor_id: int = 0, hypr_monitor_id: int | None = None, **kwargs):
+        self.monitor_id = monitor_id  # Logical ID for workspace calculation
+        
+        # Use hypr_monitor_id for actual window placement, fallback to monitor_id
+        actual_monitor = hypr_monitor_id if hypr_monitor_id is not None else monitor_id
         
         super().__init__(
             name="bar",
@@ -56,7 +60,7 @@ class Bar(Window):
             exclusivity="auto",
             visible=True,
             all_visible=True,
-            monitor=monitor_id,
+            monitor=actual_monitor,  # Use Hyprland ID for window placement
         )
 
         self.anchor_var = ""
@@ -99,11 +103,11 @@ class Bar(Window):
         self.dock_instance = None
         self.integrated_dock_widget = None
 
-        # Calculate workspace range based on monitor_id
-        # Monitor 0: workspaces 1-10, Monitor 1: workspaces 11-20, etc.
-        start_workspace = self.monitor_id * 10 + 1
-        end_workspace = start_workspace + 10
-        workspace_range = range(start_workspace, end_workspace)
+        # Calculate workspace range based on monitor_id using monitor manager
+        # This ensures workspaces are assigned based on monitor position (left to right)
+        monitor_manager = get_monitor_manager()
+        start_workspace, end_workspace = monitor_manager.get_workspace_range_for_monitor(self.monitor_id)
+        workspace_range = range(start_workspace, end_workspace + 1)  # +1 because range is exclusive
 
         self.workspaces = Workspaces(
             name="workspaces",

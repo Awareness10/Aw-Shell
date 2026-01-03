@@ -105,9 +105,9 @@ if __name__ == "__main__":
         
         # Create monitor-specific components
         if multi_monitor_enabled:
-            bar = Bar(monitor_id=monitor_id)
-            notch = Notch(monitor_id=monitor_id)
-            dock = Dock(monitor_id=monitor_id)
+            bar = Bar(monitor_id=monitor_id, hypr_monitor_id=monitor.get('hypr_id', monitor_id))
+            notch = Notch(monitor_id=monitor.get('hypr_id', monitor_id))  # Notch also needs Hyprland ID
+            dock = Dock(monitor_id=monitor.get('hypr_id', monitor_id))    # Dock also needs Hyprland ID
         else:
             # Single monitor fallback
             bar = Bar()
