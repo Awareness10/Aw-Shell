@@ -96,6 +96,7 @@ class MonitorManager:
     def refresh_monitors(self) -> List[Dict]:
         """
         Detect monitors using Hyprland API for accurate info, with GTK for scale detection.
+        Monitors are sorted by X position (left to right) for consistent workspace assignment.
         
         Returns:
             List of monitor dictionaries with id, name, width, height, x, y, scale
@@ -112,14 +113,17 @@ class MonitorManager:
             )
             hypr_monitors = json.loads(result.stdout)
             
-            for i, monitor in enumerate(hypr_monitors):
+            # Sort monitors by X position (left to right) for logical workspace assignment
+            sorted_monitors = sorted(hypr_monitors, key=lambda m: m.get('x', 0))
+            
+            for i, monitor in enumerate(sorted_monitors):
                 monitor_name = monitor.get('name', f'monitor-{i}')
                 
                 # Get scale directly from Hyprland (more reliable)
                 hypr_scale = monitor.get('scale', 1.0)
                 
                 self._monitors.append({
-                    'id': i,
+                    'id': i,  # Logical ID based on position (left to right)
                     'name': monitor_name,
                     'width': monitor.get('width', 1920),
                     'height': monitor.get('height', 1080),
