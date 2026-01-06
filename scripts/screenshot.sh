@@ -26,18 +26,30 @@ EOF
 case $1 in
     p)
         hyprshot -z -s -m output -o "$save_dir" -f "$save_file"
+        hyprshot_exit=$?
         ;;
     s)
         hyprshot -z -s -m region -o "$save_dir" -f "$save_file"
+        hyprshot_exit=$?
         ;;
     w)
-        hyprshot -s -m window -o "$save_dir" -f "$save_file";
+        hyprshot -s -m window -o "$save_dir" -f "$save_file"
+        hyprshot_exit=$?
         ;;
     *)
         print_error
         exit 1
         ;;
 esac
+
+# Wait for file to appear (up to 3 seconds) if hyprshot didn't explicitly fail
+if [ "$hyprshot_exit" -eq 0 ]; then
+    wait_count=0
+    while [ ! -f "$full_path" ] && [ "$wait_count" -lt 30 ]; do
+        sleep 0.1
+        wait_count=$((wait_count + 1))
+    done
+fi
 
 if [ -f "$full_path" ]; then
     # Copiar al portapapeles si no es mockup
