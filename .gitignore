@@ -1,10 +1,13 @@
-__pycache__
+**/__pycache__/
 styles/colors.css
 config/config.json
 config/hypr/aw-shell.conf
 config/hypr/colors.conf
 Aw-Shell.code-workspace
+
 .aider*
 config/dock.json
 config/dock.json.bak
-AGENTS.md
+
+*.md
+!README.md
