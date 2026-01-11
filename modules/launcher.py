@@ -90,7 +90,7 @@ class AppLauncher(Box):
                     name="config-button",
                     tooltip_markup=tooltip_settings,
                     child=Label(name="config-label", markup=icons.config),
-                    on_clicked=lambda *_: (exec_shell_command_async(f"python {get_relative_path('../config/config.py')}"), self.close_launcher()),
+                    on_clicked=lambda *_: (exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py"), self.close_launcher()),
                 ),
                 self.search_entry,
                 Button(
@@ -357,10 +357,10 @@ class AppLauncher(Box):
             case ":update":
                 GLib.idle_add(lambda: run_updater(force=True))
             case ":settings":
-                exec_shell_command_async(f"python {get_relative_path('../config/config.py')}")
+                exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py")
                 self.close_launcher()
             case ":config":
-                exec_shell_command_async(f"python {get_relative_path('../config/config.py')}")
+                exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py")
                 self.close_launcher()
             case _:
                 children = self.viewport.get_children()
