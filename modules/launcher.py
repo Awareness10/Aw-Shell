@@ -152,11 +152,9 @@ class AppLauncher(Box):
 
     def arrange_viewport(self, query: str = ""):
         if query.startswith("="):
-
             self.update_calculator_viewport()
             return
         if query.startswith(";"):
-            # In conversion mode, update history view once (not per keystroke)
             self.update_conversion_viewport()
             return
         remove_handler(self._arranger_handler) if self._arranger_handler else None
@@ -167,36 +165,82 @@ class AppLauncher(Box):
             """Extract base command name from command line, removing paths and arguments"""
             if not command_line:
                 return ""
-            # Remove common shell wrappers
             if command_line.startswith("/bin/sh -c"):
-                # Handle wrapped commands like "/bin/sh -c "\$SHELL -i -c scrcpy""
                 return ""
-            # Split by spaces and take first part (the command)
             cmd = command_line.split()[0] if command_line.split() else ""
-            # Extract just the command name from full paths
             if "/" in cmd:
                 cmd = cmd.split("/")[-1]
             return cmd
 
-        filtered_apps_iter = iter(
-            sorted(
-                [
-                    app
-                    for app in self._all_apps
-                    if query.casefold()
-                    in (
-                        (app.display_name or "")
-                        + (" " + app.name + " ")
-                        + (app.generic_name or "")
-                        + (" " + (app.command_line or "") + " ")
-                        + (" " + (app.executable or "") + " ")
-                        + (" " + extract_command_name(app.command_line) + " ")
-                    ).casefold()
-                ],
-                key=lambda app: (app.display_name or "").casefold(),
-            )
-        )
-        should_resize = operator.length_hint(filtered_apps_iter) == len(self._all_apps)
+        def calculate_score(app, q):
+            """Calculate relevance score. Higher = better match."""
+            q = q.casefold()
+            name = (app.display_name or "").casefold()
+            app_name = (app.name or "").casefold()
+            generic = (app.generic_name or "").casefold()
+            exe = (app.executable or "").casefold()
+            cmd = extract_command_name(app.command_line).casefold()
+            
+            # Exact match on display name - highest priority
+            if name == q:
+                return 10000
+            
+            # Exact match on app name or executable
+            if app_name == q or exe == q or cmd == q:
+                return 9000
+            
+            # Display name starts with query
+            if name.startswith(q):
+                return 8000 - len(name)  # Shorter names rank higher
+            
+            # App name or executable starts with query
+            if app_name.startswith(q) or exe.startswith(q) or cmd.startswith(q):
+                return 7000 - len(name)
+            
+            # Word in display name starts with query
+            words = name.split()
+            for i, word in enumerate(words):
+                if word.startswith(q):
+                    return 6000 - (i * 100) - len(name)
+            
+            # Word in app_name starts with query
+            for word in app_name.replace('-', ' ').replace('.', ' ').split():
+                if word.startswith(q):
+                    return 5000 - len(name)
+            
+            # Substring match in display name
+            if q in name:
+                pos = name.find(q)
+                return 4000 - pos - len(name)
+            
+            # Substring match in other fields
+            searchable = f"{app_name} {generic} {exe} {cmd}"
+            if q in searchable:
+                return 3000 - len(name)
+            
+            # Fuzzy match - all chars appear in order
+            if fuzzy_match(q, name):
+                return 1000
+            
+            return 0  # No match
+
+        def fuzzy_match(query, text):
+            """Check if all characters in query appear in text in order."""
+            it = iter(text)
+            return all(c in it for c in query)
+
+        # Score and filter apps
+        scored_apps = []
+        for app in self._all_apps:
+            score = calculate_score(app, query) if query else 1
+            if score > 0:
+                scored_apps.append((score, app))
+        
+        # Sort by score descending, then by name ascending for ties
+        scored_apps.sort(key=lambda x: (-x[0], (x[1].display_name or "").casefold()))
+        
+        filtered_apps_iter = iter([app for _, app in scored_apps])
+        should_resize = len(scored_apps) == len(self._all_apps)
 
         self._arranger_handler = idle_add(
             lambda apps_iter: self.add_next_application(apps_iter) or self.handle_arrange_complete(should_resize, query),

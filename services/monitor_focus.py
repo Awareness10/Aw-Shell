@@ -3,24 +3,7 @@ import subprocess
 import threading
 from typing import Optional
 
-
-class Signal:
-    """Simple signal implementation for monitor focus service."""
-    
-    def __init__(self):
-        self._callbacks = []
-    
-    def connect(self, callback):
-        """Connect a callback to this signal."""
-        self._callbacks.append(callback)
-    
-    def emit(self, *args, **kwargs):
-        """Emit the signal to all connected callbacks."""
-        for callback in self._callbacks:
-            try:
-                callback(*args, **kwargs)
-            except Exception as e:
-                print(f"Error in signal callback: {e}")
+from utils.signal import Signal
 
 
 class MonitorFocusService:

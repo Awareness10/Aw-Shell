@@ -1,5 +1,5 @@
 <p align="center">
-<a href="https://github.com/Axenide/Ax-Shell">
+<a href="https://github.com/awareness10/Aw-Shell">
   <img src="assets/cover.png">
   </a>
 </p>
@@ -16,16 +16,12 @@
   </p>
 
   <p align="center">
-  <a href="https://github.com/Axenide/Ax-Shell/stargazers">
-    <img src="https://img.shields.io/github/stars/Axenide/Ax-Shell?style=for-the-badge&logo=github&color=E3B341&logoColor=D9E0EE&labelColor=000000" alt="GitHub stars">
-  </a>
-  <a href="https://ko-fi.com/Axenide">
-    <img src="https://img.shields.io/badge/Support me on-Ko--fi-FF6433?style=for-the-badge&logo=kofi&logoColor=white&labelColor=000000" alt="Ko-Fi">
-  </a>
-  <a href="https://discord.com/invite/gHG9WHyNvH">
-    <img src="https://img.shields.io/discord/669048311034150914?style=for-the-badge&logo=discord&logoColor=D9E0EE&labelColor=000000&color=5865F2&label=Discord" alt="Discord">
+  <a href="https://github.com/awareness10/Aw-Shell/stargazers">
+    <img src="https://img.shields.io/github/stars/awareness10/Aw-Shell?style=for-the-badge&logo=github&color=E3B341&logoColor=D9E0EE&labelColor=000000" alt="GitHub stars">
   </a>
 </p>
+
+> Forked from [Axenide/Ax-Shell](https://github.com/Axenide/Ax-Shell) - A hackable shell for Hyprland
 
 ---
 
@@ -55,17 +51,8 @@
 
 **Run the following command in your terminal once logged into Hyprland:**
 ```bash
-curl -fsSL get.axeni.de/ax-shell | bash
+curl -fsSL https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.sh | bash
 ```
-
-**Alternative:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/Axenide/Ax-Shell/main/install.sh | bash
-```
-
-### NixOS
-[poogas](https://github.com/poogas) has created a flake for Ax-Shell.
-👉 [Try it out!](https://github.com/poogas/Ax-Shell) 👈
 
 ### Manual Installation
 1. Install dependencies:
@@ -121,59 +108,43 @@ curl -fsSL https://raw.githubusercontent.com/Axenide/Ax-Shell/main/install.sh | 
         - Zed Sans
         - Tabler Icons
 
-2. Download and run Ax-Shell:
+2. Download and run Aw-Shell:
     ```bash
-    git clone https://github.com/Axenide/Ax-Shell.git ~/.config/Ax-Shell
-    uwsm -- app python ~/.config/Ax-Shell/main.py > /dev/null 2>&1 & disown
+    git clone https://github.com/awareness10/Aw-Shell.git ~/.config/Aw-Shell
+    uwsm -- app python ~/.config/Aw-Shell/main.py > /dev/null 2>&1 & disown
     ```
 
-<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" /></sub> Roadmap</h2>
+<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" /></sub> Features</h2>
 
-- [x] App Launcher
-- [x] Bluetooth Manager
-- [x] Calculator
-- [x] Calendar
-- [x] Clipboard Manager
-- [x] Color Picker
-- [x] Customizable UI
-- [x] Dashboard
-- [x] Dock
-- [x] Emoji Picker
-- [x] Kanban Board
-- [x] Network Manager
-- [x] Notifications
-- [x] OCR
-- [x] Pins
-- [x] Power Manager
-- [x] Power Menu
-- [x] Screen Recorder
-- [x] Screenshot
-- [x] Settings
-- [x] System Tray
-- [x] Terminal
-- [x] Tmux Session Manager
-- [x] Update checker
-- [x] Vertical Layout
-- [x] Wallpaper Selector
-- [x] Workspaces Overview
-- [x] Multi-monitor support
-- [ ] Multimodal AI Assistant
-- [ ] OSD
-- [ ] OTP Manager
+- App Launcher
+- Bluetooth Manager
+- Calculator
+- Calendar
+- Clipboard Manager
+- Color Picker
+- Customizable UI
+- Dashboard
+- Dock
+- Emoji Picker
+- Kanban Board
+- Network Manager
+- Notifications
+- OCR
+- Pins
+- Power Manager
+- Power Menu
+- Screen Recorder
+- Screenshot
+- Settings
+- System Tray
+- Terminal
+- Tmux Session Manager
+- Update checker
+- Vertical Layout
+- Wallpaper Selector
+- Workspaces Overview
+- Multi-monitor support
 
 ---
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Telegram-Animated-Emojis/main/Activity/Sparkles.webp" alt="Sparkles" width="16" height="16" /><sup> sᴜᴘᴘᴏʀᴛ ᴛʜᴇ ᴘʀᴏᴊᴇᴄᴛ </sup><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Telegram-Animated-Emojis/main/Activity/Sparkles.webp" alt="Sparkles" width="16" height="16" /></td>
-  </tr>
-  <tr>
-    <td align="center">
-      <a href='https://ko-fi.com/Axenide' target='_blank'>
-        <img style='border:0px;height:128px;'
-             src='https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3N4NzlvZWs2Z2tsaGx4aHgwa3UzMWVpcmNwZTNraTM2NW84ZDlqbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/PaF9a1MpqDzovyqVKj/giphy.gif'
-             border='0' alt='Support me on Ko-fi!' />
-      </a>
-    </td>
-  </tr>
-</table>
+> Original project by [Axenide](https://github.com/Axenide). Consider supporting the original author on [Ko-fi](https://ko-fi.com/Axenide)!
