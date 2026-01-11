@@ -5,7 +5,7 @@ set -u
 set -o pipefail
 
 REPO_URL="https://github.com/awareness10/Aw-Shell.git"
-INSTALL_DIR="$HOME/.config/Aw-Shell"
+INSTALL_DIR="$HOME/.config/aw-shell"
 PACKAGES=(
   awww-git
   brightnessctl

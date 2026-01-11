@@ -7,7 +7,7 @@ from .data import (
 
 SOURCE_STRING = f"""
 # {APP_NAME_CAP}
-source = ~/.config/{APP_NAME_CAP}/config/hypr/{APP_NAME}.conf
+source = ~/.config/{APP_NAME}/config/hypr/{APP_NAME}.conf
 """
 
 DEFAULTS = {

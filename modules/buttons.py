@@ -407,7 +407,7 @@ class CaffeineButton(Button):
             GLib.idle_add(self.caffeine_status.set_label, "Disabled")
             GLib.idle_add(self._add_disabled_style)
         except subprocess.CalledProcessError:
-            exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME_CAP}/scripts/inhibit.py")
+            exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/scripts/inhibit.py")
             GLib.idle_add(self.caffeine_status.set_label, "Enabled")
             GLib.idle_add(self._remove_disabled_style)
 

@@ -1,4 +1,4 @@
 """
-Ax-Shell modules package.
+Aw-Shell modules package.
 Contains UI components and functionality modules.
 """

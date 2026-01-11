@@ -1,4 +1,4 @@
 """
-Ax-Shell utilities package.
+Aw-Shell utilities package.
 Contains helper functions and utility classes.
 """

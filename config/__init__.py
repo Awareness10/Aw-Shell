@@ -1,5 +1,5 @@
 """
-Ax-Shell configuration package.
+Aw-Shell configuration package.
 """
 # Import only specific names actually defined in data.py
 # This prevents circular imports by not importing everything

@@ -81,12 +81,12 @@ def ensure_matugen_config():
         },
         "templates": {
             "hyprland": {
-                "input_path": f"~/.config/{APP_NAME_CAP}/config/matugen/templates/hyprland-colors.conf",
-                "output_path": f"~/.config/{APP_NAME_CAP}/config/hypr/colors.conf",
+                "input_path": f"~/.config/{APP_NAME}/config/matugen/templates/hyprland-colors.conf",
+                "output_path": f"~/.config/{APP_NAME}/config/hypr/colors.conf",
             },
             f"{APP_NAME}": {
-                "input_path": f"~/.config/{APP_NAME_CAP}/config/matugen/templates/{APP_NAME}.css",
-                "output_path": f"~/.config/{APP_NAME_CAP}/styles/colors.css",
+                "input_path": f"~/.config/{APP_NAME}/config/matugen/templates/{APP_NAME}.css",
+                "output_path": f"~/.config/{APP_NAME}/styles/colors.css",
                 "post_hook": f"fabric-cli exec {APP_NAME} 'app.set_css()' &",
             },
         },
@@ -129,9 +129,9 @@ def ensure_matugen_config():
 
     current_wall = os.path.expanduser("~/.current.wall")
     hypr_colors = os.path.expanduser(
-        f"~/.config/{APP_NAME_CAP}/config/hypr/colors.conf"
+        f"~/.config/{APP_NAME}/config/hypr/colors.conf"
     )
-    css_colors = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/styles/colors.css")
+    css_colors = os.path.expanduser(f"~/.config/{APP_NAME}/styles/colors.css")
 
     if (
         not os.path.exists(current_wall)
@@ -144,7 +144,7 @@ def ensure_matugen_config():
         image_path = ""
         if not os.path.exists(current_wall):
             example_wallpaper_path = os.path.expanduser(
-                f"~/.config/{APP_NAME_CAP}/assets/wallpapers_example/example-1.jpg"
+                f"~/.config/{APP_NAME}/assets/wallpapers_example/example-1.jpg"
             )
             if os.path.exists(example_wallpaper_path):
                 try:
@@ -198,7 +198,7 @@ def load_bind_vars():
         settings_constants.DEFAULTS.copy()
     )  # Usar .copy() para no modificar DEFAULTS accidentalmente
 
-    config_json = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/config.json")
+    config_json = os.path.expanduser(f"~/.config/{APP_NAME}/config/config.json")
     if os.path.exists(config_json):
         try:
             with open(config_json, "r") as f:
@@ -248,16 +248,16 @@ def generate_hyprconf() -> str:
     is_vertical = bar_position in ["Left", "Right"]
     animation_type = "slidefadevert" if is_vertical else "slidefade"
 
-    return f"""exec-once = uwsm-app $(python {home}/.config/{APP_NAME_CAP}/main.py)
+    return f"""exec-once = uwsm-app $(python {home}/.config/{APP_NAME}/main.py)
 exec = pgrep -x "hypridle" > /dev/null || uwsm app -- hypridle
 exec = uwsm app -- awww-daemon
 exec-once =  wl-paste --type text --watch cliphist store
 exec-once =  wl-paste --type image --watch cliphist store
 
 $fabricSend = fabric-cli exec {APP_NAME}
-$axMessage = notify-send "Axenide" "FIRE IN THE HOLE‼️🗣️🔥🕳️" -i "{home}/.config/{APP_NAME_CAP}/assets/ax.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
+$axMessage = notify-send "Axenide" "FIRE IN THE HOLE‼️🗣️🔥🕳️" -i "{home}/.config/{APP_NAME}/assets/ax.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
 
-bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $(python {home}/.config/{APP_NAME_CAP}/main.py) # Reload {APP_NAME_CAP}
+bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $(python {home}/.config/{APP_NAME}/main.py) # Reload {APP_NAME_CAP}
 bind = {get_bind_var("prefix_axmsg")}, {get_bind_var("suffix_axmsg")}, exec, $axMessage # Message
 bind = {get_bind_var("prefix_dash")}, {get_bind_var("suffix_dash")}, exec, $fabricSend 'notch.open_notch("dashboard")' # Dashboard
 bind = {get_bind_var("prefix_bluetooth")}, {get_bind_var("suffix_bluetooth")}, exec, $fabricSend 'notch.open_notch("bluetooth")' # Bluetooth
@@ -276,11 +276,11 @@ bind = {get_bind_var("prefix_power")}, {get_bind_var("suffix_power")}, exec, $fa
 bind = {get_bind_var("prefix_caffeine")}, {get_bind_var("suffix_caffeine")}, exec, $fabricSend 'notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit(external=True)' # Toggle Caffeine
 bind = {get_bind_var("prefix_toggle")}, {get_bind_var("suffix_toggle")}, exec, $fabricSend 'from utils.global_keybinds import get_global_keybind_handler; get_global_keybind_handler().toggle_bar()' # Toggle Bar
 bind = {get_bind_var("prefix_css")}, {get_bind_var("suffix_css")}, exec, $fabricSend 'app.set_css()' # Reload CSS
-bind = {get_bind_var("prefix_restart_inspector")}, {get_bind_var("suffix_restart_inspector")}, exec, killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive python {home}/.config/{APP_NAME_CAP}/main.py) # Restart with inspector
+bind = {get_bind_var("prefix_restart_inspector")}, {get_bind_var("suffix_restart_inspector")}, exec, killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive python {home}/.config/{APP_NAME}/main.py) # Restart with inspector
 
 # Wallpapers directory: {get_bind_var("wallpapers_dir")}
 
-source = {home}/.config/{APP_NAME_CAP}/config/hypr/colors.conf
+source = {home}/.config/{APP_NAME}/config/hypr/colors.conf
 
 layerrulev3 = animation 0, namespace:fabric
 
@@ -334,7 +334,7 @@ def ensure_face_icon():
     """
     face_icon_path = os.path.expanduser("~/.face.icon")
     default_icon_path = os.path.expanduser(
-        f"~/.config/{APP_NAME_CAP}/assets/default.png"
+        f"~/.config/{APP_NAME}/assets/default.png"
     )
     if not os.path.exists(face_icon_path) and os.path.exists(default_icon_path):
         try:
@@ -373,7 +373,7 @@ def start_config():
     ensure_face_icon()
     print(f"{time.time():.4f}: start_config: Generating hypr conf...")
 
-    hypr_config_dir = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/hypr/")
+    hypr_config_dir = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/")
     os.makedirs(hypr_config_dir, exist_ok=True)
     # Usar APP_NAME para el nombre del archivo .conf para que coincida con SOURCE_STRING corregido
     hypr_conf_path = os.path.join(hypr_config_dir, f"{APP_NAME}.conf")

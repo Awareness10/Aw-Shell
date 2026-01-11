@@ -29,7 +29,7 @@ class Signal:
 
 class MonitorManager:
     """
-    Centralized monitor management for Ax-Shell multi-monitor support.
+    Centralized monitor management for Aw-Shell multi-monitor support.
     
     Manages monitor detection, workspace paging, notch states, and component instances.
     """

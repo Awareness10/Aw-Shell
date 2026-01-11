@@ -9,7 +9,7 @@ if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
 fi
 
 rm -rf ~/.cache/aw-shell
-rm -rf ~/.config/Aw-Shell
+rm -rf ~/.config/aw-shell
 
 conf_file=~/.config/hypr/hyprland.conf
 tmp_file=$(mktemp)
@@ -21,7 +21,7 @@ BEGIN { found_comment=0 }
         found_comment=1
         next
     }
-    if (found_comment && $0 ~ /source[[:space:]]*=[[:space:]]*~\/\.config\/Aw-Shell\/config\/hypr\/aw-shell\.conf/) {
+    if (found_comment && $0 ~ /source[[:space:]]*=[[:space:]]*~\/\.config\/aw-shell\/config\/hypr\/aw-shell\.conf/) {
         found_comment=0
         next
     }

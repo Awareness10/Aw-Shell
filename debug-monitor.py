@@ -7,12 +7,12 @@ import sys
 import os
 import json
 
-sys.path.insert(0, os.path.expanduser('~/.config/Ax-Shell'))
+sys.path.insert(0, os.path.expanduser('~/.config/aw-shell'))
 
 from utils.monitor_manager import get_monitor_manager
 
 # Load config
-config_file = os.path.expanduser('~/.config/Ax-Shell/config/config.json')
+config_file = os.path.expanduser('~/.config/aw-shell/config/config.json')
 with open(config_file) as f:
     config = json.load(f)
 

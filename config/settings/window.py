@@ -255,7 +255,7 @@ class HyprConfGUI(Window):
             settings_utils.bind_vars.clear()
             settings_utils.bind_vars.update(current_settings)
 
-            config_json = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/config.json")
+            config_json = os.path.expanduser(f"~/.config/{APP_NAME}/config/config.json")
             os.makedirs(os.path.dirname(config_json), exist_ok=True)
             try:
                 with open(config_json, "w") as f:
@@ -277,13 +277,13 @@ class HyprConfGUI(Window):
                     print(f"Error processing face icon: {e}")
 
             if replace_lock:
-                src = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/hypr/hyprlock.conf")
+                src = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf")
                 dest = os.path.expanduser("~/.config/hypr/hyprlock.conf")
                 if os.path.exists(src):
                     backup_and_replace(src, dest, "Hyprlock")
 
             if replace_idle:
-                src = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/hypr/hypridle.conf")
+                src = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf")
                 dest = os.path.expanduser("~/.config/hypr/hypridle.conf")
                 if os.path.exists(src):
                     backup_and_replace(src, dest, "Hypridle")
@@ -309,7 +309,7 @@ class HyprConfGUI(Window):
 
             start_config()
 
-            main_py = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/main.py")
+            main_py = os.path.expanduser(f"~/.config/{APP_NAME}/main.py")
             try:
                 kill_proc = subprocess.Popen(
                     f"killall {APP_NAME}",

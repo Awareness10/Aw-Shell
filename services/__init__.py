@@ -1,4 +1,4 @@
 """
-Ax-Shell services package.
+Aw-Shell services package.
 Contains background services and utilities for the shell.
 """

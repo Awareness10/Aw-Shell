@@ -40,7 +40,7 @@ def open_config():
 
     show_lock_checkbox = True
     dest_lock = os.path.expanduser("~/.config/hypr/hyprlock.conf")
-    src_lock = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/hypr/hyprlock.conf")
+    src_lock = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf")
     if not os.path.exists(dest_lock) and os.path.exists(src_lock):
         try:
             os.makedirs(os.path.dirname(dest_lock), exist_ok=True)
@@ -53,7 +53,7 @@ def open_config():
 
     show_idle_checkbox = True
     dest_idle = os.path.expanduser("~/.config/hypr/hypridle.conf")
-    src_idle = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/config/hypr/hypridle.conf")
+    src_idle = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf")
     if not os.path.exists(dest_idle) and os.path.exists(src_idle):
         try:
             os.makedirs(os.path.dirname(dest_idle), exist_ok=True)
