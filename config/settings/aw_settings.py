@@ -1041,7 +1041,6 @@ class AwShellSettings(FramelessMainWindow):
         self._on_ws_num_changed(Qt.CheckState.Checked.value if self.ws_num_cb.isChecked() else Qt.CheckState.Unchecked.value)
         self._on_panel_theme_changed(self.panel_theme_combo.currentText())
 
-
 def main():
     app = QApplication(sys.argv)
     win = AwShellSettings()

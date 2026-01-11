@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-
+from PySide6.QtWidgets import QApplication
 
 def _configure_sys_path_for_direct_execution():
     """
@@ -20,15 +20,15 @@ _configure_sys_path_for_direct_execution()
 
 import shutil
 
-from fabric import Application
+#from fabric import Application
 
 if __name__ == "__main__" and not __package__:
     from config.data import APP_NAME, APP_NAME_CAP
-    from config.settings_gui import HyprConfGUI
+    from config.settings_gui import AwShellSettings # AwShellSettings
     from config.settings_utils import load_bind_vars
 else:
     from .data import APP_NAME, APP_NAME_CAP
-    from .settings_gui import HyprConfGUI
+    from .settings_gui import AwShellSettings
     from .settings_utils import load_bind_vars
 
 
@@ -64,17 +64,12 @@ def open_config():
             print(f"Error copying default hypridle config: {e}")
             show_idle_checkbox = os.path.exists(src_idle)
 
-    app = Application(f"{APP_NAME}-settings")
-    window = HyprConfGUI(
-        show_lock_checkbox=show_lock_checkbox,
-        show_idle_checkbox=show_idle_checkbox,
-        application=app,
-        on_destroy=lambda *_: app.quit()
-    )
-    app.add_window(window)
+    app = QApplication(sys.argv)
+    win = AwShellSettings()
+    win.show()
+    sys.exit(app.exec())
 
-    window.show_all()
-    app.run()
+    
 
 
 if __name__ == "__main__":
