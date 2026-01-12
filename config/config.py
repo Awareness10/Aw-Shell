@@ -3,6 +3,32 @@ import sys
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
+import pyqt_theme
+from pyqt_theme import generate_theme
+
+
+def _init_theme_from_wallpaper():
+    """Initialize pyqt_theme from current wallpaper using matugen."""
+    wallpaper_path = os.path.expanduser("~/.current.wall")
+
+    if os.path.exists(wallpaper_path):
+        # Resolve symlink to get actual path
+        real_path = os.path.realpath(wallpaper_path)
+        if os.path.exists(real_path):
+            try:
+                new_theme, backend = generate_theme(image_path=real_path)
+                # Must update both: package namespace AND theme module's global
+                # (get_current_theme() reads from theme module's globals)
+                pyqt_theme.theme = new_theme
+                # Access the actual module via sys.modules to set its global
+                sys.modules['pyqt_theme.theme'].theme = new_theme
+                print(f"Loaded theme from wallpaper using {backend}")
+            except Exception as e:
+                print(f"Warning: Could not generate theme from wallpaper: {e}")
+    else:
+        print("Warning: No wallpaper found at ~/.current.wall, using default theme")
+
+
 def _configure_sys_path_for_direct_execution():
     """
     Ajusta sys.path si este script se ejecuta directamente,
@@ -37,6 +63,7 @@ def open_config():
     Entry point for opening the configuration GUI using Fabric Application.
     """
     load_bind_vars()
+    _init_theme_from_wallpaper()
 
     show_lock_checkbox = True
     dest_lock = os.path.expanduser("~/.config/hypr/hyprlock.conf")
