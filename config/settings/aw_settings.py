@@ -57,27 +57,43 @@ COMPONENT_DISPLAY_NAMES = {
     "button_power": "Power Button",
 }
 
+# Keybindings organized by category: (section_name, [(label, prefix_key, suffix_key), ...])
+KEYBIND_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
+    ("Shell Controls", [
+        (f"Reload {APP_NAME_CAP}", "prefix_restart", "suffix_restart"),
+        ("Reload CSS", "prefix_css", "suffix_css"),
+        ("Restart with Inspector", "prefix_restart_inspector", "suffix_restart_inspector"),
+        ("Toggle Bar", "prefix_toggle", "suffix_toggle"),
+        ("Toggle Caffeine", "prefix_caffeine", "suffix_caffeine"),
+    ]),
+    ("Panels & Widgets", [
+        ("Dashboard", "prefix_dash", "suffix_dash"),
+        ("Toolbox", "prefix_toolbox", "suffix_toolbox"),
+        ("Overview", "prefix_overview", "suffix_overview"),
+        ("Power Menu", "prefix_power", "suffix_power"),
+        ("Clipboard History", "prefix_cliphist", "suffix_cliphist"),
+        ("Message", "prefix_axmsg", "suffix_axmsg"),
+    ]),
+    ("Applications", [
+        ("App Launcher", "prefix_launcher", "suffix_launcher"),
+        ("Tmux", "prefix_tmux", "suffix_tmux"),
+        ("Audio Mixer", "prefix_mixer", "suffix_mixer"),
+        ("Emoji Picker", "prefix_emoji", "suffix_emoji"),
+    ]),
+    ("Wallpapers", [
+        ("Wallpapers", "prefix_wallpapers", "suffix_wallpapers"),
+        ("Random Wallpaper", "prefix_randwall", "suffix_randwall"),
+    ]),
+    ("Extras", [
+        ("Bluetooth", "prefix_bluetooth", "suffix_bluetooth"),
+        ("Pins", "prefix_pins", "suffix_pins"),
+        ("Kanban", "prefix_kanban", "suffix_kanban"),
+    ]),
+]
+
+# Flat list for backwards compatibility
 KEYBIND_DEFINITIONS: List[Tuple[str, str, str]] = [
-    (f"Reload {APP_NAME_CAP}", "prefix_restart", "suffix_restart"),
-    ("Message", "prefix_axmsg", "suffix_axmsg"),
-    ("Dashboard", "prefix_dash", "suffix_dash"),
-    ("Bluetooth", "prefix_bluetooth", "suffix_bluetooth"),
-    ("Pins", "prefix_pins", "suffix_pins"),
-    ("Kanban", "prefix_kanban", "suffix_kanban"),
-    ("App Launcher", "prefix_launcher", "suffix_launcher"),
-    ("Tmux", "prefix_tmux", "suffix_tmux"),
-    ("Clipboard History", "prefix_cliphist", "suffix_cliphist"),
-    ("Toolbox", "prefix_toolbox", "suffix_toolbox"),
-    ("Overview", "prefix_overview", "suffix_overview"),
-    ("Wallpapers", "prefix_wallpapers", "suffix_wallpapers"),
-    ("Random Wallpaper", "prefix_randwall", "suffix_randwall"),
-    ("Audio Mixer", "prefix_mixer", "suffix_mixer"),
-    ("Emoji Picker", "prefix_emoji", "suffix_emoji"),
-    ("Power Menu", "prefix_power", "suffix_power"),
-    ("Toggle Caffeine", "prefix_caffeine", "suffix_caffeine"),
-    ("Toggle Bar", "prefix_toggle", "suffix_toggle"),
-    ("Reload CSS", "prefix_css", "suffix_css"),
-    ("Restart with inspector", "prefix_restart_inspector", "suffix_restart_inspector"),
+    item for _, items in KEYBIND_SECTIONS for item in items
 ]
 
 
@@ -243,51 +259,88 @@ class AwShellSettings(FramelessMainWindow):
     def _build_keybindings_tab(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.setSpacing(16)
+        layout.setSpacing(12)
         layout.setContentsMargins(15, 15, 15, 15)
 
-        # Grid for keybindings
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(8)
+        # Build each section
+        for section_idx, (section_name, keybinds) in enumerate(KEYBIND_SECTIONS):
+            # Section header
+            header = QLabel(f"<b>{section_name}</b>")
+            header.setTextFormat(Qt.TextFormat.RichText)
+            layout.addWidget(header)
 
-        # Headers
-        headers = ["Action", "Modifier", "+", "Key"]
-        for col, text in enumerate(headers):
-            lbl = QLabel(f"<b>{text}</b>")
-            lbl.setTextFormat(Qt.TextFormat.RichText)
-            grid.addWidget(lbl, 0, col)
+            # Keybinding rows for this section
+            for label_text, prefix_key, suffix_key in keybinds:
+                row_widget = self._create_keybind_row(label_text, prefix_key, suffix_key)
+                layout.addWidget(row_widget)
 
-        # Keybinding rows
-        for row, (label_text, prefix_key, suffix_key) in enumerate(KEYBIND_DEFINITIONS, start=1):
-            # Action label
-            action_lbl = QLabel(label_text)
-            grid.addWidget(action_lbl, row, 0)
+            # Add separator between sections (except after last)
+            if section_idx < len(KEYBIND_SECTIONS) - 1:
+                layout.addSpacing(8)
+                self._add_separator(layout)
+                layout.addSpacing(4)
 
-            # Modifier entry
-            prefix_entry = QLineEdit()
-            prefix_entry.setText(str(self.bridge.get(prefix_key, "")))
-            prefix_entry.setPlaceholderText("SUPER ...")
-            prefix_entry.setMaximumWidth(180)
-            grid.addWidget(prefix_entry, row, 1)
-
-            # Plus sign
-            plus_lbl = QLabel("+")
-            plus_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            grid.addWidget(plus_lbl, row, 2)
-
-            # Key entry
-            suffix_entry = QLineEdit()
-            suffix_entry.setText(str(self.bridge.get(suffix_key, "")))
-            suffix_entry.setPlaceholderText("Key")
-            suffix_entry.setMaximumWidth(100)
-            grid.addWidget(suffix_entry, row, 3)
-
-            self.keybind_entries.append((prefix_key, suffix_key, prefix_entry, suffix_entry))
-
-        layout.addLayout(grid)
         layout.addStretch()
         return w
+
+    def _create_keybind_row(self, label_text: str, prefix_key: str, suffix_key: str) -> QWidget:
+        """Create a styled keybinding row with action label and key inputs."""
+        row = QFrame()
+        row.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.03);
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QFrame:hover {
+                background-color: rgba(255, 255, 255, 0.06);
+            }
+        """)
+
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(12, 8, 12, 8)
+        row_layout.setSpacing(12)
+
+        # Action label (left side)
+        action_lbl = QLabel(label_text)
+        action_lbl.setMinimumWidth(140)
+        row_layout.addWidget(action_lbl)
+
+        row_layout.addStretch()
+
+        # Keybind input group (right side)
+        input_group = QHBoxLayout()
+        input_group.setSpacing(6)
+
+        # Modifier entry
+        prefix_entry = QLineEdit()
+        prefix_entry.setText(str(self.bridge.get(prefix_key, "")))
+        prefix_entry.setPlaceholderText("SUPER")
+        prefix_entry.setFixedWidth(120)
+        prefix_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        input_group.addWidget(prefix_entry)
+
+        # Plus sign styled as a subtle connector
+        plus_lbl = QLabel("+")
+        plus_lbl.setStyleSheet("color: rgba(255, 255, 255, 0.4); font-weight: bold;")
+        plus_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        plus_lbl.setFixedWidth(20)
+        input_group.addWidget(plus_lbl)
+
+        # Key entry
+        suffix_entry = QLineEdit()
+        suffix_entry.setText(str(self.bridge.get(suffix_key, "")))
+        suffix_entry.setPlaceholderText("Key")
+        suffix_entry.setFixedWidth(80)
+        suffix_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        input_group.addWidget(suffix_entry)
+
+        row_layout.addLayout(input_group)
+
+        # Store references for saving
+        self.keybind_entries.append((prefix_key, suffix_key, prefix_entry, suffix_entry))
+
+        return row
 
     # =========================================================================
     # APPEARANCE TAB

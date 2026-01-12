@@ -96,13 +96,14 @@ class MonitorManager:
     def refresh_monitors(self) -> List[Dict]:
         """
         Detect monitors using Hyprland API for accurate info, with GTK for scale detection.
-        Monitors are sorted by X position (left to right) for consistent workspace assignment.
-        
+        Monitors are sorted by distance from origin (0,0), so the primary monitor
+        (typically at 0,0) gets ID 0 and workspaces 1-10.
+
         Returns:
             List of monitor dictionaries with id, name, width, height, x, y, scale
         """
         self._monitors = []
-        
+
         try:
             # Try Hyprland first for primary info (more accurate)
             result = subprocess.run(
@@ -112,19 +113,25 @@ class MonitorManager:
                 check=True
             )
             hypr_monitors = json.loads(result.stdout)
-            
-            # Sort monitors by X position (left to right) for logical workspace assignment
-            sorted_monitors = sorted(hypr_monitors, key=lambda m: m.get('x', 0))
-            
+
+            # Sort monitors by distance from origin (0,0)
+            # This ensures the primary monitor (usually at 0,0) gets ID 0 and workspaces 1-10
+            def distance_from_origin(m):
+                x, y = m.get('x', 0), m.get('y', 0)
+                return x * x + y * y  # Squared distance (no need for sqrt)
+
+            sorted_monitors = sorted(hypr_monitors, key=distance_from_origin)
+
             for i, monitor in enumerate(sorted_monitors):
                 monitor_name = monitor.get('name', f'monitor-{i}')
-                
+
                 # Get scale directly from Hyprland (more reliable)
                 hypr_scale = monitor.get('scale', 1.0)
-                
+
                 self._monitors.append({
-                    'id': i,  # Logical ID based on position (left to right)
+                    'id': i,  # Logical ID: 0 for primary (nearest origin), then outward
                     'name': monitor_name,
+                    'hypr_id': monitor.get('id', i),  # Keep original Hyprland ID
                     'width': monitor.get('width', 1920),
                     'height': monitor.get('height', 1080),
                     'x': monitor.get('x', 0),
@@ -132,7 +139,7 @@ class MonitorManager:
                     'focused': monitor.get('focused', False),
                     'scale': hypr_scale
                 })
-                
+
                 # Initialize states for new monitors
                 if i not in self._notch_states:
                     self._notch_states[i] = False
@@ -215,31 +222,45 @@ class MonitorManager:
     
     def get_workspace_range_for_monitor(self, monitor_id: int) -> Tuple[int, int]:
         """
-        Get workspace range for a monitor (10 workspaces per monitor).
-        
+        Get workspace range for a monitor.
+        All monitors share workspaces 1-10 (Hyprland handles assignment).
+
         Args:
-            monitor_id: Monitor ID
-            
+            monitor_id: Monitor ID (unused, kept for API compatibility)
+
         Returns:
-            Tuple of (start_workspace, end_workspace)
+            Tuple of (start_workspace, end_workspace) - always (1, 10)
         """
-        start = (monitor_id * 10) + 1
-        end = start + 9
-        return (start, end)
-    
-    def get_monitor_for_workspace(self, workspace_id: int) -> int:
+        return (1, 10)
+
+    def get_monitor_for_workspace(self, workspace_id: int) -> Optional[int]:
         """
-        Get monitor ID for a workspace.
-        
+        Get monitor ID for a workspace by querying Hyprland.
+
         Args:
             workspace_id: Workspace number
-            
+
         Returns:
-            Monitor ID
+            Monitor ID where the workspace is, or None if not found
         """
-        if workspace_id <= 0:
-            return 0
-        return (workspace_id - 1) // 10
+        try:
+            result = subprocess.run(
+                ["hyprctl", "workspaces", "-j"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            workspaces = json.loads(result.stdout)
+            for ws in workspaces:
+                if ws.get('id') == workspace_id:
+                    # Find our monitor by name
+                    ws_monitor = ws.get('monitor', '')
+                    for m in self._monitors:
+                        if m.get('name') == ws_monitor:
+                            return m.get('id')
+            return None
+        except Exception:
+            return None
     
     def get_monitor_scale(self, monitor_id: int) -> float:
         """

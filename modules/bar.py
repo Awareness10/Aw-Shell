@@ -99,11 +99,9 @@ class Bar(Window):
         self.dock_instance = None
         self.integrated_dock_widget = None
 
-        # Calculate workspace range based on monitor_id
-        # Monitor 0: workspaces 1-10, Monitor 1: workspaces 11-20, etc.
-        start_workspace = self.monitor_id * 10 + 1
-        end_workspace = start_workspace + 10
-        workspace_range = range(start_workspace, end_workspace)
+        # Use workspaces 1-10 for all monitors (shared workspace model)
+        # Hyprland handles which workspace is active on which monitor
+        workspace_range = range(1, 11)
 
         self.workspaces = Workspaces(
             name="workspaces",
@@ -146,9 +144,9 @@ class Bar(Window):
                     v_align="center",
                     id=i,
                     label=(
-                        CHINESE_NUMERALS[(i - start_workspace)]
+                        CHINESE_NUMERALS[i - 1]
                         if data.BAR_WORKSPACE_USE_CHINESE_NUMERALS
-                        and 0 <= (i - start_workspace) < len(CHINESE_NUMERALS)
+                        and 0 <= (i - 1) < len(CHINESE_NUMERALS)
                         else str(i)
                     ),
                 )
