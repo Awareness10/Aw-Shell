@@ -11,15 +11,14 @@ Desktop shell configuration panel with:
 import os
 import sys
 import webbrowser
-from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame,
+    QApplication, QCheckBox, QFileDialog, QFrame,
     QGraphicsDropShadowEffect, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea,
-    QSizePolicy, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
+    QSizePolicy, QSlider, QTabWidget, QVBoxLayout, QWidget
 )
 from PySide6.QtGui import QColor, QPixmap
 
@@ -29,7 +28,6 @@ from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow
 from config.settings_bridge import get_bridge
 
 from config.settings_utils import APP_NAME, APP_NAME_CAP
-from config.settings_constants import DEFAULTS
 
 # get_bridge,
 # Constants matching the original GTK implementation

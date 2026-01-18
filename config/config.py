@@ -1,8 +1,10 @@
 import os
 import sys
+import shutil
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
+#from fabric import Application
 import pyqt_theme
 from pyqt_theme import generate_theme
 
@@ -44,16 +46,12 @@ def _configure_sys_path_for_direct_execution():
 
 _configure_sys_path_for_direct_execution()
 
-import shutil
-
-#from fabric import Application
-
 if __name__ == "__main__" and not __package__:
-    from config.data import APP_NAME, APP_NAME_CAP
+    from config.data import APP_NAME
     from config.settings_gui import AwShellSettings # AwShellSettings
     from config.settings_utils import load_bind_vars
 else:
-    from .data import APP_NAME, APP_NAME_CAP
+    from .data import APP_NAME
     from .settings_gui import AwShellSettings
     from .settings_utils import load_bind_vars
 
@@ -65,31 +63,31 @@ def open_config():
     load_bind_vars()
     _init_theme_from_wallpaper()
 
-    show_lock_checkbox = True
+    #show_lock_checkbox = True
     dest_lock = os.path.expanduser("~/.config/hypr/hyprlock.conf")
     src_lock = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf")
     if not os.path.exists(dest_lock) and os.path.exists(src_lock):
         try:
             os.makedirs(os.path.dirname(dest_lock), exist_ok=True)
             shutil.copy(src_lock, dest_lock)
-            show_lock_checkbox = False 
+            #show_lock_checkbox = False 
             print(f"Copied default hyprlock config to {dest_lock}")
         except Exception as e:
             print(f"Error copying default hyprlock config: {e}")
-            show_lock_checkbox = os.path.exists(src_lock)
+            #show_lock_checkbox = os.path.exists(src_lock)
 
-    show_idle_checkbox = True
+    #show_idle_checkbox = True
     dest_idle = os.path.expanduser("~/.config/hypr/hypridle.conf")
     src_idle = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf")
     if not os.path.exists(dest_idle) and os.path.exists(src_idle):
         try:
             os.makedirs(os.path.dirname(dest_idle), exist_ok=True)
             shutil.copy(src_idle, dest_idle)
-            show_idle_checkbox = False
+            #show_idle_checkbox = False
             print(f"Copied default hypridle config to {dest_idle}")
         except Exception as e:
             print(f"Error copying default hypridle config: {e}")
-            show_idle_checkbox = os.path.exists(src_idle)
+            #show_idle_checkbox = os.path.exists(src_idle)
 
     app = QApplication(sys.argv)
     win = AwShellSettings()
