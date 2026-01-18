@@ -21,7 +21,7 @@ def _init_theme_from_wallpaper():
                 # (get_current_theme() reads from theme module's globals)
                 pyqt_theme.theme = new_theme
                 # Access the actual module via sys.modules to set its global
-                sys.modules['pyqt_theme.theme'].theme = new_theme
+                sys.modules['pyqt_theme.theme'].theme = new_theme # type: ignore
                 print(f"Loaded theme from wallpaper using {backend}")
             except Exception as e:
                 print(f"Warning: Could not generate theme from wallpaper: {e}")

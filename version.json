@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "pkg_update": false,
   "changelog": [
     "<b>refactor:</b> Major codebase refactoring for maintainability",
