@@ -316,7 +316,7 @@ class AwShellSettings(FramelessMainWindow):
         prefix_entry = QLineEdit()
         prefix_entry.setText(str(self.bridge.get(prefix_key, "")))
         prefix_entry.setPlaceholderText("SUPER")
-        prefix_entry.setFixedWidth(120)
+        prefix_entry.setFixedWidth(160)
         prefix_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
         input_group.addWidget(prefix_entry)
 
@@ -388,6 +388,7 @@ class AwShellSettings(FramelessMainWindow):
         grid.addWidget(QLabel("Directory:"), 0, 0)
 
         dir_row = QHBoxLayout()
+        dir_row.setSpacing(10)
         self.wall_dir_entry = QLineEdit()
         self.wall_dir_entry.setText(str(self.bridge.get("wallpapers_dir", "")))
         self.wall_dir_entry.setMinimumWidth(250)
@@ -403,6 +404,7 @@ class AwShellSettings(FramelessMainWindow):
         grid.addWidget(QLabel("Profile Icon:"), 1, 0)
 
         icon_row = QHBoxLayout()
+        icon_row.setSpacing(10)
         self.face_image = QLabel()
         self.face_image.setFixedSize(64, 64)
         self.face_image.setStyleSheet("border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;")
