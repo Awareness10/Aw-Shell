@@ -8,6 +8,7 @@ Provides integration with Aw-Shell's settings_utils module.
 import json
 import os
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -265,8 +266,6 @@ animations {{
 
     def apply_and_restart(self, replace_lock: bool = False, replace_idle: bool = False) -> None:
         """Save settings, generate hyprconf, and restart Aw-Shell."""
-        import shutil
-
         self.save()
 
         # Generate hyprconf
@@ -345,7 +344,6 @@ animations {{
 
     def _backup_and_replace(self, src: str, dest: str, config_name: str) -> None:
         """Backup existing config and replace with new one."""
-        import shutil
         try:
             if os.path.exists(dest):
                 backup_path = dest + ".bak"
