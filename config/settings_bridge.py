@@ -200,7 +200,7 @@ exec-once =  wl-paste --type text --watch cliphist store
 exec-once =  wl-paste --type image --watch cliphist store
 
 $fabricSend = fabric-cli exec {APP_NAME}
-$axMessage = notify-send "{USER}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{home}/.config/{APP_NAME}/assets/ax.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
+$axMessage = notify-send "{USER}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{home}/.config/{APP_NAME}/assets/tanjiro-kamado-red.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
 
 bind = {self.get("prefix_restart")}, {self.get("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $(python {home}/.config/{APP_NAME}/main.py) # Reload {APP_NAME_CAP}
 bind = {self.get("prefix_axmsg")}, {self.get("suffix_axmsg")}, exec, $axMessage # Message
