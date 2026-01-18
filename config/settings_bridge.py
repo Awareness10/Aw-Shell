@@ -114,7 +114,9 @@ class SettingsBridge:
     """Bridge to Aw-Shell's config.json settings storage."""
 
     def __init__(self):
-        self.config_path = os.path.expanduser(f"~/.config/{APP_NAME}/config/config.json")
+        self.config_path = os.path.expanduser(
+            f"~/.config/{APP_NAME}/config/config.json"
+        )
         self._settings: Dict[str, Any] = {}
         self.load()
 
@@ -143,7 +145,11 @@ class SettingsBridge:
     def _deep_update(self, target: dict, update: dict) -> dict:
         """Recursively update nested dictionaries."""
         for key, value in update.items():
-            if isinstance(value, dict) and key in target and isinstance(target[key], dict):
+            if (
+                isinstance(value, dict)
+                and key in target
+                and isinstance(target[key], dict)
+            ):
                 self._deep_update(target[key], value)
             else:
                 target[key] = value
@@ -160,7 +166,9 @@ class SettingsBridge:
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a setting value."""
-        return self._settings.get(key, default if default is not None else DEFAULTS.get(key))
+        return self._settings.get(
+            key, default if default is not None else DEFAULTS.get(key)
+        )
 
     def set(self, key: str, value: Any) -> None:
         """Set a setting value."""
@@ -264,7 +272,9 @@ animations {{
 }}
 """
 
-    def apply_and_restart(self, replace_lock: bool = False, replace_idle: bool = False) -> None:
+    def apply_and_restart(
+        self, replace_lock: bool = False, replace_idle: bool = False
+    ) -> None:
         """Save settings, generate hyprconf, and restart Aw-Shell."""
         self.save()
 
@@ -359,14 +369,19 @@ animations {{
         """Get list of available monitors."""
         try:
             result = subprocess.run(
-                ["hyprctl", "monitors", "-j"],
-                capture_output=True,
-                text=True
+                ["hyprctl", "monitors", "-j"], capture_output=True, text=True
             )
             if result.returncode == 0:
                 import json
+
                 monitors = json.loads(result.stdout)
-                return [{"id": m.get("id", 0), "name": m.get("name", f"monitor-{m.get('id', 0)}")} for m in monitors]
+                return [
+                    {
+                        "id": m.get("id", 0),
+                        "name": m.get("name", f"monitor-{m.get('id', 0)}"),
+                    }
+                    for m in monitors
+                ]
         except Exception as e:
             print(f"Error getting monitors: {e}")
 
@@ -375,6 +390,7 @@ animations {{
 
 # Global instance
 _bridge: Optional[SettingsBridge] = None
+
 
 def get_bridge() -> SettingsBridge:
     """Get the global settings bridge instance."""
