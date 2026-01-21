@@ -10,14 +10,14 @@ import os
 import subprocess
 import shutil
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 APP_NAME = "aw-shell"
 APP_NAME_CAP = "Aw-Shell"
 HOME_DIR = str(Path.home())
 USER = os.environ.get("USER")
 
-DEFAULTS = {
+DEFAULTS: dict[str, Any] = {
     "prefix_restart": "SUPER ALT",
     "suffix_restart": "B",
     "prefix_axmsg": "SUPER",
@@ -117,7 +117,7 @@ class SettingsBridge:
         self.config_path = os.path.expanduser(
             f"~/.config/{APP_NAME}/config/config.json"
         )
-        self._settings: Dict[str, Any] = {}
+        self._settings: dict[str, Any] = {}
         self.load()
 
     def load(self) -> None:
@@ -174,11 +174,11 @@ class SettingsBridge:
         """Set a setting value."""
         self._settings[key] = value
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """Get all settings."""
         return self._settings.copy()
 
-    def set_all(self, settings: Dict[str, Any]) -> None:
+    def set_all(self, settings: dict[str, object]) -> None:
         """Set all settings from a dictionary."""
         self._settings = settings
 
@@ -389,7 +389,7 @@ animations {{
 
 
 # Global instance
-_bridge: Optional[SettingsBridge] = None
+_bridge: SettingsBridge | None = None
 
 
 def get_bridge() -> SettingsBridge:
