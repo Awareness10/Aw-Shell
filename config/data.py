@@ -1,11 +1,13 @@
 import json
 import os
+import sys
+from pathlib import Path
+
+from .settings_constants import DEFAULTS
 
 import gi
-
 gi.require_version("Gtk", "3.0")
-from fabric.utils.helpers import get_relative_path
-from gi.repository import Gdk, GLib
+from gi.repository import Gdk, GLib  # type: ignore # noqa: E402
 
 APP_NAME_CAP = "Aw-Shell"
 APP_NAME = APP_NAME_CAP.lower()
@@ -14,35 +16,32 @@ CACHE_DIR = str(GLib.get_user_cache_dir()) + f"/{APP_NAME}"
 
 USERNAME = os.getlogin()
 HOSTNAME = os.uname().nodename
-HOME_DIR = os.path.expanduser("~")
 
-CONFIG_DIR = os.path.expanduser(f"~/.config/{APP_NAME}")
+HOME_DIR = Path().home().resolve()
+CONFIG_DIR = HOME_DIR / ".config" / f"{APP_NAME}"
+CONFIG_FILE = CONFIG_DIR / "config" / "config.json"
+
+FACE_ICON = HOME_DIR / ".face.icon"
+DEFAULT_FACE_ICON = CONFIG_DIR / "assets" / "default.png"
+
+MATUGEN_STATE_FILE = sys.path.append(str(Path(CONFIG_DIR / "matugen")))
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()
 CURRENT_HEIGHT = screen.get_height()
 
-CONFIG_FILE = get_relative_path("../config/config.json")
-MATUGEN_STATE_FILE = os.path.join(CONFIG_DIR, "matugen")
-
-
 def load_config():
     """Load the configuration from config.json"""
-    config_path = os.path.expanduser(f"~/.config/{APP_NAME}/config/config.json")
     config = {}
 
-    if os.path.exists(config_path):
+    if CONFIG_FILE.exists():
         try:
-            with open(config_path, "r") as f:
+            with open(CONFIG_FILE, "r") as f:
                 config = json.load(f)
         except Exception as e:
             print(f"Error loading config: {e}")
 
     return config
-
-
-# Import defaults from settings_constants to avoid duplication
-from .settings_constants import DEFAULTS
 
 # Load configuration once and use throughout the module
 config = {}
