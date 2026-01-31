@@ -10,7 +10,6 @@ Desktop shell configuration panel with:
 
 import os
 import sys
-import webbrowser
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
@@ -24,7 +23,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor, QPixmap
 
 from pyqt_theme.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
-from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow
+from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow, DonateButton
 
 from config.settings_utils import (
     get_bind_var, set_all_bind_vars, reset_to_defaults,
@@ -467,10 +466,10 @@ class AwShellSettings(FramelessMainWindow):
         self.ws_num_cb.setChecked(get_bind_var("bar_workspace_show_number", False))
         self.ws_num_cb.stateChanged.connect(self._on_ws_num_changed)
         ws_row.addWidget(self.ws_num_cb)
-        self.ws_chinese_cb = QCheckBox("Use Chinese Numerals")
-        self.ws_chinese_cb.setChecked(get_bind_var("bar_workspace_use_chinese_numerals", False))
-        self.ws_chinese_cb.setEnabled(self.ws_num_cb.isChecked())
-        ws_row.addWidget(self.ws_chinese_cb)
+        self.ws_runes_cb = QCheckBox("Use Runes  ᚠ ᚢ ᚦ ᚯ ᚱ …")
+        self.ws_runes_cb.setChecked(get_bind_var("bar_workspace_use_runes", False))
+        self.ws_runes_cb.setEnabled(self.ws_num_cb.isChecked())
+        ws_row.addWidget(self.ws_runes_cb)
         ws_row.addStretch()
         section_layout.addLayout(ws_row)
 
@@ -541,9 +540,9 @@ class AwShellSettings(FramelessMainWindow):
 
     def _on_ws_num_changed(self, state: int) -> None:
         is_active = state == Qt.CheckState.Checked.value
-        self.ws_chinese_cb.setEnabled(is_active)
+        self.ws_runes_cb.setEnabled(is_active)
         if not is_active:
-            self.ws_chinese_cb.setChecked(False)
+            self.ws_runes_cb.setChecked(False)
 
     def _on_panel_theme_changed(self, text: str) -> None:
         self.panel_position_combo.setEnabled(text == "Panel")
@@ -808,40 +807,51 @@ class AwShellSettings(FramelessMainWindow):
     def _build_about_tab(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.setSpacing(18)
-        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(16)
+        layout.setContentsMargins(16, 16, 16, 16)
 
-        title = QLabel(f"<b>{APP_NAME_CAP}</b>")
-        title.setTextFormat(Qt.TextFormat.RichText)
-        title.setStyleSheet("font-size: 18pt;")
-        layout.addWidget(title)
+        # --- Aw-Shell section ---
+        aw_section = SettingsSection(APP_NAME_CAP)
+        aw_layout = QVBoxLayout(aw_section)
+        aw_layout.setSpacing(12)
 
         desc = QLabel("A hackable shell for Hyprland, powered by Fabric.")
-        layout.addWidget(desc)
+        aw_layout.addWidget(desc)
 
-        # GitHub link
         repo_row = QHBoxLayout()
         repo_row.addWidget(QLabel("GitHub:"))
-        repo_link = QLabel('<a href="https://github.com/awareness10/Aw-Shell">https://github.com/awareness10/Aw-Shell</a>')
+        repo_link = QLabel('<a href="https://github.com/awareness10/Aw-Shell">Awareness10/Aw-Shell</a>')
         repo_link.setOpenExternalLinks(True)
         repo_row.addWidget(repo_link)
         repo_row.addStretch()
-        layout.addLayout(repo_row)
+        aw_layout.addLayout(repo_row)
 
-        # Original link
+        donate_btn = DonateButton(url="https://ko-fi.com/awareness10", preset="gold")
+        donate_btn.setText("Donate to Aw-Shell")
+        donate_btn.setMinimumWidth(200)
+        aw_layout.addWidget(donate_btn)
+
+        layout.addWidget(aw_section)
+
+        # --- Original Project section ---
+        orig_section = SettingsSection("Original Project (Deprecated)")
+        orig_layout = QVBoxLayout(orig_section)
+        orig_layout.setSpacing(12)
+
         orig_row = QHBoxLayout()
         orig_row.addWidget(QLabel("Original:"))
         orig_link = QLabel('<a href="https://github.com/Axenide/Ax-Shell">Axenide/Ax-Shell</a>')
         orig_link.setOpenExternalLinks(True)
         orig_row.addWidget(orig_link)
         orig_row.addStretch()
-        layout.addLayout(orig_row)
+        orig_layout.addLayout(orig_row)
 
-        # Ko-Fi button
-        kofi_btn = QPushButton("Support Original Author on Ko-Fi")
-        kofi_btn.clicked.connect(lambda: webbrowser.open("https://ko-fi.com/Axenide"))
+        kofi_btn = DonateButton(url="https://ko-fi.com/Axenide", preset="silver")
+        kofi_btn.setText("Support Original Author on Ko-Fi")
         kofi_btn.setMinimumWidth(200)
-        layout.addWidget(kofi_btn)
+        orig_layout.addWidget(kofi_btn)
+
+        layout.addWidget(orig_section)
 
         layout.addStretch()
         return w
@@ -869,7 +879,7 @@ class AwShellSettings(FramelessMainWindow):
         settings["dock_always_show"] = self.dock_always_cb.isChecked()
         settings["dock_icon_size"] = self.dock_size_slider.value()
         settings["bar_workspace_show_number"] = self.ws_num_cb.isChecked()
-        settings["bar_workspace_use_chinese_numerals"] = self.ws_chinese_cb.isChecked()
+        settings["bar_workspace_use_runes"] = self.ws_runes_cb.isChecked()
         settings["bar_hide_special_workspace"] = self.special_ws_cb.isChecked()
         settings["bar_theme"] = self.bar_theme_combo.currentText()
         settings["dock_theme"] = self.dock_theme_combo.currentText()
@@ -980,7 +990,7 @@ class AwShellSettings(FramelessMainWindow):
         self.dock_always_cb.setChecked(get_bind_var("dock_always_show", False))
         self.dock_size_slider.setValue(int(get_bind_var("dock_icon_size", 28)))
         self.ws_num_cb.setChecked(get_bind_var("bar_workspace_show_number", False))
-        self.ws_chinese_cb.setChecked(get_bind_var("bar_workspace_use_chinese_numerals", False))
+        self.ws_runes_cb.setChecked(get_bind_var("bar_workspace_use_runes", False))
         self.special_ws_cb.setChecked(get_bind_var("bar_hide_special_workspace", True))
         self.bar_theme_combo.setCurrentText(str(get_bind_var("bar_theme", "Pills")))
         self.dock_theme_combo.setCurrentText(str(get_bind_var("dock_theme", "Pills")))

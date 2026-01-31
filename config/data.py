@@ -64,9 +64,7 @@ DOCK_ENABLED = _get_config_var("dock_enabled")
 DOCK_ALWAYS_SHOW = _get_config_var("dock_always_show")
 DOCK_ICON_SIZE = _get_config_var("dock_icon_size")
 BAR_WORKSPACE_SHOW_NUMBER = _get_config_var("bar_workspace_show_number")
-BAR_WORKSPACE_USE_CHINESE_NUMERALS = _get_config_var(
-    "bar_workspace_use_chinese_numerals"
-)
+BAR_WORKSPACE_USE_RUNES = _get_config_var("bar_workspace_use_runes")
 BAR_HIDE_SPECIAL_WORKSPACE = _get_config_var("bar_hide_special_workspace")
 BAR_THEME = _get_config_var("bar_theme")
 DOCK_THEME = _get_config_var("dock_theme")
