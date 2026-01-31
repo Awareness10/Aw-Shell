@@ -6,10 +6,8 @@ import time
 import toml
 from pathlib import Path
 
-from .settings_constants import DEFAULTS  # noqa: E402
+from .settings_constants import DEFAULTS, APP_NAME,APP_NAME_CAP # noqa: E402
 from .data import (
-    APP_NAME,
-    APP_NAME_CAP,
     USERNAME,
     HOME_DIR,
     CONFIG_DIR,

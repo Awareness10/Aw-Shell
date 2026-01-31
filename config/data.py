@@ -3,14 +3,12 @@ import os
 import sys
 from pathlib import Path
 
-from .settings_constants import DEFAULTS
+from .settings_constants import DEFAULTS, APP_NAME
 
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib  # type: ignore # noqa: E402
 
-APP_NAME_CAP = "Aw-Shell"
-APP_NAME = APP_NAME_CAP.lower()
 
 CACHE_DIR = str(GLib.get_user_cache_dir()) + f"/{APP_NAME}"
 

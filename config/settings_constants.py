@@ -1,9 +1,8 @@
 from fabric.utils.helpers import get_relative_path
 
-from .data import (
-    APP_NAME,
-    APP_NAME_CAP,
-)
+APP_NAME_CAP = "Aw-Shell"
+APP_NAME = APP_NAME_CAP.lower()
+
 
 SOURCE_STRING = f"""
 # {APP_NAME_CAP}
