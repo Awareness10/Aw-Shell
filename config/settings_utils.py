@@ -21,8 +21,8 @@ from .data import (
 from fabric.utils.helpers import exec_shell_command_async
 
 CURRENT_WALL = HOME_DIR / ".current.wall"
-HYPR_COLORS = CONFIG_DIR / "hypr" / "colors.conf"
-CSS_COLORS = CONFIG_DIR / "styles" / "colors.css"
+HYPR_COLORS = AW_CONFIG_DIR / "hypr" / "colors.conf"
+CSS_COLORS = AW_CONFIG_DIR / "styles" / "colors.css"
 
 # Global variable to store binding variables, managed by this module
 bind_vars = {}  # Se inicializa vacío, load_bind_vars lo poblará
@@ -194,11 +194,11 @@ def ensure_matugen_config():
         },
         "templates": {
             "hyprland": {
-                "input_path": f"{AW_CONFIG_DIR}/matugen/templates/hyprland-colors.conf",
-                "output_path": f"{AW_CONFIG_DIR}/hypr/colors.conf",
+                "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/hyprland-colors.conf",
+                "output_path": f"{str(AW_CONFIG_DIR)}/hypr/colors.conf",
             },
             f"{APP_NAME}": {
-                "input_path": f"{AW_CONFIG_DIR}/matugen/templates/{APP_NAME}.css",
+                "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/{APP_NAME}.css",
                 "output_path": f"~/.config/{APP_NAME}/styles/colors.css",
                 "post_hook": f"fabric-cli exec {APP_NAME} 'app.set_css()' &",
             },
