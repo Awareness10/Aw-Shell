@@ -16,11 +16,11 @@ USERNAME = os.getlogin()
 HOSTNAME = os.uname().nodename
 
 HOME_DIR = Path().home().resolve()
-CONFIG_DIR = HOME_DIR / ".config" / f"{APP_NAME}"
-CONFIG_FILE = CONFIG_DIR / "config" / "config.json"
+CONFIG_DIR = HOME_DIR / ".config" / f"{APP_NAME}" / "config"
+CONFIG_FILE = CONFIG_DIR / "config.json"
 
 FACE_ICON = HOME_DIR / ".face.icon"
-DEFAULT_FACE_ICON = CONFIG_DIR / "assets" / "default.png"
+DEFAULT_FACE_ICON = HOME_DIR / ".config" / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
 
 MATUGEN_STATE_FILE = sys.path.append(str(Path(CONFIG_DIR / "matugen")))
 
