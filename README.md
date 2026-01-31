@@ -100,6 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.s
         - pillow
         - psutil
         - pywayland
+        - PySide6
         - requests
         - setproctitle
         - toml

@@ -23,7 +23,7 @@ print("="*60)
 monitor_manager = get_monitor_manager()
 all_monitors = monitor_manager.get_monitors()
 
-print(f"\nAll monitors from monitor_manager:")
+print("\nAll monitors from monitor_manager:")
 for m in all_monitors:
     ws_range = monitor_manager.get_workspace_range_for_monitor(m['id'])
     print(f"  {m['name']:12s} - ID: {m['id']}, X: {m['x']:5d}, Workspaces: {ws_range[0]:2d}-{ws_range[1]:2d}")
@@ -44,7 +44,7 @@ else:
         if monitor_name in selected_monitor_names:
             monitors.append(monitor)
 
-print(f"\nFiltered monitors list that gets passed to Bar:")
+print("\nFiltered monitors list that gets passed to Bar:")
 for m in monitors:
     ws_range = monitor_manager.get_workspace_range_for_monitor(m['id'])
     print(f"  {m['name']:12s} - ID: {m['id']}, X: {m['x']:5d}, Workspaces: {ws_range[0]:2d}-{ws_range[1]:2d}")

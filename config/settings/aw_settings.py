@@ -11,25 +11,27 @@ Desktop shell configuration panel with:
 import os
 import sys
 import webbrowser
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFileDialog, QFrame,
+    QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame,
     QGraphicsDropShadowEffect, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea,
-    QSizePolicy, QSlider, QTabWidget, QVBoxLayout, QWidget
+    QSizePolicy, QSlider,  QTabWidget, QVBoxLayout, QWidget
 )
 from PySide6.QtGui import QColor, QPixmap
 
 from pyqt_theme.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
 from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow
 
-from config.settings_bridge import get_bridge
+from config.settings_utils import (
+    get_bind_var, set_all_bind_vars, reset_to_defaults,
+    apply_and_restart, get_available_monitors, load_bind_vars,
+)
+from config.data import APP_NAME, APP_NAME_CAP
 
-from config.settings_utils import APP_NAME, APP_NAME_CAP
-
-# get_bridge,
 # Constants matching the original GTK implementation
 POSITIONS = ["Top", "Bottom", "Left", "Right"]
 THEMES = ["Pills", "Dense", "Edge"]
@@ -55,7 +57,6 @@ COMPONENT_DISPLAY_NAMES = {
     "button_power": "Power Button",
 }
 
-# Keybindings organized by category: (section_name, [(label, prefix_key, suffix_key), ...])
 KEYBIND_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
     ("Shell Controls", [
         (f"Reload {APP_NAME_CAP}", "prefix_restart", "suffix_restart"),
@@ -65,33 +66,24 @@ KEYBIND_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
         ("Toggle Caffeine", "prefix_caffeine", "suffix_caffeine"),
     ]),
     ("Panels & Widgets", [
-        ("Dashboard", "prefix_dash", "suffix_dash"),
-        ("Toolbox", "prefix_toolbox", "suffix_toolbox"),
-        ("Overview", "prefix_overview", "suffix_overview"),
-        ("Power Menu", "prefix_power", "suffix_power"),
-        ("Clipboard History", "prefix_cliphist", "suffix_cliphist"),
         ("Message", "prefix_axmsg", "suffix_axmsg"),
-    ]),
-    ("Applications", [
-        ("App Launcher", "prefix_launcher", "suffix_launcher"),
-        ("Tmux", "prefix_tmux", "suffix_tmux"),
-        ("Audio Mixer", "prefix_mixer", "suffix_mixer"),
-        ("Emoji Picker", "prefix_emoji", "suffix_emoji"),
-    ]),
-    ("Wallpapers", [
-        ("Wallpapers", "prefix_wallpapers", "suffix_wallpapers"),
-        ("Random Wallpaper", "prefix_randwall", "suffix_randwall"),
-    ]),
-    ("Extras", [
+        ("Dashboard", "prefix_dash", "suffix_dash"),
         ("Bluetooth", "prefix_bluetooth", "suffix_bluetooth"),
         ("Pins", "prefix_pins", "suffix_pins"),
         ("Kanban", "prefix_kanban", "suffix_kanban"),
+        ("App Launcher", "prefix_launcher", "suffix_launcher"),
+        ("Toolbox", "prefix_toolbox", "suffix_toolbox"),
+        ("Overview", "prefix_overview", "suffix_overview"),
+        ("Clipboard History", "prefix_cliphist", "suffix_cliphist"),
     ]),
-]
-
-# Flat list for backwards compatibility
-KEYBIND_DEFINITIONS: List[Tuple[str, str, str]] = [
-    item for _, items in KEYBIND_SECTIONS for item in items
+    ("Utilities", [
+        ("Tmux", "prefix_tmux", "suffix_tmux"),
+        ("Wallpapers", "prefix_wallpapers", "suffix_wallpapers"),
+        ("Random Wallpaper", "prefix_randwall", "suffix_randwall"),
+        ("Audio Mixer", "prefix_mixer", "suffix_mixer"),
+        ("Emoji Picker", "prefix_emoji", "suffix_emoji"),
+        ("Power Menu", "prefix_power", "suffix_power"),
+    ]),
 ]
 
 
@@ -106,15 +98,11 @@ class AwShellSettings(FramelessMainWindow):
     """Main Aw-Shell Settings Window."""
 
     def __init__(self, parent=None):
-        self.bridge = get_bridge()
+        load_bind_vars()
 
         # Check for hyprlock/hypridle source files
-        self.show_lock_checkbox = os.path.exists(
-            os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf")
-        )
-        self.show_idle_checkbox = os.path.exists(
-            os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf")
-        )
+        self.show_lock_checkbox = Path(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf").exists()
+        self.show_idle_checkbox = Path(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf").exists()
 
         # Widget references
         self.keybind_entries: List[Tuple[str, str, QLineEdit, QLineEdit]] = []
@@ -125,8 +113,8 @@ class AwShellSettings(FramelessMainWindow):
         self.disk_entries: List[QWidget] = []
         self.selected_face_icon: Optional[str] = None
 
-        super().__init__(width=700, height=720, title=f"{APP_NAME_CAP} Settings")
-        self.setMinimumSize(600, 500)
+        super().__init__(width=560, height=1080, title=f"{APP_NAME_CAP} Settings")
+        self.setMinimumSize(400, 380)
 
     def _create_scrollable_tab(self, content: QWidget) -> QScrollArea:
         """Wrap tab content in a scroll area."""
@@ -209,8 +197,11 @@ class AwShellSettings(FramelessMainWindow):
             }}
             SettingsSection {{
                 font-weight: 600;
-                padding-top: 4px;
+                padding: 12px 8px 8px 8px;
                 margin-top: 4px;
+            }}
+            SettingsSection > QWidget {{
+                margin-left: 4px;
             }}
             SettingsSection::title {{
                 subcontrol-origin: margin;
@@ -257,88 +248,51 @@ class AwShellSettings(FramelessMainWindow):
     def _build_keybindings_tab(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.setSpacing(12)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(16)
+        layout.setContentsMargins(16, 16, 16, 16)
 
-        # Build each section
-        for section_idx, (section_name, keybinds) in enumerate(KEYBIND_SECTIONS):
-            # Section header
-            header = QLabel(f"<b>{section_name}</b>")
-            header.setTextFormat(Qt.TextFormat.RichText)
-            layout.addWidget(header)
+        for section_name, bindings in KEYBIND_SECTIONS:
+            section = SettingsSection(section_name)
+            section_layout = QVBoxLayout(section)
+            section_layout.setSpacing(8)
 
-            # Keybinding rows for this section
-            for label_text, prefix_key, suffix_key in keybinds:
-                row_widget = self._create_keybind_row(label_text, prefix_key, suffix_key)
-                layout.addWidget(row_widget)
+            grid = QGridLayout()
+            grid.setHorizontalSpacing(10)
+            grid.setVerticalSpacing(8)
+            grid.setColumnStretch(1, 1)
+            grid.setColumnStretch(3, 0)
 
-            # Add separator between sections (except after last)
-            if section_idx < len(KEYBIND_SECTIONS) - 1:
-                layout.addSpacing(8)
-                self._add_separator(layout)
-                layout.addSpacing(4)
+            for row, (label_text, prefix_key, suffix_key) in enumerate(bindings):
+                action_lbl = QLabel(label_text)
+                action_lbl.setFixedWidth(140)
+                grid.addWidget(action_lbl, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+                prefix_entry = QLineEdit()
+                prefix_entry.setText(str(get_bind_var(prefix_key, "")))
+                prefix_entry.setPlaceholderText("SUPER ...")
+                prefix_entry.setMinimumHeight(32)
+                prefix_entry.setMaximumWidth(130)
+                grid.addWidget(prefix_entry, row, 1)
+
+                plus_lbl = QLabel("+")
+                plus_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                plus_lbl.setFixedWidth(12)
+                grid.addWidget(plus_lbl, row, 2)
+
+                suffix_entry = QLineEdit()
+                suffix_entry.setText(str(get_bind_var(suffix_key, "")))
+                suffix_entry.setPlaceholderText("Key")
+                suffix_entry.setMinimumHeight(32)
+                suffix_entry.setMaximumWidth(80)
+                grid.addWidget(suffix_entry, row, 3)
+
+                self.keybind_entries.append((prefix_key, suffix_key, prefix_entry, suffix_entry))
+
+            section_layout.addLayout(grid)
+            layout.addWidget(section)
 
         layout.addStretch()
         return w
-
-    def _create_keybind_row(self, label_text: str, prefix_key: str, suffix_key: str) -> QWidget:
-        """Create a styled keybinding row with action label and key inputs."""
-        row = QFrame()
-        row.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.03);
-                border-radius: 6px;
-                padding: 4px;
-            }
-            QFrame:hover {
-                background-color: rgba(255, 255, 255, 0.06);
-            }
-        """)
-
-        row_layout = QHBoxLayout(row)
-        row_layout.setContentsMargins(12, 8, 12, 8)
-        row_layout.setSpacing(12)
-
-        # Action label (left side)
-        action_lbl = QLabel(label_text)
-        action_lbl.setMinimumWidth(140)
-        row_layout.addWidget(action_lbl)
-
-        row_layout.addStretch()
-
-        # Keybind input group (right side)
-        input_group = QHBoxLayout()
-        input_group.setSpacing(6)
-
-        # Modifier entry
-        prefix_entry = QLineEdit()
-        prefix_entry.setText(str(self.bridge.get(prefix_key, "")))
-        prefix_entry.setPlaceholderText("SUPER")
-        prefix_entry.setFixedWidth(160)
-        prefix_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        input_group.addWidget(prefix_entry)
-
-        # Plus sign styled as a subtle connector
-        plus_lbl = QLabel("+")
-        plus_lbl.setStyleSheet("color: rgba(255, 255, 255, 0.4); font-weight: bold;")
-        plus_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        plus_lbl.setFixedWidth(20)
-        input_group.addWidget(plus_lbl)
-
-        # Key entry
-        suffix_entry = QLineEdit()
-        suffix_entry.setText(str(self.bridge.get(suffix_key, "")))
-        suffix_entry.setPlaceholderText("Key")
-        suffix_entry.setFixedWidth(80)
-        suffix_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        input_group.addWidget(suffix_entry)
-
-        row_layout.addLayout(input_group)
-
-        # Store references for saving
-        self.keybind_entries.append((prefix_key, suffix_key, prefix_entry, suffix_entry))
-
-        return row
 
     # =========================================================================
     # APPEARANCE TAB
@@ -348,18 +302,16 @@ class AwShellSettings(FramelessMainWindow):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(16)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setContentsMargins(16, 16, 16, 16)
 
         # Wallpapers Section
         self._build_wallpapers_section(layout)
-        self._add_separator(layout)
 
         # Date & Time Section
         self._build_datetime_section(layout)
 
         # Layout Options Section
         self._build_layout_section(layout)
-        self._add_separator(layout)
 
         # Components/Modules Section
         self._build_components_section(layout)
@@ -367,49 +319,42 @@ class AwShellSettings(FramelessMainWindow):
         layout.addStretch()
         return w
 
-    def _add_separator(self, layout: QVBoxLayout) -> None:
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("background-color: rgba(255,255,255,0.1); max-height: 1px;")
-        layout.addWidget(sep)
-
     def _build_wallpapers_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Wallpapers</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
-
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(20)
-        grid.setVerticalSpacing(8)
+        section = SettingsSection("Wallpapers")
+        form = QFormLayout(section)
+        form.setSpacing(12)
+        form.setHorizontalSpacing(16)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         # Wallpaper directory
-        grid.addWidget(QLabel("Directory:"), 0, 0)
-
         dir_row = QHBoxLayout()
-        dir_row.setSpacing(10)
         self.wall_dir_entry = QLineEdit()
-        self.wall_dir_entry.setText(str(self.bridge.get("wallpapers_dir", "")))
-        self.wall_dir_entry.setMinimumWidth(250)
+        self.wall_dir_entry.setText(str(get_bind_var("wallpapers_dir", "")))
+        self.wall_dir_entry.setMinimumHeight(36)
         dir_row.addWidget(self.wall_dir_entry)
 
         browse_btn = QPushButton("Browse...")
+        browse_btn.setObjectName("secondary")
+        browse_btn.setFixedWidth(90)
+        browse_btn.setMinimumHeight(36)
         browse_btn.clicked.connect(self._on_browse_wallpapers)
         dir_row.addWidget(browse_btn)
 
-        grid.addLayout(dir_row, 0, 1)
+        form.addRow("Directory:", dir_row)
 
         # Profile icon
-        grid.addWidget(QLabel("Profile Icon:"), 1, 0)
-
         icon_row = QHBoxLayout()
-        icon_row.setSpacing(10)
         self.face_image = QLabel()
         self.face_image.setFixedSize(64, 64)
         self.face_image.setStyleSheet("border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;")
         self._load_face_icon()
         icon_row.addWidget(self.face_image)
+        icon_row.addSpacing(12)
 
         icon_btn = QPushButton("Change...")
+        icon_btn.setObjectName("secondary")
+        icon_btn.setContentsMargins(4, 0, 0, 0)
+        icon_btn.setMinimumHeight(36)
         icon_btn.clicked.connect(self._on_select_face_icon)
         icon_row.addWidget(icon_btn)
 
@@ -417,14 +362,14 @@ class AwShellSettings(FramelessMainWindow):
         icon_row.addWidget(self.face_status_label)
         icon_row.addStretch()
 
-        grid.addLayout(icon_row, 1, 1)
+        form.addRow("Profile Icon:", icon_row)
 
-        layout.addLayout(grid)
+        layout.addWidget(section)
 
     def _load_face_icon(self) -> None:
-        face_path = os.path.expanduser("~/.face.icon")
-        if os.path.exists(face_path):
-            pixmap = QPixmap(face_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        face_path = Path("~/.face.icon").expanduser()
+        if face_path.exists():
+            pixmap = QPixmap(str(face_path)).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.face_image.setPixmap(pixmap)
         else:
             self.face_image.setText("No Icon")
@@ -447,138 +392,140 @@ class AwShellSettings(FramelessMainWindow):
             self.face_image.setPixmap(pixmap)
 
     def _build_datetime_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Date & Time Format</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Date && Time")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Use 12-Hour Clock"))
-        self.datetime_12h_cb = QCheckBox()
-        self.datetime_12h_cb.setChecked(self.bridge.get("datetime_12h_format", False))
-        row.addWidget(self.datetime_12h_cb)
-        row.addStretch()
-        layout.addLayout(row)
+        self.datetime_12h_cb = QCheckBox("Use 12-Hour Clock")
+        self.datetime_12h_cb.setChecked(get_bind_var("datetime_12h_format", False))
+        section_layout.addWidget(self.datetime_12h_cb)
+
+        layout.addWidget(section)
 
     def _build_layout_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Layout Options</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Layout")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(12)
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(20)
-        grid.setVerticalSpacing(10)
-
-        row = 0
-
-        # Bar Position
-        grid.addWidget(QLabel("Bar Position"), row, 0)
+        # Bar Position row
+        pos_row = QHBoxLayout()
+        pos_row.setSpacing(10)
+        pos_label = QLabel("Bar Position:")
+        pos_label.setFixedWidth(120)
+        pos_row.addWidget(pos_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.position_combo = ThemedComboBox()
         self.position_combo.addItems(POSITIONS)
-        self.position_combo.setCurrentText(str(self.bridge.get("bar_position", "Top")))
+        self.position_combo.setCurrentText(str(get_bind_var("bar_position", "Top")))
+        self.position_combo.setMinimumWidth(120)
         self.position_combo.currentTextChanged.connect(self._on_position_changed)
-        grid.addWidget(self.position_combo, row, 1)
+        pos_row.addWidget(self.position_combo)
+        pos_row.addStretch()
+        section_layout.addLayout(pos_row)
 
-        grid.addWidget(QLabel("Centered Bar (Left/Right)"), row, 2)
-        self.centered_cb = QCheckBox()
-        self.centered_cb.setChecked(self.bridge.get("centered_bar", False))
-        self.centered_cb.setEnabled(self.bridge.get("bar_position") in ["Left", "Right"])
-        grid.addWidget(self.centered_cb, row, 3)
-
-        row += 1
+        # Checkboxes in compact rows
+        self.centered_cb = QCheckBox("Centered Bar (Left/Right only)")
+        self.centered_cb.setChecked(get_bind_var("centered_bar", False))
+        self.centered_cb.setEnabled(get_bind_var("bar_position") in ["Left", "Right"])
+        section_layout.addWidget(self.centered_cb)
 
         # Dock settings
-        grid.addWidget(QLabel("Show Dock"), row, 0)
-        self.dock_cb = QCheckBox()
-        self.dock_cb.setChecked(self.bridge.get("dock_enabled", True))
+        dock_row = QHBoxLayout()
+        dock_row.setSpacing(20)
+        self.dock_cb = QCheckBox("Show Dock")
+        self.dock_cb.setChecked(get_bind_var("dock_enabled", True))
         self.dock_cb.stateChanged.connect(self._on_dock_changed)
-        grid.addWidget(self.dock_cb, row, 1)
-
-        grid.addWidget(QLabel("Always Show Dock"), row, 2)
-        self.dock_always_cb = QCheckBox()
-        self.dock_always_cb.setChecked(self.bridge.get("dock_always_show", False))
+        dock_row.addWidget(self.dock_cb)
+        self.dock_always_cb = QCheckBox("Always Show Dock")
+        self.dock_always_cb.setChecked(get_bind_var("dock_always_show", False))
         self.dock_always_cb.setEnabled(self.dock_cb.isChecked())
-        grid.addWidget(self.dock_always_cb, row, 3)
-
-        row += 1
+        dock_row.addWidget(self.dock_always_cb)
+        dock_row.addStretch()
+        section_layout.addLayout(dock_row)
 
         # Dock icon size
-        grid.addWidget(QLabel("Dock Icon Size"), row, 0)
+        size_row = QHBoxLayout()
+        size_row.setSpacing(12)
+        size_label = QLabel("Dock Icon Size:")
+        size_label.setFixedWidth(120)
+        size_row.addWidget(size_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.dock_size_slider = QSlider(Qt.Orientation.Horizontal)
         self.dock_size_slider.setRange(16, 48)
-        self.dock_size_slider.setValue(int(self.bridge.get("dock_icon_size", 28)))
+        self.dock_size_slider.setValue(int(get_bind_var("dock_icon_size", 28)))
+        self.dock_size_slider.setMinimumWidth(200)
+        size_row.addWidget(self.dock_size_slider, 1)
         self.dock_size_label = QLabel(str(self.dock_size_slider.value()))
+        self.dock_size_label.setMinimumWidth(30)
+        self.dock_size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.dock_size_slider.valueChanged.connect(lambda v: self.dock_size_label.setText(str(v)))
-
-        size_row = QHBoxLayout()
-        size_row.addWidget(self.dock_size_slider)
         size_row.addWidget(self.dock_size_label)
-        grid.addLayout(size_row, row, 1, 1, 3)
-
-        row += 1
+        section_layout.addLayout(size_row)
 
         # Workspace options
-        grid.addWidget(QLabel("Show Workspace Numbers"), row, 0)
-        self.ws_num_cb = QCheckBox()
-        self.ws_num_cb.setChecked(self.bridge.get("bar_workspace_show_number", False))
+        ws_row = QHBoxLayout()
+        ws_row.setSpacing(20)
+        self.ws_num_cb = QCheckBox("Show Workspace Numbers")
+        self.ws_num_cb.setChecked(get_bind_var("bar_workspace_show_number", False))
         self.ws_num_cb.stateChanged.connect(self._on_ws_num_changed)
-        grid.addWidget(self.ws_num_cb, row, 1)
-
-        grid.addWidget(QLabel("Use Chinese Numerals"), row, 2)
-        self.ws_chinese_cb = QCheckBox()
-        self.ws_chinese_cb.setChecked(self.bridge.get("bar_workspace_use_chinese_numerals", False))
+        ws_row.addWidget(self.ws_num_cb)
+        self.ws_chinese_cb = QCheckBox("Use Chinese Numerals")
+        self.ws_chinese_cb.setChecked(get_bind_var("bar_workspace_use_chinese_numerals", False))
         self.ws_chinese_cb.setEnabled(self.ws_num_cb.isChecked())
-        grid.addWidget(self.ws_chinese_cb, row, 3)
+        ws_row.addWidget(self.ws_chinese_cb)
+        ws_row.addStretch()
+        section_layout.addLayout(ws_row)
 
-        row += 1
+        self.special_ws_cb = QCheckBox("Hide Special Workspace")
+        self.special_ws_cb.setChecked(get_bind_var("bar_hide_special_workspace", True))
+        section_layout.addWidget(self.special_ws_cb)
 
-        grid.addWidget(QLabel("Hide Special Workspace"), row, 0)
-        self.special_ws_cb = QCheckBox()
-        self.special_ws_cb.setChecked(self.bridge.get("bar_hide_special_workspace", True))
-        grid.addWidget(self.special_ws_cb, row, 1)
+        # Theme combos using form-style rows
+        theme_form = QFormLayout()
+        theme_form.setSpacing(12)
+        theme_form.setHorizontalSpacing(16)
+        theme_form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        row += 1
-
-        # Theme options
-        grid.addWidget(QLabel("Bar Theme"), row, 0)
         self.bar_theme_combo = ThemedComboBox()
         self.bar_theme_combo.addItems(THEMES)
-        self.bar_theme_combo.setCurrentText(str(self.bridge.get("bar_theme", "Pills")))
-        grid.addWidget(self.bar_theme_combo, row, 1)
+        self.bar_theme_combo.setCurrentText(str(get_bind_var("bar_theme", "Pills")))
+        self.bar_theme_combo.setMinimumWidth(150)
+        theme_form.addRow("Bar Theme:", self.bar_theme_combo)
 
-        row += 1
-
-        grid.addWidget(QLabel("Dock Theme"), row, 0)
         self.dock_theme_combo = ThemedComboBox()
         self.dock_theme_combo.addItems(THEMES)
-        self.dock_theme_combo.setCurrentText(str(self.bridge.get("dock_theme", "Pills")))
-        grid.addWidget(self.dock_theme_combo, row, 1)
+        self.dock_theme_combo.setCurrentText(str(get_bind_var("dock_theme", "Pills")))
+        self.dock_theme_combo.setMinimumWidth(150)
+        theme_form.addRow("Dock Theme:", self.dock_theme_combo)
 
-        row += 1
-
-        grid.addWidget(QLabel("Panel Theme"), row, 0)
+        # Panel theme + position on same row
+        panel_row = QHBoxLayout()
+        panel_row.setSpacing(10)
         self.panel_theme_combo = ThemedComboBox()
         self.panel_theme_combo.addItems(PANEL_THEMES)
-        self.panel_theme_combo.setCurrentText(str(self.bridge.get("panel_theme", "Notch")))
+        self.panel_theme_combo.setCurrentText(str(get_bind_var("panel_theme", "Notch")))
+        self.panel_theme_combo.setMinimumWidth(150)
         self.panel_theme_combo.currentTextChanged.connect(self._on_panel_theme_changed)
-        grid.addWidget(self.panel_theme_combo, row, 1)
+        panel_row.addWidget(self.panel_theme_combo)
 
-        grid.addWidget(QLabel("Panel Position"), row, 2)
+        panel_pos_label = QLabel("Position:")
+        panel_row.addWidget(panel_pos_label)
         self.panel_position_combo = ThemedComboBox()
         self.panel_position_combo.addItems(PANEL_POSITIONS)
-        self.panel_position_combo.setCurrentText(str(self.bridge.get("panel_position", "Center")))
+        self.panel_position_combo.setCurrentText(str(get_bind_var("panel_position", "Center")))
         self.panel_position_combo.setEnabled(self.panel_theme_combo.currentText() == "Panel")
-        grid.addWidget(self.panel_position_combo, row, 3)
+        self.panel_position_combo.setMinimumWidth(100)
+        panel_row.addWidget(self.panel_position_combo)
+        panel_row.addStretch()
+        theme_form.addRow("Panel Theme:", panel_row)
 
-        row += 1
-
-        # Notification position
-        grid.addWidget(QLabel("Notification Position"), row, 0)
         self.notif_pos_combo = ThemedComboBox()
         self.notif_pos_combo.addItems(NOTIFICATION_POSITIONS)
-        self.notif_pos_combo.setCurrentText(str(self.bridge.get("notif_pos", "Top")))
-        grid.addWidget(self.notif_pos_combo, row, 1)
+        self.notif_pos_combo.setCurrentText(str(get_bind_var("notif_pos", "Top")))
+        self.notif_pos_combo.setMinimumWidth(150)
+        theme_form.addRow("Notifications:", self.notif_pos_combo)
 
-        layout.addLayout(grid)
+        section_layout.addLayout(theme_form)
+
+        layout.addWidget(section)
 
     def _on_position_changed(self, text: str) -> None:
         is_vertical = text in ["Left", "Right"]
@@ -602,39 +549,37 @@ class AwShellSettings(FramelessMainWindow):
         self.panel_position_combo.setEnabled(text == "Panel")
 
     def _build_components_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Modules</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Modules")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
 
+        self.corners_cb = QCheckBox("Rounded Corners")
+        self.corners_cb.setChecked(get_bind_var("corners_visible", True))
+        section_layout.addWidget(self.corners_cb)
+
+        # Component toggles in 2-column grid
         grid = QGridLayout()
-        grid.setHorizontalSpacing(15)
-        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(20)
+        grid.setVerticalSpacing(6)
 
-        # Corners visibility first
-        grid.addWidget(QLabel("Rounded Corners"), 0, 0)
-        self.corners_cb = QCheckBox()
-        self.corners_cb.setChecked(self.bridge.get("corners_visible", True))
-        grid.addWidget(self.corners_cb, 0, 1)
-
-        # Component toggles in 2 columns
         items = list(COMPONENT_DISPLAY_NAMES.items())
         rows_per_col = (len(items) + 1) // 2
 
         for idx, (name, display) in enumerate(items):
             if idx < rows_per_col:
-                row = idx + 1
+                row = idx
                 col = 0
             else:
                 row = idx - rows_per_col
-                col = 2
+                col = 1
 
-            grid.addWidget(QLabel(display), row, col)
-            cb = QCheckBox()
-            cb.setChecked(self.bridge.get(f"bar_{name}_visible", True))
-            grid.addWidget(cb, row, col + 1)
+            cb = QCheckBox(display)
+            cb.setChecked(get_bind_var(f"bar_{name}_visible", True))
+            grid.addWidget(cb, row, col)
             self.component_switches[name] = cb
 
-        layout.addLayout(grid)
+        section_layout.addLayout(grid)
+        layout.addWidget(section)
 
     # =========================================================================
     # SYSTEM TAB
@@ -644,7 +589,7 @@ class AwShellSettings(FramelessMainWindow):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(16)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setContentsMargins(16, 16, 16, 16)
 
         # General section
         self._build_general_section(layout)
@@ -671,174 +616,176 @@ class AwShellSettings(FramelessMainWindow):
         return w
 
     def _build_general_section(self, layout: QVBoxLayout) -> None:
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Auto-append to hyprland.conf"))
-        self.auto_append_cb = QCheckBox()
-        self.auto_append_cb.setChecked(self.bridge.get("auto_append_hyprland", True))
+        section = SettingsSection("General")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
+
+        self.auto_append_cb = QCheckBox("Auto-append to hyprland.conf")
+        self.auto_append_cb.setChecked(get_bind_var("auto_append_hyprland", True))
         self.auto_append_cb.setToolTip("Automatically append Aw-Shell source string to hyprland.conf")
-        row.addWidget(self.auto_append_cb)
-        row.addStretch()
-        layout.addLayout(row)
+        section_layout.addWidget(self.auto_append_cb)
+
+        layout.addWidget(section)
 
     def _build_monitor_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Monitor Selection</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Monitor Selection")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
 
-        layout.addWidget(QLabel("Show Aw-Shell on monitors:"))
+        monitors = get_available_monitors()
+        current_selection = get_bind_var("selected_monitors", [])
 
-        monitors = self.bridge.get_available_monitors()
-        current_selection = self.bridge.get("selected_monitors", [])
-
-        monitor_box = QVBoxLayout()
         for mon in monitors:
             name = mon.get("name", f'monitor-{mon.get("id", 0)}')
             cb = QCheckBox(name)
             is_selected = len(current_selection) == 0 or name in current_selection
             cb.setChecked(is_selected)
-            monitor_box.addWidget(cb)
+            section_layout.addWidget(cb)
             self.monitor_checkboxes[name] = cb
 
         hint = QLabel("<small>Leave all unchecked to show on all monitors</small>")
         hint.setTextFormat(Qt.TextFormat.RichText)
-        monitor_box.addWidget(hint)
+        hint.setObjectName("subtitle")
+        section_layout.addWidget(hint)
 
-        layout.addLayout(monitor_box)
+        layout.addWidget(section)
 
     def _build_terminal_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Terminal Settings</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Terminal")
+        form = QFormLayout(section)
+        form.setSpacing(12)
+        form.setHorizontalSpacing(16)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Command:"))
         self.terminal_entry = QLineEdit()
-        self.terminal_entry.setText(str(self.bridge.get("terminal_command", "kitty -e")))
+        self.terminal_entry.setText(str(get_bind_var("terminal_command", "kitty -e")))
         self.terminal_entry.setToolTip("Command used to launch terminal apps (e.g., 'kitty -e')")
-        row.addWidget(self.terminal_entry)
-        layout.addLayout(row)
+        self.terminal_entry.setMinimumHeight(32)
+        form.addRow("Command:", self.terminal_entry)
 
         hint = QLabel("<small>Examples: 'kitty -e', 'alacritty -e', 'foot -e'</small>")
         hint.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(hint)
+        hint.setObjectName("subtitle")
+        form.addRow("", hint)
+
+        layout.addWidget(section)
 
     def _build_hypr_section(self, layout: QVBoxLayout) -> None:
         if not self.show_lock_checkbox and not self.show_idle_checkbox:
             return
 
-        header = QLabel("<b>Hyprland Integration</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Hyprland Integration")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
 
         if self.show_lock_checkbox:
-            row = QHBoxLayout()
-            row.addWidget(QLabel("Replace Hyprlock config"))
-            self.lock_cb = QCheckBox()
+            self.lock_cb = QCheckBox("Replace Hyprlock config")
             self.lock_cb.setToolTip("Replace Hyprlock configuration with Aw-Shell's custom config")
-            row.addWidget(self.lock_cb)
-            row.addStretch()
-            layout.addLayout(row)
+            section_layout.addWidget(self.lock_cb)
 
         if self.show_idle_checkbox:
-            row = QHBoxLayout()
-            row.addWidget(QLabel("Replace Hypridle config"))
-            self.idle_cb = QCheckBox()
+            self.idle_cb = QCheckBox("Replace Hypridle config")
             self.idle_cb.setToolTip("Replace Hypridle configuration with Aw-Shell's custom config")
-            row.addWidget(self.idle_cb)
-            row.addStretch()
-            layout.addLayout(row)
+            section_layout.addWidget(self.idle_cb)
 
         hint = QLabel("<small>Existing configs will be backed up</small>")
         hint.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(hint)
+        hint.setObjectName("subtitle")
+        section_layout.addWidget(hint)
+
+        layout.addWidget(section)
 
     def _build_notification_apps_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Notification Settings</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Notifications")
+        form = QFormLayout(section)
+        form.setSpacing(12)
+        form.setHorizontalSpacing(16)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        # Limited apps
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("Limited Apps History:"))
         self.limited_apps_entry = QLineEdit()
-        limited_list = self.bridge.get("limited_apps_history", [])
+        limited_list = get_bind_var("limited_apps_history", [])
         self.limited_apps_entry.setText(", ".join(f'"{app}"' for app in limited_list))
         self.limited_apps_entry.setToolTip('Enter app names separated by commas, e.g: "Spotify", "Discord"')
-        row1.addWidget(self.limited_apps_entry)
-        layout.addLayout(row1)
+        self.limited_apps_entry.setMinimumHeight(32)
+        form.addRow("Limited Apps:", self.limited_apps_entry)
 
-        hint1 = QLabel('<small>Apps with limited notification history (format: "App1", "App2")</small>')
-        hint1.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(hint1)
-
-        # Ignored apps
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("History Ignored Apps:"))
         self.ignored_apps_entry = QLineEdit()
-        ignored_list = self.bridge.get("history_ignored_apps", [])
+        ignored_list = get_bind_var("history_ignored_apps", [])
         self.ignored_apps_entry.setText(", ".join(f'"{app}"' for app in ignored_list))
         self.ignored_apps_entry.setToolTip('Enter app names separated by commas, e.g: "Hyprshot", "Screenshot"')
-        row2.addWidget(self.ignored_apps_entry)
-        layout.addLayout(row2)
+        self.ignored_apps_entry.setMinimumHeight(32)
+        form.addRow("Ignored Apps:", self.ignored_apps_entry)
 
-        hint2 = QLabel('<small>Apps whose notifications are ignored in history (format: "App1", "App2")</small>')
-        hint2.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(hint2)
+        hint = QLabel('<small>Comma-separated app names, e.g: "Spotify", "Discord"</small>')
+        hint.setTextFormat(Qt.TextFormat.RichText)
+        hint.setObjectName("subtitle")
+        form.addRow("", hint)
+
+        layout.addWidget(section)
 
     def _build_metrics_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>System Metrics Options</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("System Metrics")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(15)
-        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(20)
+        grid.setVerticalSpacing(6)
 
-        grid.addWidget(QLabel("Show in Metrics"), 0, 0)
-        grid.addWidget(QLabel("Show in Small Metrics"), 0, 2)
+        # Column headers
+        metrics_header = QLabel("Metrics")
+        metrics_header.setStyleSheet("font-weight: 600;")
+        grid.addWidget(metrics_header, 0, 0)
+        small_header = QLabel("Small Metrics")
+        small_header.setStyleSheet("font-weight: 600;")
+        grid.addWidget(small_header, 0, 1)
 
-        metrics_vis = self.bridge.get("metrics_visible", {})
-        metrics_small_vis = self.bridge.get("metrics_small_visible", {})
+        metrics_vis = get_bind_var("metrics_visible", {})
+        metrics_small_vis = get_bind_var("metrics_small_visible", {})
 
         for i, (key, label) in enumerate(METRIC_NAMES.items()):
-            # Full metrics
-            grid.addWidget(QLabel(label), i + 1, 0)
-            cb = QCheckBox()
+            cb = QCheckBox(label)
             cb.setChecked(metrics_vis.get(key, True))
-            grid.addWidget(cb, i + 1, 1)
+            grid.addWidget(cb, i + 1, 0)
             self.metrics_switches[key] = cb
 
-            # Small metrics
-            grid.addWidget(QLabel(label), i + 1, 2)
-            cb_small = QCheckBox()
+            cb_small = QCheckBox(label)
             cb_small.setChecked(metrics_small_vis.get(key, True))
-            grid.addWidget(cb_small, i + 1, 3)
+            grid.addWidget(cb_small, i + 1, 1)
             self.metrics_small_switches[key] = cb_small
 
-        layout.addLayout(grid)
+        section_layout.addLayout(grid)
+        layout.addWidget(section)
 
     def _build_disk_section(self, layout: QVBoxLayout) -> None:
-        header = QLabel("<b>Disk directories for Metrics</b>")
-        header.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(header)
+        section = SettingsSection("Disk Directories")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
 
         self.disk_container = QVBoxLayout()
-        layout.addLayout(self.disk_container)
+        section_layout.addLayout(self.disk_container)
 
-        for path in self.bridge.get("bar_metrics_disks", ["/"]):
+        for path in get_bind_var("bar_metrics_disks", ["/"]):
             self._add_disk_entry(path)
 
-        add_btn = QPushButton("Add new disk")
+        add_btn = QPushButton("Add Directory")
+        add_btn.setObjectName("secondary")
+        add_btn.setMaximumWidth(130)
+        add_btn.setMinimumHeight(32)
         add_btn.clicked.connect(lambda: self._add_disk_entry("/"))
-        layout.addWidget(add_btn)
+        section_layout.addWidget(add_btn)
+
+        layout.addWidget(section)
 
     def _add_disk_entry(self, path: str) -> None:
         row = QHBoxLayout()
         entry = QLineEdit(path)
+        entry.setMinimumHeight(32)
         row.addWidget(entry)
 
         remove_btn = QPushButton("X")
-        remove_btn.setMaximumWidth(30)
+        remove_btn.setObjectName("danger")
+        remove_btn.setFixedSize(32, 32)
 
         container = QWidget()
         container.setLayout(row)
@@ -977,7 +924,7 @@ class AwShellSettings(FramelessMainWindow):
     def _on_apply(self) -> None:
         """Apply settings and restart Aw-Shell."""
         settings = self._collect_settings()
-        self.bridge.set_all(settings)
+        set_all_bind_vars(settings)
 
         # Handle face icon
         if self.selected_face_icon:
@@ -1000,7 +947,7 @@ class AwShellSettings(FramelessMainWindow):
         replace_idle = hasattr(self, 'idle_cb') and self.idle_cb.isChecked()
 
         # Apply and restart
-        self.bridge.apply_and_restart(replace_lock, replace_idle)
+        apply_and_restart(replace_lock, replace_idle)
 
         QMessageBox.information(self, APP_NAME_CAP, "Settings applied. Aw-Shell is restarting...")
 
@@ -1014,67 +961,67 @@ class AwShellSettings(FramelessMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            self.bridge.reset_to_defaults()
-            self._reload_widgets_from_bridge()
+            reset_to_defaults()
+            self._reload_widgets()
 
-    def _reload_widgets_from_bridge(self) -> None:
-        """Reload all widget values from the bridge."""
+    def _reload_widgets(self) -> None:
+        """Reload all widget values from bind_vars."""
         # Keybindings
         for prefix_key, suffix_key, prefix_entry, suffix_entry in self.keybind_entries:
-            prefix_entry.setText(str(self.bridge.get(prefix_key, "")))
-            suffix_entry.setText(str(self.bridge.get(suffix_key, "")))
+            prefix_entry.setText(str(get_bind_var(prefix_key, "")))
+            suffix_entry.setText(str(get_bind_var(suffix_key, "")))
 
         # Appearance
-        self.wall_dir_entry.setText(str(self.bridge.get("wallpapers_dir", "")))
-        self.datetime_12h_cb.setChecked(self.bridge.get("datetime_12h_format", False))
-        self.position_combo.setCurrentText(str(self.bridge.get("bar_position", "Top")))
-        self.centered_cb.setChecked(self.bridge.get("centered_bar", False))
-        self.dock_cb.setChecked(self.bridge.get("dock_enabled", True))
-        self.dock_always_cb.setChecked(self.bridge.get("dock_always_show", False))
-        self.dock_size_slider.setValue(int(self.bridge.get("dock_icon_size", 28)))
-        self.ws_num_cb.setChecked(self.bridge.get("bar_workspace_show_number", False))
-        self.ws_chinese_cb.setChecked(self.bridge.get("bar_workspace_use_chinese_numerals", False))
-        self.special_ws_cb.setChecked(self.bridge.get("bar_hide_special_workspace", True))
-        self.bar_theme_combo.setCurrentText(str(self.bridge.get("bar_theme", "Pills")))
-        self.dock_theme_combo.setCurrentText(str(self.bridge.get("dock_theme", "Pills")))
-        self.panel_theme_combo.setCurrentText(str(self.bridge.get("panel_theme", "Notch")))
-        self.panel_position_combo.setCurrentText(str(self.bridge.get("panel_position", "Center")))
-        self.notif_pos_combo.setCurrentText(str(self.bridge.get("notif_pos", "Top")))
-        self.corners_cb.setChecked(self.bridge.get("corners_visible", True))
+        self.wall_dir_entry.setText(str(get_bind_var("wallpapers_dir", "")))
+        self.datetime_12h_cb.setChecked(get_bind_var("datetime_12h_format", False))
+        self.position_combo.setCurrentText(str(get_bind_var("bar_position", "Top")))
+        self.centered_cb.setChecked(get_bind_var("centered_bar", False))
+        self.dock_cb.setChecked(get_bind_var("dock_enabled", True))
+        self.dock_always_cb.setChecked(get_bind_var("dock_always_show", False))
+        self.dock_size_slider.setValue(int(get_bind_var("dock_icon_size", 28)))
+        self.ws_num_cb.setChecked(get_bind_var("bar_workspace_show_number", False))
+        self.ws_chinese_cb.setChecked(get_bind_var("bar_workspace_use_chinese_numerals", False))
+        self.special_ws_cb.setChecked(get_bind_var("bar_hide_special_workspace", True))
+        self.bar_theme_combo.setCurrentText(str(get_bind_var("bar_theme", "Pills")))
+        self.dock_theme_combo.setCurrentText(str(get_bind_var("dock_theme", "Pills")))
+        self.panel_theme_combo.setCurrentText(str(get_bind_var("panel_theme", "Notch")))
+        self.panel_position_combo.setCurrentText(str(get_bind_var("panel_position", "Center")))
+        self.notif_pos_combo.setCurrentText(str(get_bind_var("notif_pos", "Top")))
+        self.corners_cb.setChecked(get_bind_var("corners_visible", True))
 
         # Component switches
         for name, cb in self.component_switches.items():
-            cb.setChecked(self.bridge.get(f"bar_{name}_visible", True))
+            cb.setChecked(get_bind_var(f"bar_{name}_visible", True))
 
         # System
-        self.auto_append_cb.setChecked(self.bridge.get("auto_append_hyprland", True))
-        self.terminal_entry.setText(str(self.bridge.get("terminal_command", "kitty -e")))
+        self.auto_append_cb.setChecked(get_bind_var("auto_append_hyprland", True))
+        self.terminal_entry.setText(str(get_bind_var("terminal_command", "kitty -e")))
 
         # Monitors
-        current_selection = self.bridge.get("selected_monitors", [])
+        current_selection = get_bind_var("selected_monitors", [])
         for name, cb in self.monitor_checkboxes.items():
             is_selected = len(current_selection) == 0 or name in current_selection
             cb.setChecked(is_selected)
 
         # Metrics
-        metrics_vis = self.bridge.get("metrics_visible", {})
+        metrics_vis = get_bind_var("metrics_visible", {})
         for k, cb in self.metrics_switches.items():
             cb.setChecked(metrics_vis.get(k, True))
 
-        metrics_small_vis = self.bridge.get("metrics_small_visible", {})
+        metrics_small_vis = get_bind_var("metrics_small_visible", {})
         for k, cb in self.metrics_small_switches.items():
             cb.setChecked(metrics_small_vis.get(k, True))
 
         # Disk entries
         for container in self.disk_entries[:]:
             self._remove_disk_entry(container)
-        for path in self.bridge.get("bar_metrics_disks", ["/"]):
+        for path in get_bind_var("bar_metrics_disks", ["/"]):
             self._add_disk_entry(path)
 
         # Notification apps
-        limited_list = self.bridge.get("limited_apps_history", [])
+        limited_list = get_bind_var("limited_apps_history", [])
         self.limited_apps_entry.setText(", ".join(f'"{app}"' for app in limited_list))
-        ignored_list = self.bridge.get("history_ignored_apps", [])
+        ignored_list = get_bind_var("history_ignored_apps", [])
         self.ignored_apps_entry.setText(", ".join(f'"{app}"' for app in ignored_list))
 
         # Reset lock/idle checkboxes
@@ -1093,6 +1040,7 @@ class AwShellSettings(FramelessMainWindow):
         self._on_dock_changed(Qt.CheckState.Checked.value if self.dock_cb.isChecked() else Qt.CheckState.Unchecked.value)
         self._on_ws_num_changed(Qt.CheckState.Checked.value if self.ws_num_cb.isChecked() else Qt.CheckState.Unchecked.value)
         self._on_panel_theme_changed(self.panel_theme_combo.currentText())
+
 
 def main():
     app = QApplication(sys.argv)

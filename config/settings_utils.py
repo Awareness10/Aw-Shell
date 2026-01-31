@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import subprocess
 import time
 import toml
 from pathlib import Path
@@ -28,8 +29,117 @@ CSS_COLORS = CONFIG_DIR / "styles" / "colors.css"
 bind_vars = {}  # Se inicializa vacío, load_bind_vars lo poblará
 
 
-def get_bind_var(setting_str: str):
+def get_bind_var(setting_str: str, default=None):
+    if default is not None:
+        return bind_vars.get(setting_str, default)
     return bind_vars.get(setting_str, get_default(setting_str))
+
+
+def set_bind_var(key: str, value) -> None:
+    bind_vars[key] = value
+
+
+def set_all_bind_vars(settings: dict) -> None:
+    bind_vars.clear()
+    bind_vars.update(settings)
+
+
+def save_bind_vars() -> None:
+    """Save current bind_vars to config.json."""
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        CONFIG_FILE.write_text(json.dumps(bind_vars, indent=4), encoding="utf-8")
+    except Exception as e:
+        print(f"Error saving config: {e}")
+
+
+def reset_to_defaults() -> None:
+    bind_vars.clear()
+    bind_vars.update(DEFAULTS.copy())
+
+
+def get_available_monitors() -> list:
+    """Get list of available monitors from Hyprland."""
+    try:
+        result = subprocess.run(
+            ["hyprctl", "monitors", "-j"], capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            monitors = json.loads(result.stdout)
+            return [
+                {"id": m.get("id", 0), "name": m.get("name", f"monitor-{m.get('id', 0)}")}
+                for m in monitors
+            ]
+    except Exception as e:
+        print(f"Error getting monitors: {e}")
+    return [{"id": 0, "name": "default"}]
+
+
+def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) -> None:
+    """Save settings, generate hyprconf, and restart Aw-Shell."""
+    save_bind_vars()
+
+    hypr_config_dir = CONFIG_DIR / "config" / "hypr"
+    hypr_config_dir.mkdir(parents=True, exist_ok=True)
+    hypr_conf_path = hypr_config_dir / f"{APP_NAME}.conf"
+
+    try:
+        hypr_conf_path.write_text(generate_hyprconf(), encoding="utf-8")
+    except Exception as e:
+        print(f"Error writing Hyprland config: {e}")
+
+    if replace_lock:
+        src = CONFIG_DIR / "config" / "hypr" / "hyprlock.conf"
+        dest = Path.home() / ".config" / "hypr" / "hyprlock.conf"
+        if src.exists():
+            backup_and_replace(src, dest, "Hyprlock")
+
+    if replace_idle:
+        src = CONFIG_DIR / "config" / "hypr" / "hypridle.conf"
+        dest = Path.home() / ".config" / "hypr" / "hypridle.conf"
+        if src.exists():
+            backup_and_replace(src, dest, "Hypridle")
+
+    if get_bind_var("auto_append_hyprland"):
+        hypr_path = Path.home() / ".config" / "hypr" / "hyprland.conf"
+        source_string = f"source = ~/.config/{APP_NAME}/config/hypr/{APP_NAME}.conf"
+        try:
+            needs_append = True
+            if hypr_path.exists():
+                if source_string in hypr_path.read_text(encoding="utf-8"):
+                    needs_append = False
+            else:
+                hypr_path.parent.mkdir(parents=True, exist_ok=True)
+            if needs_append:
+                with open(hypr_path, "a") as f:
+                    f.write("\n" + source_string)
+        except Exception as e:
+            print(f"Error updating hyprland.conf: {e}")
+
+    try:
+        subprocess.run(["hyprctl", "reload"], capture_output=True)
+    except Exception as e:
+        print(f"Error reloading Hyprland: {e}")
+
+    main_py = str(CONFIG_DIR / "main.py")
+    try:
+        subprocess.Popen(
+            f"killall {APP_NAME}", shell=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        ).wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        pass
+    except Exception as e:
+        print(f"Error killing {APP_NAME}: {e}")
+
+    try:
+        subprocess.Popen(
+            ["uwsm", "app", "--", "python", main_py],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except Exception as e:
+        print(f"Error restarting {APP_NAME_CAP}: {e}")
 
 
 def deep_update(target: dict, update: dict) -> dict:
