@@ -11,11 +11,11 @@ from pyqt_theme import generate_theme
 
 def _init_theme_from_wallpaper():
     """Initialize pyqt_theme from current wallpaper using matugen."""
-    wallpaper_path = (Path.home() / ".current.wall").resolve(strict=False)
+    wallpaper_path = Path.home() / ".current.wall"
 
     if wallpaper_path.exists():
         try:
-            new_theme, backend = generate_theme(image_path="~/.current.wall")
+            new_theme, backend = generate_theme(image_path=str(wallpaper_path))
             # Must update both: package namespace AND theme module's global
             # (get_current_theme() reads from theme module's globals)
             pyqt_theme.theme = new_theme
@@ -61,8 +61,8 @@ def open_config():
     _init_theme_from_wallpaper()
 
     #show_lock_checkbox = True
-    dest_lock = Path("~/.config/hypr/hyprlock.conf").resolve()
-    src_lock = Path(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf").resolve()
+    dest_lock = Path.home() / ".config/hypr/hyprlock.conf"
+    src_lock = Path.home() / f".config/{APP_NAME}/config/hypr/hyprlock.conf"
     if not dest_lock.exists() and src_lock.exists():
         try:
             os.makedirs(os.path.dirname(dest_lock), exist_ok=True)
@@ -74,8 +74,8 @@ def open_config():
             #show_lock_checkbox = os.path.exists(src_lock)
 
     #show_idle_checkbox = True
-    dest_idle = os.path.expanduser("~/.config/hypr/hypridle.conf")
-    src_idle = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf")
+    dest_idle = Path.home() / ".config/hypr/hypridle.conf"
+    src_idle = Path.home() / f".config/{APP_NAME}/config/hypr/hypridle.conf"
     if not os.path.exists(dest_idle) and os.path.exists(src_idle):
         try:
             os.makedirs(os.path.dirname(dest_idle), exist_ok=True)
@@ -92,7 +92,5 @@ def open_config():
     sys.exit(app.exec())
 
     
-
-
 if __name__ == "__main__":
     open_config()

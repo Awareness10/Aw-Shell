@@ -15,13 +15,14 @@ USERNAME = os.getlogin()
 HOSTNAME = os.uname().nodename
 
 HOME_DIR = Path.home()
-CONFIG_DIR = HOME_DIR / ".config" / f"{APP_NAME}" / "config"
-CONFIG_FILE = CONFIG_DIR / "config.json"
+CONFIG_DIR = HOME_DIR / ".config"
+AW_CONFIG_DIR = CONFIG_DIR / f"{APP_NAME}" / "config"
+CONFIG_FILE = AW_CONFIG_DIR / "config.json"
 
 FACE_ICON = HOME_DIR / ".face.icon"
-DEFAULT_FACE_ICON = HOME_DIR / ".config" / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
+DEFAULT_FACE_ICON = CONFIG_DIR / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
 
-MATUGEN_STATE_FILE = CONFIG_DIR / "matugen"
+MATUGEN_STATE_FILE = AW_CONFIG_DIR / "matugen"
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()
