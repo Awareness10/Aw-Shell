@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import subprocess
 import time
 import toml
 from pathlib import Path
@@ -233,7 +232,7 @@ exec-once =  wl-paste --type text --watch cliphist store
 exec-once =  wl-paste --type image --watch cliphist store
 
 $fabricSend = fabric-cli exec {APP_NAME}
-$axMessage = notify-send "{USERNAME}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{CONFIG_DIR}/assets/ax.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
+$axMessage = notify-send "{USERNAME}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{CONFIG_DIR}/assets/tanjiro-kamado-red.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
 
 bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $(python {str(APP_MAIN)}) # Reload {APP_NAME_CAP}
 bind = {get_bind_var("prefix_axmsg")}, {get_bind_var("suffix_axmsg")}, exec, $axMessage # Message
