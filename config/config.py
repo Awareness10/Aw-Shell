@@ -11,22 +11,19 @@ from pyqt_theme import generate_theme
 
 def _init_theme_from_wallpaper():
     """Initialize pyqt_theme from current wallpaper using matugen."""
-    wallpaper_path = os.path.expanduser("~/.current.wall")
+    wallpaper_path = Path("~/.current.wall").resolve()
 
-    if os.path.exists(wallpaper_path):
-        # Resolve symlink to get actual path
-        real_path = os.path.realpath(wallpaper_path)
-        if os.path.exists(real_path):
-            try:
-                new_theme, backend = generate_theme(image_path=real_path)
-                # Must update both: package namespace AND theme module's global
-                # (get_current_theme() reads from theme module's globals)
-                pyqt_theme.theme = new_theme
-                # Access the actual module via sys.modules to set its global
-                sys.modules['pyqt_theme.theme'].theme = new_theme # type: ignore
-                print(f"Loaded theme from wallpaper using {backend}")
-            except Exception as e:
-                print(f"Warning: Could not generate theme from wallpaper: {e}")
+    if wallpaper_path.exists():
+        try:
+            new_theme, backend = generate_theme(image_path=str(wallpaper_path))
+            # Must update both: package namespace AND theme module's global
+            # (get_current_theme() reads from theme module's globals)
+            pyqt_theme.theme = new_theme
+            # Access the actual module via sys.modules to set its global
+            sys.modules['pyqt_theme.theme'].theme = new_theme # type: ignore
+            print(f"Loaded theme from wallpaper using {backend}")
+        except Exception as e:
+            print(f"Warning: Could not generate theme from wallpaper: {e}")
     else:
         print("Warning: No wallpaper found at ~/.current.wall, using default theme")
 
@@ -64,9 +61,9 @@ def open_config():
     _init_theme_from_wallpaper()
 
     #show_lock_checkbox = True
-    dest_lock = os.path.expanduser("~/.config/hypr/hyprlock.conf")
-    src_lock = os.path.expanduser(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf")
-    if not os.path.exists(dest_lock) and os.path.exists(src_lock):
+    dest_lock = Path("~/.config/hypr/hyprlock.conf").resolve()
+    src_lock = Path(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf").resolve()
+    if not dest_lock.exists() and src_lock.exists():
         try:
             os.makedirs(os.path.dirname(dest_lock), exist_ok=True)
             shutil.copy(src_lock, dest_lock)
