@@ -29,8 +29,8 @@ from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow
 from config.settings_utils import (
     get_bind_var, set_all_bind_vars, reset_to_defaults,
     apply_and_restart, get_available_monitors, load_bind_vars,
+    APP_NAME, APP_NAME_CAP
 )
-from config.settings_constants import APP_NAME, APP_NAME_CAP
 
 # Constants matching the original GTK implementation
 POSITIONS = ["Top", "Bottom", "Left", "Right"]
