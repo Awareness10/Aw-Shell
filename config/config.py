@@ -47,11 +47,11 @@ def _configure_sys_path_for_direct_execution():
 _configure_sys_path_for_direct_execution()
 
 if __name__ == "__main__" and not __package__:
-    from config.data import APP_NAME
+    from config.settings_constants import APP_NAME
     from config.settings_gui import AwShellSettings # AwShellSettings
     from config.settings_utils import load_bind_vars
 else:
-    from .data import APP_NAME
+    from .settings_constants import APP_NAME
     from .settings_gui import AwShellSettings
     from .settings_utils import load_bind_vars
 
