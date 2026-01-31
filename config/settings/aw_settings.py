@@ -29,7 +29,7 @@ from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow
 from config.settings_utils import (
     get_bind_var, set_all_bind_vars, reset_to_defaults,
     apply_and_restart, get_available_monitors, load_bind_vars,
-    APP_NAME, APP_NAME_CAP
+    APP_NAME, APP_NAME_CAP, HOME_DIR
 )
 
 # Constants matching the original GTK implementation
@@ -101,8 +101,8 @@ class AwShellSettings(FramelessMainWindow):
         load_bind_vars()
 
         # Check for hyprlock/hypridle source files
-        self.show_lock_checkbox = Path(f"~/.config/{APP_NAME}/config/hypr/hyprlock.conf").exists()
-        self.show_idle_checkbox = Path(f"~/.config/{APP_NAME}/config/hypr/hypridle.conf").exists()
+        self.show_lock_checkbox = (HOME_DIR / ".config" / "hypr" / "hyprlock.conf").exists()
+        self.show_idle_checkbox = (HOME_DIR / ".config" / "hypr" / "hypridle.conf").exists()
 
         # Widget references
         self.keybind_entries: List[Tuple[str, str, QLineEdit, QLineEdit]] = []
