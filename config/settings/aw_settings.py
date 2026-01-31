@@ -271,7 +271,7 @@ class AwShellSettings(FramelessMainWindow):
                 prefix_entry.setText(str(get_bind_var(prefix_key, "")))
                 prefix_entry.setPlaceholderText("SUPER ...")
                 prefix_entry.setMinimumHeight(32)
-                prefix_entry.setMaximumWidth(130)
+                prefix_entry.setMaximumWidth(140)
                 grid.addWidget(prefix_entry, row, 1)
 
                 plus_lbl = QLabel("+")

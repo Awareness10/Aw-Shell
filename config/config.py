@@ -11,7 +11,7 @@ from pyqt_theme import generate_theme
 
 def _init_theme_from_wallpaper():
     """Initialize pyqt_theme from current wallpaper using matugen."""
-    wallpaper_path = Path("~/.current.wall").resolve()
+    wallpaper_path = (Path.home() / ".current.wall").resolve(strict=False)
 
     if wallpaper_path.exists():
         try:
