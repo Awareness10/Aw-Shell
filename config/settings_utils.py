@@ -78,7 +78,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
     """Save settings, generate hyprconf, and restart Aw-Shell."""
     save_bind_vars()
 
-    hypr_config_dir = CONFIG_DIR / "config" / "hypr"
+    hypr_config_dir = AW_CONFIG_DIR / "hypr"
     hypr_config_dir.mkdir(parents=True, exist_ok=True)
     hypr_conf_path = hypr_config_dir / f"{APP_NAME}.conf"
 
@@ -88,19 +88,19 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
         print(f"Error writing Hyprland config: {e}")
 
     if replace_lock:
-        src = CONFIG_DIR / "config" / "hypr" / "hyprlock.conf"
-        dest = Path.home() / ".config" / "hypr" / "hyprlock.conf"
+        src = AW_CONFIG_DIR / "hypr" / "hyprlock.conf"
+        dest = CONFIG_DIR / "hypr" / "hyprlock.conf"
         if src.exists():
             backup_and_replace(src, dest, "Hyprlock")
 
     if replace_idle:
-        src = CONFIG_DIR / "config" / "hypr" / "hypridle.conf"
-        dest = Path.home() / ".config" / "hypr" / "hypridle.conf"
+        src = AW_CONFIG_DIR / "hypr" / "hypridle.conf"
+        dest = CONFIG_DIR / "hypr" / "hypridle.conf"
         if src.exists():
             backup_and_replace(src, dest, "Hypridle")
 
     if get_bind_var("auto_append_hyprland"):
-        hypr_path = Path.home() / ".config" / "hypr" / "hyprland.conf"
+        hypr_path = CONFIG_DIR / "hypr" / "hyprland.conf"
         source_string = f"source = ~/.config/{APP_NAME}/config/hypr/{APP_NAME}.conf"
         try:
             needs_append = True
@@ -120,7 +120,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
     except Exception as e:
         print(f"Error reloading Hyprland: {e}")
 
-    main_py = str(CONFIG_DIR / "main.py")
+    main_py = str(CONFIG_DIR / f"{APP_NAME}" / "main.py")
     try:
         subprocess.Popen(
             f"killall {APP_NAME}", shell=True,
@@ -244,7 +244,7 @@ def ensure_matugen_config():
     HYPR_COLORS.parent.mkdir(parents=True, exist_ok=True)
     CSS_COLORS.parent.mkdir(parents=True, exist_ok=True)
 
-    example_wallpaper = CONFIG_DIR / "assets" / "wallpapers_example" / "example-1.jpg"
+    example_wallpaper = CONFIG_DIR / f"{APP_NAME}" / "assets" / "wallpapers_example" / "example-1.jpg"
 
     image_path: Path | None = None
 
