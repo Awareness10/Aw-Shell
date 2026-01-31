@@ -22,7 +22,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 FACE_ICON = HOME_DIR / ".face.icon"
 DEFAULT_FACE_ICON = HOME_DIR / ".config" / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
 
-sys.path.append(str(Path(CONFIG_DIR / "matugen")))
+MATUGEN_STATE_FILE = HOME_DIR / ".config" / "matugen" / "config.toml"
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()
