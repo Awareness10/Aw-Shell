@@ -101,7 +101,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
 
     if get_bind_var("auto_append_hyprland"):
         hypr_path = CONFIG_DIR / "hypr" / "hyprland.conf"
-        source_string = f"source = ~/.config/{APP_NAME}/config/hypr/{APP_NAME}.conf"
+        source_string = f"source = {AW_CONFIG_DIR}/hypr/{APP_NAME}.conf"
         try:
             needs_append = True
             if hypr_path.exists():
@@ -194,11 +194,11 @@ def ensure_matugen_config():
         },
         "templates": {
             "hyprland": {
-                "input_path": f"~/.config/{APP_NAME}/config/matugen/templates/hyprland-colors.conf",
-                "output_path": f"~/.config/{APP_NAME}/config/hypr/colors.conf",
+                "input_path": f"{AW_CONFIG_DIR}/matugen/templates/hyprland-colors.conf",
+                "output_path": f"{AW_CONFIG_DIR}/hypr/colors.conf",
             },
             f"{APP_NAME}": {
-                "input_path": f"~/.config/{APP_NAME}/config/matugen/templates/{APP_NAME}.css",
+                "input_path": f"{AW_CONFIG_DIR}/matugen/templates/{APP_NAME}.css",
                 "output_path": f"~/.config/{APP_NAME}/styles/colors.css",
                 "post_hook": f"fabric-cli exec {APP_NAME} 'app.set_css()' &",
             },
@@ -328,7 +328,8 @@ def generate_hyprconf() -> str:
     """
     Generate the Hypr configuration string using the current bind_vars.
     """
-    APP_MAIN = AW_CONFIG_DIR / "main.py"
+    LOCAL_APP = CONFIG_DIR / APP_NAME
+    APP_MAIN = LOCAL_APP / "main.py"
     # Determine animation type based on bar position
     bar_position = get_bind_var("bar_position")
     is_vertical = bar_position in ["Left", "Right"]
@@ -341,7 +342,7 @@ exec-once =  wl-paste --type text --watch cliphist store
 exec-once =  wl-paste --type image --watch cliphist store
 
 $fabricSend = fabric-cli exec {APP_NAME}
-$axMessage = notify-send "{USERNAME}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{AW_CONFIG_DIR}/assets/tanjiro-kamado-red.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
+$axMessage = notify-send "{USERNAME}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{LOCAL_APP}/assets/tanjiro-kamado-red.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
 
 bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $(python {str(APP_MAIN)}) # Reload {APP_NAME_CAP}
 bind = {get_bind_var("prefix_axmsg")}, {get_bind_var("suffix_axmsg")}, exec, $axMessage # Message
@@ -444,7 +445,7 @@ def start_config() -> None:
     ensure_face_icon()
 
     print(f"{time.time():.4f}: start_config: Generating hypr conf...")
-    hypr_config_dir = CONFIG_DIR / "hypr"
+    hypr_config_dir = AW_CONFIG_DIR / "hypr"
     hypr_config_dir.mkdir(parents=True, exist_ok=True)
     hypr_conf_path = hypr_config_dir / f"{APP_NAME}.conf"
 
