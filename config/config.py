@@ -15,7 +15,7 @@ def _init_theme_from_wallpaper():
 
     if wallpaper_path.exists():
         try:
-            new_theme, backend = generate_theme(image_path=str(wallpaper_path))
+            new_theme, backend = generate_theme(image_path="~/.current.wall")
             # Must update both: package namespace AND theme module's global
             # (get_current_theme() reads from theme module's globals)
             pyqt_theme.theme = new_theme
