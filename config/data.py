@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from pathlib import Path
 
 from .settings_constants import DEFAULTS, APP_NAME
@@ -15,14 +14,14 @@ CACHE_DIR = str(GLib.get_user_cache_dir()) + f"/{APP_NAME}"
 USERNAME = os.getlogin()
 HOSTNAME = os.uname().nodename
 
-HOME_DIR = Path().home().resolve()
+HOME_DIR = Path.home()
 CONFIG_DIR = HOME_DIR / ".config" / f"{APP_NAME}" / "config"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 FACE_ICON = HOME_DIR / ".face.icon"
 DEFAULT_FACE_ICON = HOME_DIR / ".config" / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
 
-MATUGEN_STATE_FILE = HOME_DIR / ".config" / "matugen" / "config.toml"
+MATUGEN_STATE_FILE = CONFIG_DIR / "matugen"
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()
@@ -42,13 +41,7 @@ def load_config():
     return config
 
 # Load configuration once and use throughout the module
-""" config = {}
-if os.path.exists(CONFIG_FILE):
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            config = json.load(f)
-    except Exception as e:
-        print(f"Error loading config file: {e}") """
+config = load_config()
 
 
 def get_default(setting_str: str):
@@ -56,7 +49,6 @@ def get_default(setting_str: str):
 
 
 def _get_config_var(setting_str: str):
-    config = load_config()
     return config.get(setting_str, get_default(setting_str))
 
 
