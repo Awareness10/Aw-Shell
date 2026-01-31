@@ -111,9 +111,9 @@ class HyprConfGUI(Window):
 
     def _on_ws_num_changed(self, switch, gparam) -> None:
         is_active = switch.get_active()
-        self.appearance.ws_chinese_switch.set_sensitive(is_active)
+        self.appearance.ws_runes_switch.set_sensitive(is_active)
         if not is_active:
-            self.appearance.ws_chinese_switch.set_active(False)
+            self.appearance.ws_runes_switch.set_active(False)
 
     def _on_panel_theme_changed(self, combo) -> None:
         selected_theme = combo.get_active_text()
@@ -191,7 +191,7 @@ class HyprConfGUI(Window):
         settings["auto_append_hyprland"] = self.system.auto_append_switch.get_active()
         settings["corners_visible"] = self.appearance.corners_switch.get_active()
         settings["bar_workspace_show_number"] = self.appearance.ws_num_switch.get_active()
-        settings["bar_workspace_use_chinese_numerals"] = self.appearance.ws_chinese_switch.get_active()
+        settings["bar_workspace_use_runes"] = self.appearance.ws_runes_switch.get_active()
         settings["bar_hide_special_workspace"] = self.appearance.special_ws_switch.get_active()
         settings["bar_theme"] = self.appearance.bar_theme_combo.get_active_text()
         settings["dock_theme"] = self.appearance.dock_theme_combo.get_active_text()
@@ -394,8 +394,8 @@ class HyprConfGUI(Window):
         self.system.auto_append_switch.set_active(get_bind_var("auto_append_hyprland"))
 
         self.appearance.ws_num_switch.set_active(get_bind_var("bar_workspace_show_number"))
-        self.appearance.ws_chinese_switch.set_active(get_bind_var("bar_workspace_use_chinese_numerals"))
-        self.appearance.ws_chinese_switch.set_sensitive(self.appearance.ws_num_switch.get_active())
+        self.appearance.ws_runes_switch.set_active(get_bind_var("bar_workspace_use_runes"))
+        self.appearance.ws_runes_switch.set_sensitive(self.appearance.ws_num_switch.get_active())
         self.appearance.special_ws_switch.set_active(get_bind_var("bar_hide_special_workspace"))
 
         default_theme = get_default("bar_theme")

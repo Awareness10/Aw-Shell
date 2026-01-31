@@ -24,7 +24,7 @@ from modules.systemtray import SystemTray
 from modules.weather import Weather
 from widgets.wayland import WaylandWindow as Window
 
-CHINESE_NUMERALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "〇"]
+RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚯ", "ᚱ", "ᚴ", "ᚼ", "ᚾ", "ᛁ", "ᛅ"]
 
 # Tooltips
 tooltip_apps = f"""<b><u>Launcher</u></b>
@@ -135,7 +135,7 @@ class Bar(Window):
             empty_scroll=True,
             v_align="fill",
             orientation="h" if not data.VERTICAL else "v",
-            spacing=0 if not data.BAR_WORKSPACE_USE_CHINESE_NUMERALS else 4,
+            spacing=0 if not data.BAR_WORKSPACE_USE_RUNES else 4,
             buttons=[
                 WorkspaceButton(
                     h_expand=False,
@@ -144,9 +144,9 @@ class Bar(Window):
                     v_align="center",
                     id=i,
                     label=(
-                        CHINESE_NUMERALS[i - 1]
-                        if data.BAR_WORKSPACE_USE_CHINESE_NUMERALS
-                        and 0 <= (i - 1) < len(CHINESE_NUMERALS)
+                        RUNES[i - 1]
+                        if data.BAR_WORKSPACE_USE_RUNES
+                        and 0 <= (i - 1) < len(RUNES)
                         else str(i)
                     ),
                 )
@@ -491,7 +491,7 @@ class Bar(Window):
             self.bar_inner.add_style_class("vertical")
 
         self.systray._update_visibility()
-        self.chinese_numbers()
+        self.runic_numbers()
 
     def apply_component_props(self):
         components = {
@@ -618,8 +618,8 @@ class Bar(Window):
                 # Focus the notch window to bring it to front
                 GLib.idle_add(lambda: exec_shell_command_async("hyprctl dispatch focuswindow class:notch") if self.notch else None)
 
-    def chinese_numbers(self):
-        if data.BAR_WORKSPACE_USE_CHINESE_NUMERALS:
-            self.workspaces_num.add_style_class("chinese")
+    def runic_numbers(self):
+        if data.BAR_WORKSPACE_USE_RUNES:
+            self.workspaces_num.add_style_class("runic")
         else:
-            self.workspaces_num.remove_style_class("chinese")
+            self.workspaces_num.remove_style_class("runic")

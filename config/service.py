@@ -30,7 +30,7 @@ class DockConfig:
 @dataclass(slots=True)
 class WorkspaceConfig:
     show_number: bool = False
-    use_chinese_numerals: bool = False
+    use_runes: bool = False
     hide_special: bool = True
 
 
@@ -111,7 +111,7 @@ class ConfigService:
     def workspace(self) -> WorkspaceConfig:
         return WorkspaceConfig(
             show_number=self._data.BAR_WORKSPACE_SHOW_NUMBER,
-            use_chinese_numerals=self._data.BAR_WORKSPACE_USE_CHINESE_NUMERALS,
+            use_runes=self._data.BAR_WORKSPACE_USE_RUNES,
             hide_special=self._data.BAR_HIDE_SPECIAL_WORKSPACE,
         )
 

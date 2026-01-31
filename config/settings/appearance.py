@@ -42,7 +42,7 @@ class AppearanceWidgets:
     __slots__ = (
         'wall_dir_chooser', 'face_image', 'face_status_label', 'selected_face_icon',
         'datetime_12h_switch', 'position_combo', 'centered_switch', 'dock_switch',
-        'dock_hover_switch', 'dock_size_scale', 'ws_num_switch', 'ws_chinese_switch',
+        'dock_hover_switch', 'dock_size_scale', 'ws_num_switch', 'ws_runes_switch',
         'special_ws_switch', 'bar_theme_combo', 'dock_theme_combo', 'panel_theme_combo',
         'panel_position_combo', 'notification_pos_combo', 'component_switches', 'corners_switch',
     )
@@ -285,20 +285,20 @@ def _add_workspace_rows(grid: Gtk.Grid, widgets: AppearanceWidgets, row1: int, r
     ws_num_switch_container.add(widgets.ws_num_switch)
     grid.attach(ws_num_switch_container, 1, row1, 1, 1)
 
-    ws_chinese_label = Label(label="Use Chinese Numerals", h_align="start", v_align="center")
-    grid.attach(ws_chinese_label, 2, row1, 1, 1)
+    ws_runes_label = Label(label="Use runes Numerals", h_align="start", v_align="center")
+    grid.attach(ws_runes_label, 2, row1, 1, 1)
 
-    ws_chinese_switch_container = Gtk.Box(
+    ws_runes_switch_container = Gtk.Box(
         orientation=Gtk.Orientation.HORIZONTAL,
         halign=Gtk.Align.START,
         valign=Gtk.Align.CENTER,
     )
-    widgets.ws_chinese_switch = Gtk.Switch(
-        active=get_bind_var("bar_workspace_use_chinese_numerals"),
+    widgets.ws_runes_switch = Gtk.Switch(
+        active=get_bind_var("bar_workspace_use_runes"),
         sensitive=widgets.ws_num_switch.get_active(),
     )
-    ws_chinese_switch_container.add(widgets.ws_chinese_switch)
-    grid.attach(ws_chinese_switch_container, 3, row1, 1, 1)
+    ws_runes_switch_container.add(widgets.ws_runes_switch)
+    grid.attach(ws_runes_switch_container, 3, row1, 1, 1)
 
     special_ws_label = Label(label="Hide Special Workspace", h_align="start", v_align="center")
     grid.attach(special_ws_label, 0, row2, 1, 1)
