@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from .settings_constants import DEFAULTS, APP_NAME
+from .settings_constants import DEFAULTS, APP_NAME, APP_NAME_CAP # noqa: F401
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -22,7 +22,7 @@ CONFIG_FILE = AW_CONFIG_DIR / "config.json"
 FACE_ICON = HOME_DIR / ".face.icon"
 DEFAULT_FACE_ICON = CONFIG_DIR / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
 
-MATUGEN_STATE_FILE = AW_CONFIG_DIR / "matugen"
+MATUGEN_STATE_FILE = AW_CONFIG_DIR / "matugen" / "matugen-state"
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()

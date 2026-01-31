@@ -8,7 +8,7 @@ from fabric import Application
 from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
-from config.data import APP_NAME, APP_NAME_CAP, CACHE_DIR, CONFIG_FILE, HOME_DIR
+from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
 from modules.bar import Bar
 from modules.corners import Corners
 from modules.dock import Dock
