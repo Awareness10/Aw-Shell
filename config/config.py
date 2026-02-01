@@ -5,12 +5,12 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 #from fabric import Application
-import pyqt_theme
-from pyqt_theme import generate_theme
+import glaze
+from glaze import generate_theme
 
 
 def _init_theme_from_wallpaper():
-    """Initialize pyqt_theme from current wallpaper using matugen."""
+    """Initialize glaze theme from current wallpaper using matugen."""
     wallpaper_path = Path.home() / ".current.wall"
 
     if wallpaper_path.exists():
@@ -18,9 +18,9 @@ def _init_theme_from_wallpaper():
             new_theme, backend = generate_theme(image_path=str(wallpaper_path))
             # Must update both: package namespace AND theme module's global
             # (get_current_theme() reads from theme module's globals)
-            pyqt_theme.theme = new_theme
+            glaze.theme = new_theme
             # Access the actual module via sys.modules to set its global
-            sys.modules['pyqt_theme.theme'].theme = new_theme # type: ignore
+            sys.modules['glaze.theme'].theme = new_theme # type: ignore
             print(f"Loaded theme from wallpaper using {backend}")
         except Exception as e:
             print(f"Warning: Could not generate theme from wallpaper: {e}")

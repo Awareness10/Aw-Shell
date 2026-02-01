@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor, QPixmap
 
-from pyqt_theme.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
-from pyqt_theme.widgets import ThemedComboBox, FramelessMainWindow, DonateButton
+from glaze.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
+from glaze.widgets import ThemedComboBox, FramelessMainWindow, DonateButton
 
 from config.settings_utils import (
     get_bind_var, set_all_bind_vars, reset_to_defaults,
