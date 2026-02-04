@@ -186,9 +186,12 @@ class AnimatedStack(QStackedWidget):
         transition: Optional[str] = None,
         duration: Optional[int] = None,
     ):
+        print(f"[AnimatedStack] switch_to({index}), current={self.currentIndex()}, animating={self._animating}", flush=True)
         if self._animating:
+            print("[AnimatedStack] Already animating, returning", flush=True)
             return
         if index == self.currentIndex():
+            print("[AnimatedStack] Already at target index", flush=True)
             self.transition_finished.emit(index)
             return
 

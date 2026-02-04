@@ -160,10 +160,10 @@ class Bar(QWidget):
         self.button_tools = _make_icon_button("\uebca", "Toolbox")
         self.button_power = _make_icon_button("\ueb0d", "Power Menu")
 
-        self.button_apps.clicked.connect(lambda: state.notch_opened.emit("launcher"))
-        self.button_overview.clicked.connect(lambda: state.notch_opened.emit("overview"))
-        self.button_tools.clicked.connect(lambda: state.notch_opened.emit("tools"))
-        self.button_power.clicked.connect(lambda: state.notch_opened.emit("power"))
+        self.button_apps.clicked.connect(lambda: (print("[Bar] Apps clicked", flush=True), state.notch_opened.emit("launcher")))
+        self.button_overview.clicked.connect(lambda: (print("[Bar] Overview clicked", flush=True), state.notch_opened.emit("overview")))
+        self.button_tools.clicked.connect(lambda: (print("[Bar] Tools clicked", flush=True), state.notch_opened.emit("tools")))
+        self.button_power.clicked.connect(lambda: (print("[Bar] Power clicked", flush=True), state.notch_opened.emit("power")))
 
         # Workspaces
         self.workspaces = WorkspaceIndicator(
