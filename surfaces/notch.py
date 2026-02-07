@@ -12,7 +12,7 @@ from datetime import datetime as dt
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal, QSize
-from PySide6.QtGui import QFont, QScreen
+from PySide6.QtGui import QFont, QKeySequence, QScreen, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QVBoxLayout, QWidget, QFrame,
     QSizePolicy,
@@ -234,9 +234,6 @@ class Notch(QWidget):
 
     def close_notch(self):
         """Return to compact view."""
-        import traceback
-        print(f"[Notch] close_notch called, is_open={self._is_open}", flush=True)
-        print("".join(traceback.format_stack()[-5:-1]), flush=True)
         if not self._is_open:
             return
 
@@ -262,11 +259,10 @@ class Notch(QWidget):
 class NotchSurface(OverlaySurface):
     """Layer-shell surface containing the Notch widget.
 
-    Handles:
-    - Positioning based on theme (Notch vs Panel) and bar position
-    - Slide reveal animation
-    - Keyboard interactivity switching
-    - Occlusion coordination
+    Key design: Fabric uses anchor="top" (NOT top+left+right) so the
+    surface auto-sizes to its content and floats centered — it does NOT
+    stretch across the full screen width.  This prevents the overlay
+    from being an invisible click-blocker over the entire top edge.
     """
 
     def __init__(
@@ -275,33 +271,26 @@ class NotchSurface(OverlaySurface):
         screen: Optional[QScreen] = None,
         parent=None,
     ):
-        # Determine position and anchors from config
         panel_theme = state.get("panel_theme", "Notch")
         bar_position = state.get("bar_position", "Top")
-        panel_position = state.get("panel_position", "Center")
+        bar_theme = state.get("bar_theme", "Pills")
         vertical = bar_position in ("Left", "Right")
 
-        # Calculate anchors based on theme and position
+        # Fabric notch anchoring — single edge only, auto-sized
         if panel_theme == "Notch":
-            # Notch theme: always top-center
-            anchors = Anchor.TOP | Anchor.LEFT | Anchor.RIGHT
+            anchors = Anchor.TOP
             self._slide_direction = "down"
-            margins = (0, 0, 0, 0)
         else:
-            # Panel theme: follows bar position
-            if bar_position == "Top":
-                anchors = Anchor.TOP | Anchor.LEFT | Anchor.RIGHT
-                self._slide_direction = "down"
-            elif bar_position == "Bottom":
-                anchors = Anchor.BOTTOM | Anchor.LEFT | Anchor.RIGHT
-                self._slide_direction = "up"
-            elif bar_position == "Left":
-                anchors = Anchor.LEFT | Anchor.TOP | Anchor.BOTTOM
-                self._slide_direction = "right"
-            else:  # Right
-                anchors = Anchor.RIGHT | Anchor.TOP | Anchor.BOTTOM
-                self._slide_direction = "left"
-            margins = (0, 0, 0, 0)
+            edge_map = {"Top": Anchor.TOP, "Bottom": Anchor.BOTTOM,
+                        "Left": Anchor.LEFT, "Right": Anchor.RIGHT}
+            anchors = edge_map.get(bar_position, Anchor.TOP)
+            dir_map = {"Top": "down", "Bottom": "up",
+                       "Left": "right", "Right": "left"}
+            self._slide_direction = dir_map.get(bar_position, "down")
+
+        # Margins matching Fabric: pills=-40px top, dense/edge=-46px top
+        top_margin = -40 if bar_theme == "Pills" else -46
+        margins = (top_margin, 0, 0, 0)
 
         super().__init__(
             anchors=anchors,
@@ -320,101 +309,152 @@ class NotchSurface(OverlaySurface):
         self.notch = Notch(state, vertical=vertical)
         self.content_layout.addWidget(self.notch)
 
+        # Compact size — narrow, matching Fabric's notch-hover-eventbox min-width
+        self.setFixedWidth(260)
+
+        # Escape shortcut — works regardless of which child has focus
+        esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        esc.activated.connect(self.notch.close_notch)
+
         # Connect signals
         self.notch.opened.connect(self._on_opened)
         self.notch.closed.connect(self._on_closed)
         state.occlusion_changed.connect(self._on_occlusion)
 
-        # Style
         self.setObjectName("notch-surface")
 
+    # Module-specific surface sizes (width, min_height)
+    _MODULE_SIZES = {
+        "dashboard": (780, 500),
+        "launcher":  (600, 450),
+        "power":     (500, 300),
+        "overview":  (700, 450),
+        "tools":     (600, 400),
+        "emoji":     (600, 450),
+    }
+    _DEFAULT_SIZE = (600, 450)
+
     def _on_opened(self, module: str):
-        """When notch opens, grab keyboard."""
+        """When notch opens, expand surface and grab keyboard."""
+        w, h = self._MODULE_SIZES.get(module, self._DEFAULT_SIZE)
+        self.setFixedWidth(w)
+        self.setMinimumHeight(h)
         self.set_keyboard_interactivity(KeyboardInteractivity.EXCLUSIVE)
         self._reveal(True)
 
     def _on_closed(self):
-        """When notch closes, release keyboard."""
+        """When notch closes, shrink surface and release keyboard."""
         self.set_keyboard_interactivity(KeyboardInteractivity.NONE)
+        self.setMinimumHeight(0)
+        self.setFixedWidth(260)
 
     def _on_occlusion(self, surface_id: str, occluded: bool):
-        """Handle occlusion changes from OcclusionMonitor."""
         if surface_id != "notch":
             return
-
         if self._forced_occlusion:
             return
-
         if occluded and not self.notch.is_open:
             self._reveal(False)
         elif not occluded:
             self._reveal(True)
 
     def _reveal(self, show: bool):
-        """Animate notch reveal/hide."""
         if show == self._is_revealed:
             return
-
         self._is_revealed = show
-        # For now just show/hide — slide animation can be added
-        # by animating margins or using a revealer pattern
         self.setVisible(show)
 
     def force_occlusion(self):
-        """Force hide for bar toggle coordination."""
         self._forced_occlusion = True
         if not self.notch.is_open:
             self._reveal(False)
 
     def restore_from_occlusion(self):
-        """Restore normal occlusion behavior."""
         self._forced_occlusion = False
         self._reveal(True)
 
-    def keyPressEvent(self, event):
-        """Handle Escape to close notch."""
-        print(f"[NotchSurface] keyPressEvent: key={event.key()}, Qt.Key_Escape={Qt.Key.Key_Escape}", flush=True)
-        if event.key() == Qt.Key.Key_Escape:
-            self.notch.close_notch()
-        else:
-            super().keyPressEvent(event)
+    def mousePressEvent(self, event):
+        """Click on the surface background (outside content) closes notch."""
+        if self.notch.is_open:
+            # Check if click is outside the notch content
+            notch_rect = self.notch.geometry()
+            if not notch_rect.contains(event.pos()):
+                self.notch.close_notch()
+                return
+        super().mousePressEvent(event)
 
 
 def get_notch_stylesheet(theme: object) -> str:
-    """Generate notch-specific stylesheet from a Glaze Theme."""
+    """Generate notch-specific stylesheet from a Glaze Theme.
+
+    Matches styles/notch.css pill shapes:
+    - notch-content: rounded bottom corners, shadow bg
+    - Open state: larger border-radius
+    - Views: inner rounded bottom corners with padding
+    """
     t = theme
+    shadow = t.surface
+    surface = t.surface_variant
+    accent = t.accent
+    fg = t.text_primary
+    fg2 = t.text_secondary
+
     return f"""
+        /* --- Notch surface --- */
         #notch-surface {{
             background: transparent;
         }}
+
+        /* --- Notch outer box --- */
         #notch-box {{
-            background: {t.surface};
-            border-radius: 0 0 16px 16px;
+            margin: 0 20px 10px 20px;
             min-height: 40px;
         }}
-        #notch-box[open="true"] {{
+
+        /* --- Notch content (AnimatedStack) --- pill with rounded bottom --- */
+        #notch-content {{
+            background: {shadow};
+            border-radius: 0px 0px 20px 20px;
+        }}
+        #notch-box[open="true"] #notch-content {{
+            border-radius: 0px 0px 36px 36px;
+            padding: 2px;
             min-height: 400px;
             min-width: 500px;
         }}
+
+        /* --- Compact view --- */
         #notch-compact {{
             background: transparent;
+            font-weight: bold;
         }}
         #compact-clock {{
-            color: {t.text_primary};
+            color: {fg};
             font-size: 14px;
             font-weight: 600;
         }}
         #compact-info, #compact-media {{
-            color: {t.text_secondary};
+            color: {fg2};
             font-size: 12px;
         }}
+
+        /* --- Expanded view containers --- rounded bottom pill --- */
+        #app-launcher, #power-menu, #toolbox,
+        #dashboard, #tmux-manager, #clip-history,
+        #overview, #emoji {{
+            background: {shadow};
+            padding: 14px;
+            border-radius: 0px 0px 34px 34px;
+        }}
+
+        /* --- Placeholder views --- */
         #placeholder-label {{
-            color: {t.text_primary};
+            color: {fg};
             font-size: 18px;
             font-weight: 600;
         }}
         #placeholder-hint {{
-            color: {t.text_secondary};
+            color: {fg2};
             font-size: 12px;
         }}
     """

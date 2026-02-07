@@ -223,10 +223,9 @@ class AnimatedStack(QStackedWidget):
         fade_out = Animator.fade(old_widget, 1.0, 0.0, half, SMOOTH)
 
         def on_fade_out_done():
-            # Reset old widget opacity
-            effect = old_widget.graphicsEffect()
-            if isinstance(effect, QGraphicsOpacityEffect):
-                effect.setOpacity(1.0)
+            # Remove opacity effect entirely — leaving it at 1.0 still forces
+            # offscreen pixmap rendering, breaking complex nested layouts.
+            old_widget.setGraphicsEffect(None)
 
             self.setCurrentIndex(index)
 
@@ -258,4 +257,10 @@ class AnimatedStack(QStackedWidget):
     def _finish_transition(self, index: int):
         self._animating = False
         self._active_anim = None
+        # Remove QGraphicsOpacityEffect — leaving it attached (even at 1.0)
+        # forces Qt to render complex widget trees into an offscreen pixmap,
+        # which can cause blank/broken rendering for nested layouts.
+        w = self.widget(index)
+        if w and isinstance(w.graphicsEffect(), QGraphicsOpacityEffect):
+            w.setGraphicsEffect(None)
         self.transition_finished.emit(index)

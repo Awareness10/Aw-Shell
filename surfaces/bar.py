@@ -30,7 +30,7 @@ RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚯ", "ᚱ", "ᚴ", "ᚼ", "ᚾ", "ᛁ", "ᛅ"]
 def _icon_font() -> QFont:
     """Tabler Icons font for bar buttons."""
     f = QFont("tabler-icons")
-    f.setPixelSize(16)
+    f.setPixelSize(20)
     return f
 
 
@@ -39,7 +39,7 @@ def _make_icon_button(icon_char: str, tooltip: str = "") -> QPushButton:
     btn.setFont(_icon_font())
     btn.setToolTip(tooltip)
     btn.setObjectName("button-bar")
-    btn.setFixedSize(32, 32)
+    btn.setFixedSize(36, 36)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     return btn
 
@@ -85,7 +85,10 @@ class WorkspaceIndicator(QWidget):
             btn = QPushButton(label)
             btn.setObjectName("ws-button")
             btn.setCheckable(True)
-            btn.setFixedSize(14 if not show_numbers else 22, 14 if not show_numbers else 22)
+            if not show_numbers:
+                btn.setFixedSize(8, 8)
+            else:
+                btn.setFixedSize(22, 22)
             btn.clicked.connect(lambda checked, ws=i: self.workspace_clicked.emit(ws))
             self._layout.addWidget(btn)
             self._buttons.append(btn)
@@ -318,51 +321,100 @@ class Bar(QWidget):
 
 
 def get_bar_stylesheet(theme: object) -> str:
-    """Generate bar-specific stylesheet from a Glaze Theme."""
+    """Generate bar-specific stylesheet from a Glaze Theme.
+
+    Pills theme: transparent bar, each component is a separate rounded pill.
+    Matches styles/bar.css + styles/workspaces.css + styles/shadows.css.
+    """
     t = theme
+    # shadow = darkest bg for pills, surface_variant = lighter for hover
+    shadow = t.surface
+    surface = t.surface_variant
+    accent = t.accent
+    on_accent = t.on_accent
+    fg = t.text_primary
+    fg2 = t.text_secondary
+
     return f"""
+        /* --- Bar container --- */
         #bar-inner {{
-            background: {t.surface};
-            border-radius: 10px;
+            margin: 8px;
         }}
         #bar-inner[theme="pills"] {{
             background: transparent;
         }}
         #bar-inner[theme="dense"] {{
-            background: {t.surface};
-            border-radius: 0px;
+            background: {shadow};
+            border: 2px solid {surface};
+            border-radius: 16px;
+            padding: 4px;
         }}
         #bar-inner[theme="edge"] {{
-            background: {t.surface};
+            background: {shadow};
+            border-bottom: 2px solid {surface};
             border-radius: 0px;
-        }}
-        #button-bar {{
-            background: {t.surface_variant};
-            color: {t.text_primary};
-            border: none;
-            border-radius: 8px;
             padding: 4px;
-            font-size: 16px;
+        }}
+
+        /* --- Buttons (each is a pill) --- */
+        #button-bar {{
+            background: {shadow};
+            color: {accent};
+            border: none;
+            border-radius: 16px;
+            padding: 4px;
+            min-width: 28px;
+            min-height: 28px;
+            font-size: 20px;
         }}
         #button-bar:hover {{
-            background: {t.accent};
-            color: {t.on_accent};
+            background: {surface};
+        }}
+        #button-bar:pressed {{
+            background: {accent};
+            color: {shadow};
+        }}
+
+        /* --- Workspaces pill --- */
+        #workspaces-container {{
+            background: {shadow};
+            border-radius: 16px;
+            padding: 4px;
         }}
         #ws-button {{
-            background: {t.surface_variant};
+            background: {fg};
             border: none;
-            border-radius: 4px;
-            min-width: 12px;
-            min-height: 12px;
+            border-radius: 16px;
+            min-width: 8px;
+            min-height: 8px;
+            max-width: 8px;
+            max-height: 8px;
         }}
         #ws-button:checked {{
-            background: {t.accent};
+            background: {accent};
+            min-width: 48px;
+            max-width: 48px;
+            border-radius: 16px;
         }}
+
+        /* --- Date/time pill --- */
         #date-time {{
-            color: {t.text_primary};
+            background: {shadow};
+            border-radius: 16px;
+            color: {fg};
             font-size: 13px;
             font-weight: 600;
-            padding: 0 6px;
+            padding: 0 8px;
+            min-height: 36px;
+        }}
+
+        /* --- Other widget pills (placeholders until real implementations) --- */
+        #systray, #weather, #language, #network,
+        #battery, #metrics, #control, #sysprofiles {{
+            background: {shadow};
+            border-radius: 16px;
+            min-height: 36px;
+            padding: 0 8px;
         }}
     """
 

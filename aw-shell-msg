@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Send a command to the running PySide6 shell via Unix socket."""
+import os, socket, sys
+
+SOCKET_PATH = f"/tmp/aw-shell-pyside6-{os.getuid()}.sock"
+
+if len(sys.argv) < 2:
+    print(f"Usage: {sys.argv[0]} <command> [args]")
+    print("Commands: open_notch <module>, toggle_bar, close_notch, reload_css")
+    sys.exit(1)
+
+msg = " ".join(sys.argv[1:])
+try:
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(SOCKET_PATH)
+    s.sendall(msg.encode())
+    s.shutdown(socket.SHUT_WR)
+    print(s.recv(64).decode().strip())
+    s.close()
+except ConnectionRefusedError:
+    print("Shell not running", file=sys.stderr)
+    sys.exit(1)
+except FileNotFoundError:
+    print("Shell not running", file=sys.stderr)
+    sys.exit(1)

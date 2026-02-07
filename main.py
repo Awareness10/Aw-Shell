@@ -88,21 +88,17 @@ if __name__ == "__main__":
     
     # Create application components list
     app_components = []
-    corners = None
-    notification = None
-    
+
     # Create components for each monitor
     for monitor in monitors:
         monitor_id = monitor['id']
-        
-        # Create corners only for the first monitor (shared across all)
-        if monitor_id == 0:
-            corners = Corners()
-            # Set corners visibility based on config
-            corners_visible = config.get("corners_visible", True)
-            corners.set_visible(corners_visible)
-            app_components.append(corners)
-        
+
+        # Create corners for this monitor
+        corners = Corners(monitor_id=monitor_id)
+        corners_visible = config.get("corners_visible", True)
+        corners.set_visible(corners_visible)
+        app_components.append(corners)
+
         # Create monitor-specific components
         if multi_monitor_enabled:
             bar = Bar(monitor_id=monitor_id)
@@ -113,25 +109,24 @@ if __name__ == "__main__":
             bar = Bar()
             notch = Notch()
             dock = Dock()
-        
+
         # Connect bar and notch
         bar.notch = notch
         notch.bar = bar
-        
-        # Create notification popup for the first monitor only
-        if monitor_id == 0:
-            notification = NotificationPopup(widgets=notch.dashboard.widgets)
-            app_components.append(notification)
-        
+
+        # Create notification popup for this monitor
+        notification = NotificationPopup(monitor_id=monitor_id, widgets=notch.dashboard.widgets)
+        app_components.append(notification)
+
         # Register instances in monitor manager if available
         if multi_monitor_enabled and monitor_manager:
             monitor_manager.register_monitor_instances(monitor_id, {
                 'bar': bar,
                 'notch': notch,
                 'dock': dock,
-                'corners': corners if monitor_id == 0 else None
+                'corners': corners,
             })
-        
+
         # Add components to app list
         app_components.extend([bar, notch, dock])
 

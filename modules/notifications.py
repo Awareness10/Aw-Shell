@@ -1391,7 +1391,8 @@ class NotificationContainer(Box):
 
 
 class NotificationPopup(Window):
-    def __init__(self, **kwargs):
+    def __init__(self, monitor_id: int = 0, **kwargs):
+        self.monitor_id = monitor_id
         y_pos = data.NOTIF_POS.lower()
         x_pos = "right"
 
@@ -1408,6 +1409,7 @@ class NotificationPopup(Window):
             layer="top",
             keyboard_mode="none",
             exclusivity="none",
+            monitor=monitor_id,
             visible=True,
             all_visible=True,
         )
