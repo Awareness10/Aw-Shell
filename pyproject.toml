@@ -1,0 +1,51 @@
+[project]
+name = "aw-shell"
+version = "1.0.1"
+description = "A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+authors = [
+    { name = "Robin Martinsen (Awareness10)" },
+]
+keywords = ["hyprland", "shell", "wayland", "desktop", "fabric", "gtk", "pyside6"]
+dependencies = [
+    "dbus-python>=1.3.2",
+    "fabric",
+    "glaze",
+    "ijson>=3.3.0",
+    "loguru>=0.7.0",
+    "numpy>=1.26.0",
+    "pillow>=10.0.0",
+    "psutil>=5.9.0",
+    "pycairo>=1.25.0",
+    "pygobject>=3.50.0",
+    "pyopengl>=3.1.7",
+    "pyside6>=6.6.0",
+    "pywayland>=0.4.17",
+    "requests>=2.31.0",
+    "setproctitle>=1.3.0",
+    "toml>=0.10.2",
+    "watchdog>=3.0.0",
+]
+
+[tool.uv.sources]
+glaze = { git = "https://github.com/awareness10/glaze" }
+fabric = { git = "https://github.com/Fabric-Development/fabric" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.15.0",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

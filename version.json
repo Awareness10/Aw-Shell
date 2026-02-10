@@ -1,0 +1,11 @@
+{
+  "version": "1.0.1",
+  "pkg_update": false,
+  "changelog": [
+    "<b>refactor:</b> Major codebase refactoring for maintainability",
+    "<b>refactor:</b> Extracted Signal class to utils/signal.py",
+    "<b>refactor:</b> Created BaseSlider class hierarchy for controls",
+    "<b>refactor:</b> Added layout utilities module",
+    "<b>fork:</b> Rebranded from Ax-Shell to Aw-Shell"
+  ]
+}
