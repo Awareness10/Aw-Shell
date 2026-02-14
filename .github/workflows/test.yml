@@ -16,12 +16,17 @@ jobs:
         with:
           version: "latest"
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y --no-install-recommends libegl1
+
       - name: Install test dependencies
         run: |
           uv venv
           uv pip install pytest pytest-cov toml psutil loguru requests PySide6
 
       - name: Run tests with coverage
+        env:
+          PYTHONPATH: .
         run: uv run --no-project pytest --tb=short --cov-report=json:coverage.json
 
       - name: Extract coverage percentage
