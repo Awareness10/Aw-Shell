@@ -22,7 +22,7 @@ jobs:
       - name: Install test dependencies
         run: |
           uv venv
-          uv pip install pytest pytest-cov toml psutil loguru requests PySide6
+          uv pip install pytest pytest-cov toml psutil loguru requests PySide6 "glaze @ git+https://github.com/awareness10/glaze"
 
       - name: Run tests with coverage
         env:
