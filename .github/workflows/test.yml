@@ -16,8 +16,10 @@ jobs:
         with:
           version: "latest"
 
-      - name: Install dependencies
-        run: uv sync --dev
+      - name: Install test dependencies
+        run: |
+          uv venv
+          uv pip install pytest pytest-cov toml psutil loguru requests PySide6
 
       - name: Run tests with coverage
         run: uv run pytest --tb=short --cov-report=json:coverage.json
