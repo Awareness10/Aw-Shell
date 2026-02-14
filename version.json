@@ -1,7 +1,9 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "pkg_update": false,
   "changelog": [
+    "<b>test:</b> Comprehensive test suite — 362 tests, 94% coverage",
+    "<b>cleanup:</b> Removed dead GTK settings modules (about, appearance, keybindings, system, window)",
     "<b>refactor:</b> Major codebase refactoring for maintainability",
     "<b>refactor:</b> Extracted Signal class to utils/signal.py",
     "<b>refactor:</b> Created BaseSlider class hierarchy for controls",
