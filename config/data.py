@@ -11,7 +11,10 @@ from gi.repository import Gdk, GLib  # type: ignore # noqa: E402
 
 CACHE_DIR = str(GLib.get_user_cache_dir()) + f"/{APP_NAME}"
 
-USERNAME = os.getlogin()
+try:
+    USERNAME = os.getlogin()
+except OSError:
+    USERNAME = os.environ.get("USER", "unknown")
 HOSTNAME = os.uname().nodename
 
 HOME_DIR = Path.home()

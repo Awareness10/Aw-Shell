@@ -16,8 +16,11 @@
   </p>
 
   <p align="center">
-  <a href="https://github.com/awareness10/Aw-Shell/stargazers">
-    <img src="https://img.shields.io/github/stars/awareness10/Aw-Shell?style=for-the-badge&logo=github&color=E3B341&logoColor=D9E0EE&labelColor=000000" alt="GitHub stars">
+  <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/awareness10/Aw-Shell/test.yml?style=for-the-badge&logo=github-actions&logoColor=D9E0EE&labelColor=000000&label=tests" alt="Tests">
+  </a>
+  <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml">
+    <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Awareness10/f92c9f225879c8ab92110340e6e56c9f/raw/coverage.json&style=for-the-badge&logoColor=D9E0EE&labelColor=000000" alt="Coverage">
   </a>
 </p>
 
@@ -38,6 +41,19 @@
   </tr>
 </table>
 
+<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Wrench.png" alt="Wrench" width="25" height="25" /></sub> Changes from Ax-Shell</h2>
+
+Aw-Shell builds on the original Ax-Shell with the following improvements:
+
+- **Refactored settings** - monolithic settings GUI split into focused modules (appearance, keybindings, system, window, about)
+- **Refactored controls** — simplified and reorganized control panel
+- **Improved launcher** — better search relevance and multi-monitor awareness
+- **Multi-monitor fixes** — dashboard and workspaces open on the correct monitor
+- **`uv` package manager** — replaced manual pip/venv setup with `uv sync` for reproducible installs
+- **Glaze theming** — integrated [Glaze](https://github.com/Awareness10/Glaze) for consistent Qt6 styling
+- **Test suite** — added unit tests for core utilities (layout, signals, settings conversion)
+- **Code quality** — `pathlib` over `os.path`, cleaned up imports, removed deprecated typings
+
 <h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
 
 > [!NOTE]
@@ -51,7 +67,7 @@
 
 **Run the following command in your terminal once logged into Hyprland:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.sh | bash
 ```
 
 ### Manual Installation
@@ -76,7 +92,7 @@ curl -fsSL https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.s
 
 3. Clone, install Python deps, and run:
     ```bash
-    git clone https://github.com/awareness10/Aw-Shell.git ~/.config/aw-shell
+    git clone https://github.com/Awareness10/Aw-Shell.git ~/.config/aw-shell
     cd ~/.config/aw-shell
     uv sync
     uwsm app -- .venv/bin/python main.py > /dev/null 2>&1 & disown
@@ -115,4 +131,4 @@ curl -fsSL https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.s
 
 ---
 
-> Original project by [Axenide](https://github.com/Axenide). Consider supporting the original author on [Ko-fi](https://ko-fi.com/Axenide)!
+> Originally based on [Ax-Shell](https://github.com/Axenide/Ax-Shell) by [Axenide](https://github.com/Axenide). Consider supporting the original author on [Ko-fi](https://ko-fi.com/Axenide).

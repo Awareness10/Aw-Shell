@@ -1,7 +1,11 @@
 """Tests for pure functions in utils/functions.py."""
 
+import os
+from unittest.mock import patch, MagicMock
+
 import pytest
 from utils.functions import (
+    ExecutableNotFoundError,
     format_time,
     convert_bytes,
     get_relative_time,
@@ -11,6 +15,11 @@ from utils.functions import (
     unique_list,
     convert_seconds_to_milliseconds,
     parse_markup,
+    validate_widgets,
+    executable_exists,
+    ensure_dir_exists,
+    send_notification,
+    uptime,
 )
 
 
@@ -227,3 +236,143 @@ class TestSimpleHelpers:
     def test_parse_markup_passthrough(self):
         assert parse_markup("hello <b>world</b>") == "hello <b>world</b>"
         assert parse_markup("") == ""
+
+
+# =========================================================================
+# ExecutableNotFoundError
+# =========================================================================
+
+class TestExecutableNotFoundError:
+
+    def test_message_contains_name(self):
+        err = ExecutableNotFoundError("hyprctl")
+        assert "hyprctl" in str(err)
+
+    def test_is_import_error(self):
+        assert issubclass(ExecutableNotFoundError, ImportError)
+
+
+# =========================================================================
+# validate_widgets
+# =========================================================================
+
+class TestValidateWidgets:
+
+    def test_valid_widgets_pass(self):
+        parsed = {"layout": {"left": ["clock", "battery"], "right": ["volume"]}}
+        defaults = {"clock": {}, "battery": {}, "volume": {}}
+        validate_widgets(parsed, defaults)  # should not raise
+
+    def test_invalid_widget_raises(self):
+        parsed = {"layout": {"center": ["nonexistent_widget"]}}
+        defaults = {"clock": {}}
+        with pytest.raises(ValueError, match="nonexistent_widget"):
+            validate_widgets(parsed, defaults)
+
+    def test_empty_layout(self):
+        parsed = {"layout": {"left": []}}
+        validate_widgets(parsed, {})  # should not raise
+
+
+# =========================================================================
+# executable_exists
+# =========================================================================
+
+class TestExecutableExists:
+
+    @patch("utils.functions.shutil.which", return_value="/usr/bin/hyprctl")
+    def test_found(self, _mock):
+        assert executable_exists("hyprctl") is True
+
+    @patch("utils.functions.shutil.which", return_value=None)
+    def test_not_found(self, _mock):
+        assert executable_exists("nonexistent_binary") is False
+
+
+# =========================================================================
+# ensure_dir_exists
+# =========================================================================
+
+class TestEnsureDirExists:
+
+    @patch("utils.functions.os.makedirs")
+    @patch("utils.functions.os.path.exists", return_value=False)
+    def test_creates_when_missing(self, _exists, mock_makedirs):
+        ensure_dir_exists("/tmp/test_dir")
+        mock_makedirs.assert_called_once_with("/tmp/test_dir")
+
+    @patch("utils.functions.os.makedirs")
+    @patch("utils.functions.os.path.exists", return_value=True)
+    def test_skips_when_exists(self, _exists, mock_makedirs):
+        ensure_dir_exists("/tmp/test_dir")
+        mock_makedirs.assert_not_called()
+
+
+# =========================================================================
+# send_notification
+# =========================================================================
+
+class TestSendNotification:
+
+    @patch("utils.functions.subprocess.run")
+    def test_basic_notification(self, mock_run):
+        send_notification("Title", "Body", "normal")
+        mock_run.assert_called_once()
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "notify-send"
+        assert "--urgency" in cmd
+        assert "normal" in cmd
+        assert "Title" in cmd
+        assert "Body" in cmd
+
+    @patch("utils.functions.subprocess.run")
+    def test_with_icon(self, mock_run):
+        send_notification("T", "B", "low", icon="dialog-info")
+        cmd = mock_run.call_args[0][0]
+        assert "--icon" in cmd
+        assert "dialog-info" in cmd
+
+    @patch("utils.functions.subprocess.run")
+    def test_with_timeout(self, mock_run):
+        send_notification("T", "B", "critical", timeout=5000)
+        cmd = mock_run.call_args[0][0]
+        assert "-t" in cmd
+        assert "5000" in cmd
+
+    @patch("utils.functions.subprocess.run")
+    def test_with_app_name(self, mock_run):
+        send_notification("T", "B", "normal", app_name="aw-shell")
+        cmd = mock_run.call_args[0][0]
+        assert "--app-name" in cmd
+        assert "aw-shell" in cmd
+
+    @patch("utils.functions.subprocess.run", side_effect=__import__("subprocess").CalledProcessError(1, "notify-send"))
+    def test_failure_prints_error(self, _mock, capsys):
+        send_notification("T", "B", "normal")
+        assert "Failed to send notification" in capsys.readouterr().out
+
+
+# =========================================================================
+# uptime
+# =========================================================================
+
+class TestUptime:
+
+    @patch("utils.functions.datetime")
+    @patch("utils.functions.psutil.boot_time")
+    def test_uptime_format(self, mock_boot, mock_dt):
+        # Simulate 2h 30m uptime
+        mock_boot.return_value = 1000.0
+        mock_now = MagicMock()
+        mock_now.timestamp.return_value = 1000.0 + (2 * 3600) + (30 * 60)
+        mock_dt.datetime.now.return_value = mock_now
+        assert uptime() == "02:30"
+
+    @patch("utils.functions.datetime")
+    @patch("utils.functions.psutil.boot_time")
+    def test_uptime_zero(self, mock_boot, mock_dt):
+        mock_boot.return_value = 5000.0
+        mock_now = MagicMock()
+        mock_now.timestamp.return_value = 5000.0
+        mock_dt.datetime.now.return_value = mock_now
+        assert uptime() == "00:00"

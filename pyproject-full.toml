@@ -1,0 +1,8 @@
+# Full project coverage — includes GUI/runtime modules that can't be unit tested.
+# Usage: uv run pytest --cov-config=pyproject-full.toml
+#
+# Default (pyproject.toml) excludes these modules for an accurate testable-code metric.
+# Use this config when you want to see the complete picture.
+
+[tool.coverage.run]
+source = ["utils", "config"]

@@ -4,7 +4,6 @@ import shutil
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
-#from fabric import Application
 import glaze
 from glaze import generate_theme
 
