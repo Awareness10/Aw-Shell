@@ -16,9 +16,6 @@
   </p>
 
   <p align="center">
-  <a href="https://github.com/awareness10/Aw-Shell/stargazers">
-    <img src="https://img.shields.io/github/stars/awareness10/Aw-Shell?style=for-the-badge&logo=github&color=E3B341&logoColor=D9E0EE&labelColor=000000" alt="GitHub stars">
-  </a>
   <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/awareness10/Aw-Shell/test.yml?style=for-the-badge&logo=github-actions&logoColor=D9E0EE&labelColor=000000&label=tests" alt="Tests">
   </a>
