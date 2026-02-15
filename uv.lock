@@ -309,7 +309,7 @@ dependencies = [
 [[package]]
 name = "glaze"
 version = "0.2.1"
-source = { git = "https://github.com/awareness10/glaze#21f081594446eb9fd04450e62fcd5cb9eb47925f" }
+source = { git = "https://github.com/awareness10/glaze#dc35b09778a88fe4e3f1c7a767557727d6f12780" }
 dependencies = [
     { name = "pyside6" },
 ]
