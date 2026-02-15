@@ -1,7 +1,8 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "pkg_update": false,
   "changelog": [
+  	"<b>hotfix:</b> Matugen 4.0.0 breaking api change, json decode changes"
     "<b>test:</b> Comprehensive test suite — 362 tests, 94% coverage",
     "<b>cleanup:</b> Removed dead GTK settings modules (about, appearance, keybindings, system, window)",
     "<b>refactor:</b> Major codebase refactoring for maintainability",

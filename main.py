@@ -1,4 +1,5 @@
 import os
+import sys
 
 import gi
 
@@ -14,7 +15,7 @@ from modules.corners import Corners
 from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
-from modules.updater import run_updater
+import subprocess as _sp
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
 
@@ -37,9 +38,18 @@ if __name__ == "__main__":
 
     config = load_config()
 
-    GLib.idle_add(run_updater)
-    # Every hour
-    GLib.timeout_add(3600000, run_updater)
+    def _launch_updater(force=False):
+        """Launch the PySide6 updater in a separate process."""
+        cmd = [sys.executable, "-m", "modules.updater"]
+        if force:
+            cmd.append("--force")
+        try:
+            _sp.Popen(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
+        except Exception as e:
+            print(f"Error launching updater: {e}")
+
+    GLib.idle_add(_launch_updater)
+    GLib.timeout_add(3600000, _launch_updater)
 
     # Initialize multi-monitor services
     try:
