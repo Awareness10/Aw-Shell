@@ -4,7 +4,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "aw-shell"
-version = "1.0.2"
+version = "1.0.4"
 source = { virtual = "." }
 dependencies = [
     { name = "dbus-python" },
@@ -308,8 +308,8 @@ dependencies = [
 
 [[package]]
 name = "glaze"
-version = "0.2.0"
-source = { git = "https://github.com/awareness10/glaze#d36ce21764a433a6085fca2503f79da357f25f1c" }
+version = "0.2.1"
+source = { git = "https://github.com/awareness10/glaze#21f081594446eb9fd04450e62fcd5cb9eb47925f" }
 dependencies = [
     { name = "pyside6" },
 ]

@@ -1,6 +1,6 @@
 [project]
 name = "aw-shell"
-version = "1.0.3"
+version = "1.0.4"
 description = "A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,7 +12,7 @@ keywords = ["hyprland", "shell", "wayland", "desktop", "fabric", "gtk", "pyside6
 dependencies = [
     "dbus-python>=1.3.2",
     "fabric",
-    "glaze",
+    "glaze>=0.2.1",
     "ijson>=3.3.0",
     "loguru>=0.7.0",
     "numpy>=1.26.0",
