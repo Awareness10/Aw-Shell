@@ -1,7 +1,8 @@
 {
-  "version": "1.0.4",
+  "version": "1.0.5",
   "pkg_update": false,
   "changelog": [
+    "<b>update:</b> Added regression tests for the latest breaking changes, updated to use .venv-python",
     "<b>hotfix:</b> Update Glaze version with matugen fix",
     "<b>hotfix:</b> Matugen 4.0.0 breaking api change, json decode changes",
     "<b>test:</b> Comprehensive test suite — 362 tests, 94% coverage",

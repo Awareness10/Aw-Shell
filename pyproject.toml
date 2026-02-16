@@ -1,11 +1,12 @@
 [project]
 name = "aw-shell"
-version = "1.0.4"
+version = "1.0.5"
 description = "A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
 authors = [
+    { name = "Adriano Tisera (Axenide)"},
     { name = "Robin Martinsen (Awareness10)" },
 ]
 keywords = ["hyprland", "shell", "wayland", "desktop", "fabric", "gtk", "pyside6"]

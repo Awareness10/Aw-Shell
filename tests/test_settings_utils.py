@@ -172,6 +172,39 @@ class TestGenerateHyprconf:
         assert "decoration {" in conf
         assert "animations {" in conf
 
+    def test_uses_venv_python_in_exec(self):
+        """Regression: exec-once and keybinds must use .venv/bin/python, not bare 'python'.
+
+        Bug: bare 'python' doesn't resolve to the project venv when the shell
+        is launched via uwsm, causing silent startup failures.
+        """
+        conf = generate_hyprconf()
+        # exec-once line that starts the shell
+        assert ".venv/bin/python" in conf, \
+            "Generated hyprconf must reference .venv/bin/python for shell startup"
+        # Must NOT contain bare 'python main.py' (without venv path)
+        lines = conf.splitlines()
+        for line in lines:
+            if "exec" in line.lower() and "main.py" in line:
+                assert ".venv/bin/python" in line, \
+                    f"Line with main.py must use venv python: {line}"
+
+    def test_restart_keybind_uses_venv_python(self):
+        """Regression: the reload keybind must also use venv python."""
+        conf = generate_hyprconf()
+        for line in conf.splitlines():
+            if "Reload" in line and "killall" in line:
+                assert ".venv/bin/python" in line, \
+                    f"Reload keybind must use venv python: {line}"
+
+    def test_inspector_keybind_uses_venv_python(self):
+        """Regression: the inspector restart keybind must use venv python."""
+        conf = generate_hyprconf()
+        for line in conf.splitlines():
+            if "inspector" in line.lower() and "killall" in line:
+                assert ".venv/bin/python" in line, \
+                    f"Inspector keybind must use venv python: {line}"
+
 
 # =========================================================================
 # backup_and_replace
@@ -413,6 +446,41 @@ class TestApplyAndRestart:
         assert hypr_path.exists()
         assert "source =" in hypr_path.read_text()
 
+    def test_restart_uses_venv_python_not_bare(self, ar_env):
+        """Regression: apply_and_restart must use .venv/bin/python, not bare 'python'.
+
+        Bug: bare 'python' doesn't resolve to the venv interpreter when launched
+        via 'uwsm app --', causing the shell to silently fail to start.
+        """
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        mock_popen = MagicMock()
+        mock_popen.return_value.wait.return_value = None
+        with self._patches(aw_config_dir, config_dir, config_file):
+            with patch("config.settings_utils.subprocess.run"):
+                with patch("config.settings_utils.subprocess.Popen", mock_popen):
+                    apply_and_restart()
+        # Find the restart Popen call (the one with "uwsm" in args)
+        restart_call = None
+        for c in mock_popen.call_args_list:
+            args = c[0][0] if c[0] else c[1].get("args", [])
+            if isinstance(args, list) and "uwsm" in args:
+                restart_call = args
+                break
+            elif isinstance(args, str) and "uwsm" in args:
+                restart_call = args
+                break
+        assert restart_call is not None, "Expected a Popen call with 'uwsm' for restart"
+        # The python path must contain .venv/bin/python
+        if isinstance(restart_call, list):
+            python_arg = restart_call[3]  # ["uwsm", "app", "--", <python>, <main.py>]
+            assert ".venv/bin/python" in python_arg, \
+                f"Restart must use venv python, got: {python_arg}"
+            assert python_arg != "python", \
+                "Must not use bare 'python' — it won't resolve in uwsm context"
+        else:
+            assert ".venv/bin/python" in restart_call
+
     def test_killall_timeout_handled(self, ar_env):
         import subprocess as sp
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -582,6 +650,32 @@ class TestEnsureMatugenConfig:
                     ensure_matugen_config()
         output = capsys.readouterr().out
         assert "Example wallpaper not found" in output
+
+    def test_matugen_uses_source_color_index(self, matugen_env):
+        """Regression: matugen 4.0.0 requires --source-color-index 0 to avoid TTY prompt.
+
+        Bug: matugen 4.0.0 added interactive source color selection that requires
+        a TTY. Without --source-color-index 0, exec_shell_command_async fails
+        silently with 'IO error: not a terminal'.
+        """
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        wall = tmp_path / "wall.jpg"
+        wall.write_text("image data")
+        current_wall.parent.mkdir(parents=True, exist_ok=True)
+        current_wall.symlink_to(wall)
+        matugen_config = config_dir / "matugen" / "config.toml"
+        mock_exec = MagicMock()
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.os.path.expanduser",
+                       return_value=str(matugen_config)):
+                with patch("config.settings_utils.exec_shell_command_async", mock_exec):
+                    ensure_matugen_config()
+        mock_exec.assert_called_once()
+        cmd = mock_exec.call_args[0][0]
+        assert "--source-color-index" in cmd, \
+            f"matugen command must include --source-color-index to avoid TTY prompt: {cmd}"
+        assert "--source-color-index 0" in cmd, \
+            f"matugen command must use --source-color-index 0: {cmd}"
 
     def test_matugen_command_not_found(self, matugen_env, capsys):
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
