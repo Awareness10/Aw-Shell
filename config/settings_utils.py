@@ -275,7 +275,7 @@ def ensure_matugen_config():
     if image_path and image_path.exists():
         print(f"Generating color theme from wallpaper: {image_path}")
         try:
-            matugen_cmd = f"matugen image '{image_path}'"
+            matugen_cmd = f"matugen image '{image_path}' --source-color-index 0"
             exec_shell_command_async(matugen_cmd)
             print("Matugen color theme generation initiated.")
         except FileNotFoundError:
