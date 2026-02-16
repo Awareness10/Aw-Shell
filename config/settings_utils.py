@@ -120,7 +120,9 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
     except Exception as e:
         print(f"Error reloading Hyprland: {e}")
 
-    main_py = str(CONFIG_DIR / f"{APP_NAME}" / "main.py")
+    install_dir = CONFIG_DIR / APP_NAME
+    main_py = str(install_dir / "main.py")
+    venv_python = str(install_dir / ".venv" / "bin" / "python")
     try:
         subprocess.Popen(
             f"killall {APP_NAME}", shell=True,
@@ -133,7 +135,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
 
     try:
         subprocess.Popen(
-            ["uwsm", "app", "--", "python", main_py],
+            ["uwsm", "app", "--", venv_python, main_py],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
@@ -330,12 +332,13 @@ def generate_hyprconf() -> str:
     """
     LOCAL_APP = CONFIG_DIR / APP_NAME
     APP_MAIN = LOCAL_APP / "main.py"
+    VENV_PYTHON = LOCAL_APP / ".venv" / "bin" / "python"
     # Determine animation type based on bar position
     bar_position = get_bind_var("bar_position")
     is_vertical = bar_position in ["Left", "Right"]
     animation_type = "slidefadevert" if is_vertical else "slidefade"
 
-    return f"""exec-once = uwsm-app $(python {str(APP_MAIN)})
+    return f"""exec-once = uwsm-app $({str(VENV_PYTHON)} {str(APP_MAIN)})
 exec = pgrep -x "hypridle" > /dev/null || uwsm app -- hypridle
 exec = uwsm app -- awww-daemon
 exec-once =  wl-paste --type text --watch cliphist store
@@ -344,7 +347,7 @@ exec-once =  wl-paste --type image --watch cliphist store
 $fabricSend = fabric-cli exec {APP_NAME}
 $axMessage = notify-send "{USERNAME}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{LOCAL_APP}/assets/tanjiro-kamado-red.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
 
-bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $(python {str(APP_MAIN)}) # Reload {APP_NAME_CAP}
+bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $({str(VENV_PYTHON)} {str(APP_MAIN)}) # Reload {APP_NAME_CAP}
 bind = {get_bind_var("prefix_axmsg")}, {get_bind_var("suffix_axmsg")}, exec, $axMessage # Message
 bind = {get_bind_var("prefix_dash")}, {get_bind_var("suffix_dash")}, exec, $fabricSend 'notch.open_notch("dashboard")' # Dashboard
 bind = {get_bind_var("prefix_bluetooth")}, {get_bind_var("suffix_bluetooth")}, exec, $fabricSend 'notch.open_notch("bluetooth")' # Bluetooth
@@ -363,7 +366,7 @@ bind = {get_bind_var("prefix_power")}, {get_bind_var("suffix_power")}, exec, $fa
 bind = {get_bind_var("prefix_caffeine")}, {get_bind_var("suffix_caffeine")}, exec, $fabricSend 'notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit(external=True)' # Toggle Caffeine
 bind = {get_bind_var("prefix_toggle")}, {get_bind_var("suffix_toggle")}, exec, $fabricSend 'from utils.global_keybinds import get_global_keybind_handler; get_global_keybind_handler().toggle_bar()' # Toggle Bar
 bind = {get_bind_var("prefix_css")}, {get_bind_var("suffix_css")}, exec, $fabricSend 'app.set_css()' # Reload CSS
-bind = {get_bind_var("prefix_restart_inspector")}, {get_bind_var("suffix_restart_inspector")}, exec, killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive python {str(APP_MAIN)}) # Restart with inspector
+bind = {get_bind_var("prefix_restart_inspector")}, {get_bind_var("suffix_restart_inspector")}, exec, killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive {str(VENV_PYTHON)} {str(APP_MAIN)}) # Restart with inspector
 
 # Wallpapers directory: {get_bind_var("wallpapers_dir")}
 
