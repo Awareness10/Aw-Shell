@@ -4,6 +4,8 @@ import operator
 import os
 import re
 import subprocess
+import sys
+from pathlib import Path
 from collections.abc import Iterator
 
 import numpy as np
@@ -21,7 +23,7 @@ from gi.repository import Gdk, GLib
 import config.data as data
 import modules.icons as icons
 from modules.dock import Dock
-from modules.updater import run_updater
+import subprocess as _sp
 from utils.conversion import Conversion
 
 tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"
@@ -355,7 +357,10 @@ class AppLauncher(Box):
             case ":p":
                 self.notch.open_notch("power")
             case ":update":
-                GLib.idle_add(lambda: run_updater(force=True))
+                _sp.Popen(
+                    [sys.executable, "-m", "modules.updater", "--force"],
+                    cwd=str(Path(__file__).resolve().parent.parent),
+                )
             case ":settings":
                 exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py")
                 self.close_launcher()

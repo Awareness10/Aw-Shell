@@ -1,3 +1,9 @@
+"""Aw-Shell Updater — PySide6 version.
+
+Checks for updates, displays a changelog window, and runs
+the update process via QProcess. No GTK dependencies.
+"""
+
 import json
 import os
 import shutil
@@ -7,63 +13,71 @@ import sys
 import time
 from pathlib import Path
 
-import gi
+from PySide6.QtCore import QObject, QProcess, QThread, Qt, QTimer, Signal, Slot
+from PySide6.QtWidgets import (
+    QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
+    QPushButton, QScrollArea, QSizePolicy, QTextEdit, QVBoxLayout,
+)
+from PySide6.QtGui import QColor
 
-# Insertion for embedded VTE terminal
-gi.require_version("Gtk", "3.0")
-gi.require_version("Gdk", "3.0")
-gi.require_version("Vte", "2.91")
-from gi.repository import Gdk, GLib, Gtk, Vte
+from glaze.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
+from glaze.widgets import FramelessMainWindow
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from fabric.utils.helpers import get_relative_path
+from config.settings_constants import APP_NAME, APP_NAME_CAP
 
-import config.data as data
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
 
-# File locations
-VERSION_FILE = get_relative_path("../version.json")
+_MODULE_DIR = Path(__file__).resolve().parent
+_PROJECT_DIR = _MODULE_DIR.parent
+
+VERSION_FILE = str(_PROJECT_DIR / "version.json")
 REMOTE_VERSION_FILE = "/tmp/remote_version.json"
-REMOTE_URL = "https://raw.githubusercontent.com/awareness10/Aw-Shell/refs/heads/main/version.json"
-REPO_DIR = get_relative_path("../")
+REMOTE_URL = (
+    "https://raw.githubusercontent.com/awareness10/Aw-Shell/"
+    "refs/heads/main/version.json"
+)
+REPO_DIR = str(_PROJECT_DIR)
+
+CACHE_DIR = os.path.expanduser(f"~/.cache/{APP_NAME}")
 
 SNOOZE_FILE_NAME = "updater_snooze.txt"
 UPDATER_DISABLE_FILE_NAME = "updater_disabled.flag"
 SNOOZE_DURATION_SECONDS = 8 * 60 * 60  # 8 hours
 
-# --- Global state for standalone execution control ---
-_QUIT_GTK_IF_NO_WINDOW_STANDALONE = False
+# ---------------------------------------------------------------------------
+# Backend helpers
+# ---------------------------------------------------------------------------
 
-def get_cache_dir():
-    """Returns the cache directory path, creating it if necessary."""
-    cache_dir_base = data.CACHE_DIR or os.path.expanduser(f"~/.cache/{data.APP_NAME}")
+
+def get_cache_dir() -> str:
+    """Return the cache directory path, creating it if necessary."""
     try:
-        os.makedirs(cache_dir_base, exist_ok=True)
+        os.makedirs(CACHE_DIR, exist_ok=True)
     except Exception as e:
-        print(f"Error creating cache directory {cache_dir_base}: {e}")
-    return cache_dir_base
+        print(f"Error creating cache directory {CACHE_DIR}: {e}")
+    return CACHE_DIR
 
-def get_snooze_file_path():
-    """
-    Returns the path to the 'snooze' file inside ~/.cache/APP_NAME.
-    """
+
+def get_snooze_file_path() -> str:
+    """Return the path to the snooze timestamp file."""
     return os.path.join(get_cache_dir(), SNOOZE_FILE_NAME)
 
-def get_disable_file_path():
-    """
-    Returns the path to the 'updater_disabled.flag' file inside ~/.cache/APP_NAME.
-    """
+
+def get_disable_file_path() -> str:
+    """Return the path to the updater-disabled flag file."""
     return os.path.join(get_cache_dir(), UPDATER_DISABLE_FILE_NAME)
 
 
-def fetch_remote_version():
-    """
-    Downloads the remote version JSON using curl, with timeout and error handling.
-    """
+def fetch_remote_version() -> None:
+    """Download the remote version.json with curl."""
     try:
         subprocess.run(
-            ["curl", "-sL", "--connect-timeout", "10", REMOTE_URL, "-o", REMOTE_VERSION_FILE],
+            ["curl", "-sL", "--connect-timeout", "10",
+             REMOTE_URL, "-o", REMOTE_VERSION_FILE],
             check=False,
-            timeout=15
+            timeout=15,
         )
     except subprocess.TimeoutExpired:
         print("Error: curl timed out while fetching the remote version.")
@@ -74,14 +88,12 @@ def fetch_remote_version():
 
 
 def get_local_version():
-    """
-    Reads the local version file and returns (version, changelog).
-    """
+    """Read the local version file and return *(version, changelog)*."""
     if os.path.exists(VERSION_FILE):
         try:
             with open(VERSION_FILE, "r") as f:
-                data_content = json.load(f)
-                return data_content.get("version", "0.0.0"), data_content.get("changelog", [])
+                data = json.load(f)
+                return data.get("version", "0.0.0"), data.get("changelog", [])
         except json.JSONDecodeError:
             print(f"Error: Invalid JSON in local file: {VERSION_FILE}")
             return "0.0.0", []
@@ -92,18 +104,16 @@ def get_local_version():
 
 
 def get_remote_version():
-    """
-    Reads the downloaded remote file and returns (version, changelog, download_url, pkg_update).
-    """
+    """Read the remote version file and return *(version, changelog, download_url, pkg_update)*."""
     if os.path.exists(REMOTE_VERSION_FILE):
         try:
             with open(REMOTE_VERSION_FILE, "r") as f:
-                data_content = json.load(f)
+                data = json.load(f)
                 return (
-                    data_content.get("version", "0.0.0"),
-                    data_content.get("changelog", []),
-                    data_content.get("download_url", "#"),
-                    data_content.get("pkg_update", True),  # Default to True if missing
+                    data.get("version", "0.0.0"),
+                    data.get("changelog", []),
+                    data.get("download_url", "#"),
+                    data.get("pkg_update", True),
                 )
         except json.JSONDecodeError:
             print(f"Error: Invalid JSON in remote file: {REMOTE_VERSION_FILE}")
@@ -114,10 +124,8 @@ def get_remote_version():
     return "0.0.0", [], "#", True
 
 
-def update_local_version_file():
-    """
-    Replaces the local version with the remote one by moving the downloaded JSON to the local version file.
-    """
+def update_local_version_file() -> None:
+    """Replace the local version.json with the downloaded remote one."""
     if os.path.exists(REMOTE_VERSION_FILE):
         try:
             shutil.move(REMOTE_VERSION_FILE, VERSION_FILE)
@@ -126,10 +134,8 @@ def update_local_version_file():
             raise
 
 
-def is_connected():
-    """
-    Checks basic connectivity by attempting to connect to www.google.com:80.
-    """
+def is_connected() -> bool:
+    """Return *True* if we can reach www.google.com:80."""
     try:
         socket.create_connection(("www.google.com", 80), timeout=5)
         return True
@@ -137,435 +143,492 @@ def is_connected():
         return False
 
 
-class UpdateWindow(Gtk.Window):
-    def __init__(self, latest_version, changelog, pkg_update, is_standalone_mode=False):
-        super().__init__(name="update-window", title=f"{data.APP_NAME_CAP} Updater")
-        self.set_default_size(500, 480)
-        self.set_border_width(16)
-        self.set_resizable(False)
-        self.set_position(Gtk.WindowPosition.CENTER)
-        self.set_keep_above(True)
-        self.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+def is_snoozed() -> bool:
+    """Return *True* if the snooze window (8 h) has not yet elapsed."""
+    snooze_path = get_snooze_file_path()
+    if not os.path.exists(snooze_path):
+        return False
+    try:
+        with open(snooze_path, "r") as f:
+            ts = float(f.read().strip())
+        if time.time() - ts < SNOOZE_DURATION_SECONDS:
+            return True
+        # Expired — clean up
+        os.remove(snooze_path)
+    except (ValueError, OSError) as e:
+        print(f"Error processing snooze file: {e}")
+        try:
+            os.remove(snooze_path)
+        except OSError:
+            pass
+    return False
 
-        self.is_standalone_mode = is_standalone_mode
-        self.quit_gtk_main_on_destroy = False
-        self.pkg_update = pkg_update # Store pkg_update
 
-        # Main vertical container
-        self.main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
-        self.add(self.main_vbox)
+def is_updater_disabled() -> bool:
+    """Return *True* if the updater-disabled flag file exists."""
+    return os.path.exists(get_disable_file_path())
+
+
+def write_snooze() -> None:
+    """Write the current timestamp to the snooze file."""
+    snooze_path = get_snooze_file_path()
+    try:
+        with open(snooze_path, "w") as f:
+            f.write(str(time.time()))
+        print(f"Update snoozed. Snooze file at: {snooze_path}")
+    except Exception as e:
+        print(f"Error creating snooze file {snooze_path}: {e}")
+
+
+def toggle_updater_disabled() -> bool:
+    """Toggle the updater-disabled flag file.  Return the new *disabled* state."""
+    disable_path = get_disable_file_path()
+    try:
+        if os.path.exists(disable_path):
+            os.remove(disable_path)
+            print("Updater enabled.")
+            return False
+        else:
+            with open(disable_path, "w") as f:
+                pass
+            print("Updater disabled.")
+            return True
+    except Exception as e:
+        print(f"Error toggling updater state: {e}")
+        return os.path.exists(disable_path)
+
+
+def _version_is_newer(latest: str, current: str) -> bool:
+    """Semantic version comparison using tuple of ints."""
+    try:
+        return tuple(int(x) for x in latest.split(".")) > tuple(int(x) for x in current.split("."))
+    except ValueError:
+        return latest > current
+
+
+# ---------------------------------------------------------------------------
+# UpdateCheckWorker
+# ---------------------------------------------------------------------------
+
+
+class UpdateCheckWorker(QObject):
+    """Runs the update-check logic on a background QThread."""
+
+    update_available = Signal(str, list, bool)  # version, changelog, pkg_update
+    no_update = Signal()
+    finished = Signal()
+
+    def __init__(self, force: bool = False):
+        super().__init__()
+        self._force = force
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            if is_updater_disabled() and not self._force:
+                print(f"Updater is disabled via {UPDATER_DISABLE_FILE_NAME}. Skipping.")
+                self.no_update.emit()
+                return
+
+            if not is_connected():
+                print("No internet connection. Skipping update check.")
+                self.no_update.emit()
+                return
+
+            fetch_remote_version()
+            latest_version, changelog, _, pkg_update = get_remote_version()
+
+            if self._force:
+                print(f"Force mode — opening updater for version {latest_version}.")
+                self.update_available.emit(latest_version, changelog, pkg_update)
+                return
+
+            if is_snoozed():
+                print("Update check snoozed.")
+                self.no_update.emit()
+                return
+
+            current_version, _ = get_local_version()
+            if _version_is_newer(latest_version, current_version) and latest_version != "0.0.0":
+                self.update_available.emit(latest_version, changelog, pkg_update)
+            else:
+                print(f"{APP_NAME_CAP} is up to date.")
+                self.no_update.emit()
+        finally:
+            self.finished.emit()
+
+
+# ---------------------------------------------------------------------------
+# UpdaterWindow
+# ---------------------------------------------------------------------------
+
+
+class UpdaterWindow(FramelessMainWindow):
+    """PySide6 updater dialog following the FramelessMainWindow pattern."""
+
+    def __init__(
+        self,
+        latest_version: str = "0.0.0",
+        changelog: list | None = None,
+        pkg_update: bool = True,
+    ):
+        self._latest_version = latest_version
+        self._changelog = changelog or []
+        self._pkg_update = pkg_update
+        self._process: QProcess | None = None
+
+        super().__init__(width=500, height=480, title=f"{APP_NAME_CAP} Updater")
+        self.setMinimumSize(400, 380)
+
+    # -- FramelessMainWindow overrides --
+
+    def setup_content(self) -> None:
+        self.content_layout.setContentsMargins(16, 12, 16, 16)
+        self.content_layout.setSpacing(12)
+
+        # Container with shadow (same pattern as settings dialog)
+        container = QFrame()
+        container.setObjectName("tableContainer")
+        container.setStyleSheet(get_table_container_style())
+        container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        container.setGraphicsEffect(shadow)
+
+        inner = QVBoxLayout(container)
+        inner.setContentsMargins(16, 16, 16, 16)
+        inner.setSpacing(10)
 
         # Title
-        title_label = Gtk.Label(name="update-title")
-        title_label.set_markup("<span size='xx-large' weight='bold'>📦 Update Available ✨</span>")
-        title_label.get_style_context().add_class("title-1")
-        self.main_vbox.pack_start(title_label, False, False, 10)
+        title = QLabel("Update Available")
+        title.setObjectName("updaterTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        inner.addWidget(title)
 
-        # Version info text
-        info_label = Gtk.Label(
-            label=f"A new version ({latest_version}) of {data.APP_NAME_CAP} is available."
+        # Info
+        self.info_label = QLabel(
+            f"A new version ({self._latest_version}) of {APP_NAME_CAP} is available."
         )
-        info_label.set_xalign(0)
-        info_label.set_line_wrap(True)
-        self.main_vbox.pack_start(info_label, False, False, 0)
+        self.info_label.setWordWrap(True)
+        inner.addWidget(self.info_label)
 
         # Changelog header
-        changelog_header_label = Gtk.Label()
-        changelog_header_label.set_markup("<b>Changelog:</b>")
-        changelog_header_label.set_xalign(0)
-        self.main_vbox.pack_start(changelog_header_label, False, False, 5)
+        cl_header = QLabel("<b>Changelog:</b>")
+        inner.addWidget(cl_header)
 
-        # — Scrollable window for the changelog (using Gtk.Label with markup) —
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_hexpand(True)
-        scrolled_window.set_vexpand(True)
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        # Scrollable changelog
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-        if changelog:
-            # Each entry may already contain Pango tags (<b>, <i>, etc.)
-            joined = "\n".join(f"• {change}" for change in changelog)
+        if self._changelog:
+            joined = "<br>".join(f"&bull; {c}" for c in self._changelog)
         else:
             joined = "No specific changes listed for this version."
 
-        self.changelog_label = Gtk.Label()
-        self.changelog_label.set_xalign(0)
-        self.changelog_label.set_yalign(0)
-        self.changelog_label.set_line_wrap(Gtk.WrapMode.WORD_CHAR) # Gtk.WrapMode instead of just True
-        self.changelog_label.set_selectable(False)
-        self.changelog_label.set_markup(joined)
+        self.changelog_label = QLabel(joined)
+        self.changelog_label.setTextFormat(Qt.TextFormat.RichText)
+        self.changelog_label.setWordWrap(True)
+        self.changelog_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        scroll.setWidget(self.changelog_label)
+        inner.addWidget(scroll, 1)
 
-        scrolled_window.add(self.changelog_label)
-        self.main_vbox.pack_start(scrolled_window, True, True, 0)
+        # Log area (hidden by default)
+        self.log_area = QTextEdit()
+        self.log_area.setObjectName("updaterLog")
+        self.log_area.setReadOnly(True)
+        self.log_area.setVisible(False)
+        inner.addWidget(self.log_area)
 
-        # ProgressBar (will be shown if we need to indicate status, although with VTE it remains unused)
-        self.progress_bar = Gtk.ProgressBar()
-        self.progress_bar.set_no_show_all(True)
-        self.progress_bar.set_visible(False)
-        self.main_vbox.pack_start(self.progress_bar, False, False, 5)
+        # Status label (hidden by default)
+        self.status_label = QLabel()
+        self.status_label.setObjectName("updaterStatus")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setVisible(False)
+        inner.addWidget(self.status_label)
 
-        # Button container
-        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        self.main_vbox.pack_start(action_box, False, False, 10)
+        self.content_layout.addWidget(container, 1)
 
-        # "Disable/Enable Updater" Button (aligned left)
-        self.toggle_updater_button = Gtk.Button(name="toggle-updater-button")
-        self.toggle_updater_button.connect("clicked", self.on_toggle_updater_clicked)
-        self._update_toggle_updater_button_label() # Set initial label
-        action_box.pack_start(self.toggle_updater_button, False, False, 0)
+        # Button row
+        btn_row = QHBoxLayout()
 
-        # Box for right-aligned buttons
-        right_aligned_buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        right_aligned_buttons_box.set_halign(Gtk.Align.END)
-        action_box.pack_end(right_aligned_buttons_box, True, True, 0) # This box expands
+        self.toggle_btn = QPushButton(
+            "Enable Updater" if is_updater_disabled() else "Disable Updater"
+        )
+        self.toggle_btn.setMinimumHeight(36)
+        self.toggle_btn.clicked.connect(self._on_toggle_updater)
+        btn_row.addWidget(self.toggle_btn)
 
-        # Update button (will now show embedded VTE terminal)
-        self.update_button = Gtk.Button(name="update-button", label="Update")
-        self.update_button.get_style_context().add_class("suggested-action")
-        self.update_button.connect("clicked", self.on_update_clicked)
-        right_aligned_buttons_box.pack_end(self.update_button, False, False, 0)
+        btn_row.addStretch()
 
-        # 'Later' button
-        self.close_button = Gtk.Button(name="later-button", label="Later")
-        self.close_button.connect("clicked", self.on_later_clicked)
-        right_aligned_buttons_box.pack_end(self.close_button, False, False, 0)
+        self.later_btn = QPushButton("Later")
+        self.later_btn.setMinimumHeight(36)
+        self.later_btn.clicked.connect(self._on_later)
+        btn_row.addWidget(self.later_btn)
 
-        self.connect("destroy", self.on_window_destroyed)
+        self.update_btn = QPushButton("Update")
+        self.update_btn.setObjectName("updateButton")
+        self.update_btn.setMinimumHeight(36)
+        self.update_btn.clicked.connect(self._on_update)
+        btn_row.addWidget(self.update_btn)
 
-        # Placeholder for embedded terminal
-        self.terminal_container = None
-        self.vte_terminal = None
+        self.content_layout.addLayout(btn_row)
 
-    def _update_toggle_updater_button_label(self):
-        disable_file = get_disable_file_path()
-        if os.path.exists(disable_file):
-            self.toggle_updater_button.set_label("Enable Updater")
-        else:
-            self.toggle_updater_button.set_label("Disable Updater")
-
-    def on_toggle_updater_clicked(self, _widget):
-        disable_file = get_disable_file_path()
-        try:
-            if os.path.exists(disable_file):
-                os.remove(disable_file)
-                print("Updater enabled.")
-            else:
-                with open(disable_file, "w") as f:
-                    pass # File content doesn't matter, its existence is the flag
-                print("Updater disabled.")
-            self._update_toggle_updater_button_label()
-        except Exception as e:
-            print(f"Error toggling updater state: {e}")
-            error_dialog = Gtk.MessageDialog(
-                transient_for=self,
-                flags=0,
-                message_type=Gtk.MessageType.ERROR,
-                buttons=Gtk.ButtonsType.OK,
-                text="Error Changing Updater Setting",
-            )
-            error_dialog.format_secondary_text(f"Could not change the updater setting: {e}")
-            error_dialog.run()
-            error_dialog.destroy()
-
-    def on_later_clicked(self, _widget):
+    def get_extra_stylesheet(self) -> str:
+        t = get_current_theme()
+        return get_dialog_stylesheet() + f"""
+            #updaterTitle {{
+                font-size: 20px;
+                font-weight: bold;
+                color: {t.text_primary};
+            }}
+            #updateButton {{
+                background-color: {t.accent};
+                color: {t.text_dark};
+                border: none;
+                border-radius: 6px;
+                padding: 6px 18px;
+            }}
+            #updateButton:hover {{
+                background-color: {t.accent_hover};
+            }}
+            #updateButton:pressed {{
+                background-color: {t.accent_pressed};
+            }}
+            #updateButton:disabled {{
+                background-color: {t.surface_variant};
+                color: {t.text_secondary};
+            }}
+            #updaterLog {{
+                font-family: monospace;
+                background-color: {t.bg_tertiary};
+                border: 1px solid {t.border};
+                border-radius: 4px;
+                padding: 6px;
+            }}
+            #updaterStatus {{
+                font-weight: bold;
+                padding: 4px 0;
+            }}
+            QScrollArea {{
+                border: none;
+                background: transparent;
+            }}
+            QScrollArea > QWidget > QWidget {{
+                background: transparent;
+            }}
         """
-        When 'Later' is clicked, create/update the snooze file and close the window.
-        """
-        snooze_file_path = get_snooze_file_path()
-        try:
-            with open(snooze_file_path, "w") as f:
-                f.write(str(time.time()))
-            print(f"Update snoozed. Snooze file at: {snooze_file_path}")
-        except Exception as e:
-            print(f"Error creating snooze file {snooze_file_path}: {e}")
-        self.destroy()
 
-    def on_update_clicked(self, _widget):
-        """
-        When 'Update' is pressed, disable buttons, hide the progress bar,
-        and create a VTE terminal to run the update command.
-        """
-        # Disable the buttons so they can't be clicked again
-        self.update_button.set_sensitive(False)
-        self.close_button.set_sensitive(False)
-        self.toggle_updater_button.set_sensitive(False) # Disable toggle button during update
+    # -- Button handlers --
 
-        # Hide the progress bar (we don't need it now)
-        self.progress_bar.set_visible(False)
-
-        # If there's no container for the terminal, create it
-        if self.terminal_container is None:
-            # Scrollable container so the terminal can scroll
-            self.terminal_container = Gtk.ScrolledWindow()
-            self.terminal_container.set_hexpand(True)
-            self.terminal_container.set_vexpand(True)
-            self.terminal_container.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-
-            # Create the VTE terminal
-            self.vte_terminal = Vte.Terminal()
-            self.vte_terminal.set_size(120, 48)
-            # Make update window larger
-            self.set_default_size(720, 540)
-            self.terminal_container.add(self.vte_terminal)
-            # Insert the terminal at the end of main_vbox
-            self.main_vbox.pack_start(self.terminal_container, True, True, 0)
-
-        # Show everything
-        self.show_all()
-
-        # Command to run in the terminal
-        if self.pkg_update:
-            update_command = "curl -fsSL https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.sh | bash"
-        else:
-            # Ensure REPO_DIR is correctly defined at the top of the file.
-            update_command = f"git -C \"{REPO_DIR}\" pull && echo 'Reloading in 3...' && sleep 1 && echo '2...' && sleep 1 && echo '1...' && sleep 1 && killall {data.APP_NAME} && setsid python \"{REPO_DIR}main.py\""
-
-
-        # Spawn the process asynchronously inside the terminal
-        self.vte_terminal.spawn_async(
-            Vte.PtyFlags.DEFAULT,
-            os.environ.get("HOME", "/"), # CWD for the command
-            ["/bin/bash", "-lc", update_command], # Command and args
-            [], # envv
-            GLib.SpawnFlags.DO_NOT_REAP_CHILD, # spawn_flags
-            None, # child_setup
-            None, # child_setup_data
-            -1, # timeout
-            None, # cancellable
-            None, # callback_data for Vte.Terminal.spawn_async_wait_finish
-            self.on_curl_script_exit, # callback for when process finishes
-            None # user_data for callback
+    def _on_toggle_updater(self) -> None:
+        now_disabled = toggle_updater_disabled()
+        self.toggle_btn.setText(
+            "Enable Updater" if now_disabled else "Disable Updater"
         )
 
-    def on_curl_script_exit(self, terminal, exit_status, user_data):
-        """
-        Callback when the script running in the VTE terminal finishes.
-        Depending on exit_status, success or failure is considered.
-        """
-        # exit_status is encoded: 0 means success
-        if exit_status == 0:
-            # Call the success routine, which restarts the app
-            GLib.idle_add(self.handle_update_success)
-        else:
-            # If there was an error, read the last part of the buffer to display it
-            end_iter = self.vte_terminal.get_end_iter()
-            start_iter = self.vte_terminal.get_iter_at_line(max(0, self.vte_terminal.get_line_count() - 5))
-            error_excerpt = self.vte_terminal.get_text_range(start_iter, end_iter, False)
-            GLib.idle_add(self.handle_update_failure, f"Script exited with status {exit_status}. Last lines:\n{error_excerpt}")
+    def _on_later(self) -> None:
+        write_snooze()
+        self.close()
 
-    def handle_update_success(self):
-        """
-        Shows a success message, updates local version.json, and restarts the application.
-        """
-        # Update the local version.json with the fetched remote one
+    def _on_update(self) -> None:
+        # Disable all buttons
+        self.update_btn.setEnabled(False)
+        self.later_btn.setEnabled(False)
+        self.toggle_btn.setEnabled(False)
+
+        # Show log area and resize
+        self.log_area.setVisible(True)
+        self.resize(500, 600)
+
+        # Build command
+        if self._pkg_update:
+            cmd = (
+                "curl -fsSL "
+                "https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.sh "
+                "| bash"
+            )
+        else:
+            cmd = (
+                f'git -C "{REPO_DIR}" pull && '
+                f'echo "Reloading in 3..." && sleep 1 && '
+                f'echo "2..." && sleep 1 && '
+                f'echo "1..." && sleep 1 && '
+                f'killall {APP_NAME} && '
+                f'setsid python "{REPO_DIR}/main.py"'
+            )
+
+        self._process = QProcess(self)
+        self._process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self._process.readyReadStandardOutput.connect(self._on_process_output)
+        self._process.finished.connect(self._on_process_finished)
+        self._process.start("/bin/bash", ["-lc", cmd])
+
+    def _on_process_output(self) -> None:
+        if self._process is None:
+            return
+        raw = self._process.readAllStandardOutput()
+        text = raw.data().decode("utf-8", errors="replace")
+        self.log_area.append(text)
+
+    def _on_process_finished(self, exit_code: int, _exit_status: QProcess.ExitStatus) -> None:
+        if exit_code == 0:
+            self._handle_success()
+        else:
+            self._handle_failure(exit_code)
+
+    def _handle_success(self) -> None:
         try:
             update_local_version_file()
             print("Local version.json updated successfully.")
         except Exception as e:
             print(f"Failed to update local version.json: {e}")
-            # Optionally, you could show an error message to the user here
-            # For now, we'll proceed with the restart if the script itself was successful.
 
-        # If there was any progress bar timeout, remove it
-        if hasattr(self, "pulse_timeout_id"):
-            GLib.source_remove(self.pulse_timeout_id)
-            delattr(self, "pulse_timeout_id")
+        self.status_label.setText("Update complete. Restarting...")
+        self.status_label.setVisible(True)
+        QTimer.singleShot(2000, self._restart_app)
 
-        # Replace the terminal (or other widget) with a brief message
-        # First remove the terminal to show the progress bar and text
-        if self.terminal_container:
-            self.main_vbox.remove(self.terminal_container)
+    def _handle_failure(self, exit_code: int = 1) -> None:
+        t = get_current_theme()
+        self.status_label.setText(f"Update failed (exit code {exit_code}).")
+        self.status_label.setStyleSheet(f"color: {t.danger}; font-weight: bold;")
+        self.status_label.setVisible(True)
 
-        # Prepare the progress bar to indicate success
-        self.progress_bar.set_visible(True)
-        self.progress_bar.set_fraction(1.0)
-        self.progress_bar.set_text("Update Complete. Restarting application...")
-        self.progress_bar.set_show_text(True)
+        # Re-enable buttons
+        self.update_btn.setEnabled(True)
+        self.later_btn.setEnabled(True)
+        self.toggle_btn.setEnabled(True)
 
-        # Force it to show
-        self.show_all()
-
-        # After 2 seconds, close and restart
-        GLib.timeout_add_seconds(2, self.trigger_restart_and_close)
-
-    def trigger_restart_and_close(self):
-        """
-        Closes the window and relaunches the application.
-        """
-        self.destroy()
+    @staticmethod
+    def _restart_app() -> None:
         try:
             print("Restarting application...")
-            # Relaunch the application
             os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
-            print(f"Error during application restart: {e}")
-            # Fallback or error message if execv fails
-            # For instance, you might want to just quit GTK if restart fails in standalone mode.
-            if self.is_standalone_mode and self.quit_gtk_main_on_destroy:
-                Gtk.main_quit()
-        return False  # So the timeout runs only once
-
-    def handle_update_failure(self, error_message):
-        """
-        Shows an error dialog if the script execution fails.
-        """
-        # If there was any progress bar timeout, remove it
-        if hasattr(self, "pulse_timeout_id"):
-            GLib.source_remove(self.pulse_timeout_id)
-            delattr(self, "pulse_timeout_id")
-
-        # Indicate failure in the progress bar
-        self.progress_bar.set_visible(True)
-        self.progress_bar.set_fraction(0.0)
-        self.progress_bar.set_text("Update Failed.")
-        self.progress_bar.set_show_text(True)
-
-        # Buttons are re-enabled to retry or close
-        self.update_button.set_sensitive(True)
-        self.close_button.set_sensitive(True)
-        self.toggle_updater_button.set_sensitive(True) # Re-enable toggle button
-
-        # Error dialog
-        error_dialog = Gtk.MessageDialog(
-            transient_for=self,
-            flags=0,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text="Update Failed",
-        )
-        error_dialog.format_secondary_text(error_message)
-        error_dialog.run()
-        error_dialog.destroy()
-
-    def on_window_destroyed(self, _widget):
-        """
-        If the window is destroyed and we're in standalone mode, quit Gtk.main().
-        """
-        if hasattr(self, "pulse_timeout_id"):
-            GLib.source_remove(self.pulse_timeout_id)
-            delattr(self, "pulse_timeout_id")
-
-        if self.quit_gtk_main_on_destroy:
-            Gtk.main_quit()
+            print(f"Error during restart: {e}")
 
 
-def _initiate_update_check_flow(is_standalone_mode, force=False): # Added force argument with default
+# ---------------------------------------------------------------------------
+# Entry points
+# ---------------------------------------------------------------------------
+
+_active_threads: list = []
+_active_windows: list = []
+_theme_initialized = False
+
+
+def _ensure_theme() -> None:
+    """Initialize the Glaze theme from the current wallpaper (once)."""
+    global _theme_initialized
+    if _theme_initialized:
+        return
+    _theme_initialized = True
+    wallpaper = Path.home() / ".current.wall"
+    if wallpaper.exists():
+        try:
+            import glaze
+            from glaze import generate_theme
+            new_theme, backend = generate_theme(image_path=str(wallpaper))
+            glaze.theme = new_theme
+            sys.modules["glaze.theme"].theme = new_theme  # type: ignore
+            print(f"Loaded theme from wallpaper using {backend}")
+        except Exception as e:
+            print(f"Warning: Could not generate theme from wallpaper: {e}")
+
+
+def _show_updater(version: str, changelog: list, pkg_update: bool) -> None:
+    """Create and display the UpdaterWindow (must be called on the main thread)."""
+    _ensure_theme()
+    win = UpdaterWindow(
+        latest_version=version,
+        changelog=changelog,
+        pkg_update=pkg_update,
+    )
+    _active_windows.append(win)
+    win.destroyed.connect(lambda: _active_windows.remove(win) if win in _active_windows else None)
+    win.show()
+
+
+def check_for_updates(force: bool = False) -> None:
+    """Kick off a background update check.
+
+    Connects signals so that *_show_updater* is invoked on the main thread
+    if an update is available.
     """
-    Logic that checks connection, snooze, and downloads the remote version.
-    If there's a new version or force is True, launches the update window.
-    """
-    global _QUIT_GTK_IF_NO_WINDOW_STANDALONE
+    thread = QThread()
+    worker = UpdateCheckWorker(force=force)
+    worker.moveToThread(thread)
 
-    # --- Check if updater is permanently disabled ---
-    disable_file_path = get_disable_file_path()
-    if os.path.exists(disable_file_path) and not force:
-        print(f"Updater is disabled via {UPDATER_DISABLE_FILE_NAME}. Skipping update check.")
-        if is_standalone_mode and _QUIT_GTK_IF_NO_WINDOW_STANDALONE:
-            GLib.idle_add(Gtk.main_quit)
+    thread.started.connect(worker.run)
+    worker.update_available.connect(_show_updater, Qt.ConnectionType.QueuedConnection)
+    worker.finished.connect(thread.quit)
+    # Clean up after thread fully stops (avoids cross-thread parenting warnings)
+    thread.finished.connect(worker.deleteLater)
+    thread.finished.connect(thread.deleteLater)
+    thread.finished.connect(lambda t=thread: _active_threads.remove(t) if t in _active_threads else None)
+
+    _active_threads.append(thread)
+    thread.start()
+
+
+def run_updater(force: bool = False) -> None:
+    """Convenience wrapper compatible with existing callers."""
+    check_for_updates(force=force)
+
+
+def _run_standalone(force: bool = False) -> None:
+    """Run the updater as a standalone Qt application.
+
+    Runs the update check synchronously (before the event loop) to avoid
+    cross-thread Qt warnings that occur with the QThread approach.
+    """
+    # Check synchronously — network calls are fast enough for standalone
+    if is_updater_disabled() and not force:
+        print(f"Updater is disabled via {UPDATER_DISABLE_FILE_NAME}. Skipping.")
         return
 
     if not is_connected():
         print("No internet connection. Skipping update check.")
-        if is_standalone_mode and _QUIT_GTK_IF_NO_WINDOW_STANDALONE:
-            GLib.idle_add(Gtk.main_quit)
         return
 
     fetch_remote_version()
-    latest_version, changelog, _, pkg_update = get_remote_version() # Unpack pkg_update
+    latest, changelog, _, pkg_update = get_remote_version()
 
-    if force:
-        print(f"Force update mode enabled. Opening updater for version {latest_version}.")
-        if latest_version == "0.0.0" and not changelog: # And pkg_update will be True (default)
-            print(f"Warning: Could not fetch remote version details for {data.APP_NAME_CAP}. Updater will show default/empty info.")
-        GLib.idle_add(launch_update_window, latest_version, changelog, pkg_update, is_standalone_mode) # Pass pkg_update
-        return # Exit after launching in force mode
+    if not force:
+        if is_snoozed():
+            print("Update check snoozed.")
+            return
+        current, _ = get_local_version()
+        if not (_version_is_newer(latest, current) and latest != "0.0.0"):
+            print(f"{APP_NAME_CAP} is up to date.")
+            return
 
-    # --- Regular update check flow (if not forced) ---
-    snooze_file_path = get_snooze_file_path()
-    if os.path.exists(snooze_file_path):
-        try:
-            with open(snooze_file_path, "r") as f:
-                snooze_timestamp_str = f.read().strip()
-                snooze_timestamp = float(snooze_timestamp_str)
+    # Update available (or forced) — show the window
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(True)
 
-            current_time = time.time()
-            if current_time - snooze_timestamp < SNOOZE_DURATION_SECONDS:
-                snooze_until_time = snooze_timestamp + SNOOZE_DURATION_SECONDS
-                snooze_until_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(snooze_until_time))
-                print(f"Check postponed. It will resume after {snooze_until_time_str}.")
-                if is_standalone_mode and _QUIT_GTK_IF_NO_WINDOW_STANDALONE:
-                    GLib.idle_add(Gtk.main_quit)
-                return
-            else:
-                print("Snooze period expired. Removing file and checking for updates.")
-                os.remove(snooze_file_path)
-        except ValueError:
-            print(f"Error: invalid content in snooze file. Removing: {snooze_file_path}")
-            try:
-                os.remove(snooze_file_path)
-            except OSError as e_remove:
-                print(f"Error removing corrupt snooze file: {e_remove}")
-        except Exception as e_snooze:
-            print(f"Error processing snooze file {snooze_file_path}: {e_snooze}. Proceeding with check.")
-            try:
-                os.remove(snooze_file_path) # Attempt to remove problematic snooze file
-            except OSError as e_remove_generic:
-                print(f"Error removing problematic snooze file: {e_remove_generic}")
+    _ensure_theme()
+    win = UpdaterWindow(latest_version=latest, changelog=changelog, pkg_update=pkg_update)
+    _active_windows.append(win)
+    win.destroyed.connect(lambda: _active_windows.remove(win) if win in _active_windows else None)
+    win.show()
 
-
-    current_version, _ = get_local_version()
-
-    # Basic version comparison (not strict semver)
-    if latest_version > current_version and latest_version != "0.0.0":
-        GLib.idle_add(launch_update_window, latest_version, changelog, pkg_update, is_standalone_mode) # Pass pkg_update
-    else:
-        print(f"{data.APP_NAME_CAP} is up to date or the remote version is invalid.")
-        if is_standalone_mode and _QUIT_GTK_IF_NO_WINDOW_STANDALONE:
-            GLib.idle_add(Gtk.main_quit)
-
-
-def launch_update_window(latest_version, changelog, pkg_update, is_standalone_mode):
-    """
-    Creates and shows the update window.
-    """
-    win = UpdateWindow(latest_version, changelog, pkg_update, is_standalone_mode) # Pass pkg_update
-    if is_standalone_mode:
-        win.quit_gtk_main_on_destroy = True
-    win.show_all()
-
-
-def check_for_updates():
-    """
-    Entry point when called from the main application.
-    Initiates an update check in a background thread without force.
-    """
-    # Create wrapper function for GLib.Thread compatibility
-    def _update_check_wrapper(user_data):
-        _initiate_update_check_flow(False, False)
-    
-    GLib.Thread.new("update-check", _update_check_wrapper, None)
-
-
-def run_updater(force=False): # Modified to accept force argument
-    """
-    Standalone entry point: starts Gtk.main and the update check.
-    Args:
-        force (bool): If True, opens the updater even if the version isn't outdated or snoozed.
-                      Defaults to False.
-    """
-    global _QUIT_GTK_IF_NO_WINDOW_STANDALONE
-    _QUIT_GTK_IF_NO_WINDOW_STANDALONE = True
-
-    # Create wrapper function for GLib.Thread compatibility  
-    def _standalone_update_wrapper(user_data):
-        _initiate_update_check_flow(True, force)
-    
-    GLib.Thread.new("standalone-update-check", _standalone_update_wrapper, None)
-
-    Gtk.main()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
-    # Example of how to run with force=True:
-    # run_updater(force=True)
-    # By default, runs with force=False:
-    run_updater()
+    _force = "--force" in sys.argv
+    _run_standalone(force=_force)

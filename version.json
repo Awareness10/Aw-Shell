@@ -1,13 +1,16 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.5",
   "pkg_update": false,
   "changelog": [
+    "<b>update:</b> Added regression tests for the latest breaking changes, updated to use .venv-python",
+    "<b>hotfix:</b> Update Glaze version with matugen fix",
+    "<b>hotfix:</b> Matugen 4.0.0 breaking api change, json decode changes",
     "<b>test:</b> Comprehensive test suite — 362 tests, 94% coverage",
     "<b>cleanup:</b> Removed dead GTK settings modules (about, appearance, keybindings, system, window)",
     "<b>refactor:</b> Major codebase refactoring for maintainability",
     "<b>refactor:</b> Extracted Signal class to utils/signal.py",
     "<b>refactor:</b> Created BaseSlider class hierarchy for controls",
     "<b>refactor:</b> Added layout utilities module",
-    "<b>fork:</b> Rebranded from Ax-Shell to Aw-Shell"
+    "<b>fork:</b> Rebranded from Ax-Shell to Aw-Shell",
   ]
 }

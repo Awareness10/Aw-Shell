@@ -45,7 +45,7 @@
 
 Aw-Shell builds on the original Ax-Shell with the following improvements:
 
-- **Refactored settings** - monolithic settings GUI split into focused modules (appearance, keybindings, system, window, about)
+- **New PySide6 settings gui** - the first step of the migration to pyside6 (Qt6) gui.
 - **Refactored controls** — simplified and reorganized control panel
 - **Improved launcher** — better search relevance and multi-monitor awareness
 - **Multi-monitor fixes** — dashboard and workspaces open on the correct monitor

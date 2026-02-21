@@ -287,7 +287,7 @@ class WallpaperSelector(Box):
 
         if self.matugen_switcher.get_active():
             exec_shell_command_async(
-                f'matugen image "{full_path}" -t {selected_scheme}'
+                f'matugen image "{full_path}" -t {selected_scheme} --source-color-index 0'
             )
         else:
             exec_shell_command_async(
@@ -378,7 +378,7 @@ class WallpaperSelector(Box):
         if self.matugen_switcher.get_active():
             # Matugen is enabled: run the normal command.
             exec_shell_command_async(
-                f'matugen image "{full_path}" -t {selected_scheme}'
+                f'matugen image "{full_path}" -t {selected_scheme} --source-color-index 0'
             )
         else:
             # Matugen is disabled: run the alternative awww command.

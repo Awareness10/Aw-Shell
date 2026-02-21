@@ -40,11 +40,14 @@ if "gi" not in sys.modules:
     _mock_glib.get_user_cache_dir.return_value = "/tmp/test-cache"
     _mock_glib.get_os_info.return_value = "arch"
     _mock_gi_repo = types.ModuleType("gi.repository")
+    _mock_vte = MagicMock()
     _mock_gi_repo.Gdk = _mock_gdk
     _mock_gi_repo.Gtk = _mock_gtk
     _mock_gi_repo.GLib = _mock_glib
+    _mock_gi_repo.Vte = _mock_vte
     sys.modules["gi"] = _mock_gi
     sys.modules["gi.repository"] = _mock_gi_repo
     sys.modules["gi.repository.Gdk"] = _mock_gdk
     sys.modules["gi.repository.Gtk"] = _mock_gtk
     sys.modules["gi.repository.GLib"] = _mock_glib
+    sys.modules["gi.repository.Vte"] = _mock_vte

@@ -1,4 +1,4 @@
-from gi.repository import Gdk, GObject, Gtk
+from gi.repository import Gdk, Gtk
 import re
 from collections.abc import Iterable
 from enum import Enum
@@ -28,27 +28,10 @@ class WaylandWindowExclusivity(Enum):
     AUTO = 3
 
 
-class Layer(GObject.GEnum):
-    BACKGROUND = 0
-    BOTTOM = 1
-    TOP = 2
-    OVERLAY = 3
-    ENTRY_NUMBER = 4
-
-
-class KeyboardMode(GObject.GEnum):
-    NONE = 0
-    EXCLUSIVE = 1
-    ON_DEMAND = 2
-    ENTRY_NUMBER = 3
-
-
-class Edge(GObject.GEnum):
-    LEFT = 0
-    RIGHT = 1
-    TOP = 2
-    BOTTOM = 3
-    ENTRY_NUMBER = 4
+# Use GtkLayerShell's C-registered enums directly (compatible with PyGObject 3.50+)
+Layer = GtkLayerShell.Layer
+KeyboardMode = GtkLayerShell.KeyboardMode
+Edge = GtkLayerShell.Edge
 
 
 class WaylandWindow(Window):
