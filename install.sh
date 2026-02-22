@@ -50,6 +50,12 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
+DEV_MODE=false
+
+if [[ "${1:-}" == "--dev" ]]; then
+  DEV_MODE=true
+fi
+
 aur_helper="yay"
 
 if command -v paru &>/dev/null; then
@@ -62,12 +68,37 @@ elif ! command -v yay &>/dev/null; then
   rm -rf "$tmpdir"
 fi
 
-if [ -d "$INSTALL_DIR" ]; then
-  echo "Updating Aw-Shell..."
-  git -C "$INSTALL_DIR" pull
+# --- SOURCE ACQUISITION ----------------------------------------------
+
+if $DEV_MODE; then
+  echo "Installing Aw-Shell in DEV mode..."
+
+  # ensure we're inside a git repo
+  if [ ! -d ".git" ]; then
+    echo "Dev mode must be run from inside the Aw-Shell repository."
+    exit 1
+  fi
+
+  # replace existing install safely
+  if [ -e "$INSTALL_DIR" ] || [ -L "$INSTALL_DIR" ]; then
+    echo "Removing existing installation..."
+    rm -rf "$INSTALL_DIR"
+  fi
+
+  echo "Linking project directory:"
+  echo "  $INSTALL_DIR -> $PWD"
+
+  ln -s "$PWD" "$INSTALL_DIR"
+
 else
-  echo "Cloning Aw-Shell..."
-  git clone --depth=1 "$REPO_URL" "$INSTALL_DIR"
+  if [ -d "$INSTALL_DIR/.git" ]; then
+    echo "Updating Aw-Shell..."
+    git -C "$INSTALL_DIR" pull
+  else
+    echo "Cloning Aw-Shell..."
+    rm -rf "$INSTALL_DIR"
+    git clone --depth=1 "$REPO_URL" "$INSTALL_DIR"
+  fi
 fi
 
 echo "Installing required packages..."
