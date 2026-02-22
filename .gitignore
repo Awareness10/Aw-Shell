@@ -16,5 +16,8 @@ config/dock.json.bak
 *.md
 !README.md
 .coverage
+<<<<<<< Updated upstream
 coverage/
 htmlcov/
+=======
+>>>>>>> Stashed changes
