@@ -51,26 +51,7 @@ select = ["E", "F", "I"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--cov=utils --cov=config --cov-report=term-missing"
+addopts = "--cov --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["utils", "config"]
-
-# Default: exclude GUI/runtime modules that require GTK/Fabric and can't be unit tested.
-# To see full project coverage instead, run: uv run pytest --cov-config=pyproject-full.toml
-omit = [
-    # config modules with heavy GTK/Fabric deps that can't be imported in tests
-    "config/__init__.py",
-    "config/config.py",
-    "config/data.py",
-    "config/service.py",
-    "config/settings_gui.py",
-    "config/settings/__init__.py",
-    # utils with GTK/Fabric runtime deps
-    "utils/animator.py",
-    "utils/async_subprocess.py",
-    "utils/global_keybinds.py",
-    "utils/hyprland_monitor.py",
-    "utils/icon_resolver.py",
-    "utils/occlusion.py",
-]
+source = ["config", "modules", "services", "utils", "widgets"]

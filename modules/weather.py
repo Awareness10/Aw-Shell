@@ -26,7 +26,7 @@ class Weather(Button):
         GLib.timeout_add(100, self._initial_fetch)
 
     def set_visible(self, visible):
-        """Override to track external visibility setting"""
+        """Override to track external visibility setting (from config/user toggle)"""
         self.enabled = visible
 
         # If being disabled, always hide
@@ -38,6 +38,10 @@ class Weather(Button):
         if hasattr(self, "has_weather_data") and self.has_weather_data:
             super().set_visible(True)
         # If no weather data yet, remain hidden until fetch completes
+
+    def _update_visibility(self):
+        """Update GTK visibility based on current state, without changing self.enabled"""
+        super().set_visible(self.enabled and self.has_weather_data)
 
     def _initial_fetch(self):
         """Initial fetch that runs only once"""
@@ -75,7 +79,7 @@ class Weather(Button):
                 weather_data = result.stdout.strip()
                 if "Unknown" in weather_data:
                     self.has_weather_data = False
-                    GLib.idle_add(self.set_visible, False)
+                    GLib.idle_add(self._update_visibility)
                 else:
                     self.has_weather_data = True
 
@@ -90,17 +94,17 @@ class Weather(Button):
                         tooltip_text = tooltip_result.stdout.strip()
                         GLib.idle_add(self.set_tooltip_text, tooltip_text)
 
-                    GLib.idle_add(self.set_visible, self.enabled)
+                    GLib.idle_add(self._update_visibility)
                     GLib.idle_add(self.label.set_label, weather_data.replace(" ", ""))
             else:
                 self.has_weather_data = False
                 GLib.idle_add(self.label.set_markup, f"{icons.cloud_off} Unavailable")
-                GLib.idle_add(self.set_visible, False)
+                GLib.idle_add(self._update_visibility)
         except Exception as e:
             self.has_weather_data = False
             print(f"Error fetching weather: {e}")
             GLib.idle_add(self.label.set_markup, f"{icons.cloud_off} Error")
-            GLib.idle_add(self.set_visible, False)
+            GLib.idle_add(self._update_visibility)
         finally:
             # Always reset fetching flag when done
             self.fetching = False

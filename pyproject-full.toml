@@ -1,8 +1,63 @@
-# Full project coverage — includes GUI/runtime modules that can't be unit tested.
+# "Pretty" coverage — omits GUI/runtime modules that can't be unit tested.
+# Shows coverage only for testable code, giving a higher (more meaningful) percentage.
 # Usage: uv run pytest --cov-config=pyproject-full.toml
-#
-# Default (pyproject.toml) excludes these modules for an accurate testable-code metric.
-# Use this config when you want to see the complete picture.
 
 [tool.coverage.run]
-source = ["utils", "config"]
+source = ["config", "modules", "services", "utils", "widgets"]
+omit = [
+    # config — PySide6/GTK/Gdk at module level
+    "config/__init__.py",
+    "config/config.py",
+    "config/data.py",
+    "config/settings_gui.py",
+    "config/settings/__init__.py",
+    # modules — all depend on fabric.widgets / GTK / cairo / OpenGL
+    "modules/bar.py",
+    "modules/bluetooth.py",
+    "modules/buttons.py",
+    "modules/calendar.py",
+    "modules/cavalcade.py",
+    "modules/cliphist.py",
+    "modules/controls.py",
+    "modules/corners.py",
+    "modules/dashboard.py",
+    "modules/dock.py",
+    "modules/emoji.py",
+    "modules/icons.py",
+    "modules/kanban.py",
+    "modules/launcher.py",
+    "modules/metrics.py",
+    "modules/network.py",
+    "modules/notch.py",
+    "modules/mixer.py",
+    "modules/notifications.py",
+    "modules/overview.py",
+    "modules/pins.py",
+    "modules/player.py",
+    "modules/power.py",
+    "modules/shader.py",
+    "modules/systemprofiles.py",
+    "modules/systemtray.py",
+    "modules/tmux.py",
+    "modules/tools.py",
+    "modules/updater.py",
+    "modules/wallpapers.py",
+    "modules/widgets.py",
+    # modules with partial testability (mocked in test_weather_bdd)
+    # "modules/weather.py",  - kept: tested via BDD scenarios
+    # services — fabric.core.service / GLib main loop
+    "services/brightness.py",
+    "services/mpris.py",
+    "services/network.py",
+    # utils — Gdk/Gtk GUI state at runtime
+    "utils/animator.py",
+    "utils/async_subprocess.py",
+    "utils/hyprland_monitor.py",
+    "utils/icon_resolver.py",
+    "utils/occlusion.py",
+    # widgets — fabric.widgets / GTK / cairo / OpenGL
+    "widgets/circle_image.py",
+    "widgets/image.py",
+    "widgets/shadertoy.py",
+    "widgets/wayland.py",
+]
