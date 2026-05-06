@@ -466,7 +466,7 @@ class AwShellSettings(FramelessMainWindow):
         self.ws_num_cb.setChecked(get_bind_var("bar_workspace_show_number", False))
         self.ws_num_cb.stateChanged.connect(self._on_ws_num_changed)
         ws_row.addWidget(self.ws_num_cb)
-        self.ws_runes_cb = QCheckBox("Use Runes  ᚠ ᚢ ᚦ ᚯ ᚱ …")
+        self.ws_runes_cb = QCheckBox("Runes in place of numbers ᚠ ᚢ ᚦ ᚯ ᚱ …")
         self.ws_runes_cb.setChecked(get_bind_var("bar_workspace_use_runes", False))
         self.ws_runes_cb.setEnabled(self.ws_num_cb.isChecked())
         ws_row.addWidget(self.ws_runes_cb)

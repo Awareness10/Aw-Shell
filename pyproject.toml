@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
 authors = [
-    { name = "Adriano Tisera (Axenide)"},
+    { name = "Adriano Tisera (Axenide)" },
     { name = "Robin Martinsen (Awareness10)" },
 ]
 keywords = ["hyprland", "shell", "wayland", "desktop", "fabric", "gtk", "pyside6"]
