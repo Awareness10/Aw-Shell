@@ -59,7 +59,8 @@
 
 #button-volume,
 #button-mic,
-#button-brightness {
+#button-brightness,
+#button-mouse-battery {
   color: var(--surface-bright);
   border: 3px solid var(--primary);
 }
@@ -68,6 +69,10 @@
 #button-mic.muted {
   color: var(--surface-bright);
   border: 3px solid var(--outline);
+}
+
+#button-mouse-battery.alert {
+  border: 3px solid var(--red-dim);
 }
 
 #vol-label,

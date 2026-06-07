@@ -13,6 +13,7 @@ from gi.repository import Gdk, GLib
 
 import config.data as data
 import modules.icons as icons
+from modules.upower.upower import UPowerManager
 from services.brightness import Brightness
 
 
@@ -370,6 +371,82 @@ class MicSmall(BaseSmallControl):
         self.control_button.get_child().set_markup(icon)
 
 
+class MouseBattery(BaseSmallControl):
+    DEVICE_TYPE_MOUSE = 5
+    STATE_CHARGING = 1
+    LOW_THRESHOLD = 15
+    POLL_INTERVAL_SECONDS = 30
+
+    def __init__(self, **kwargs):
+        super().__init__("button-bar-mouse-battery", "button-mouse-battery", icons.battery, **kwargs)
+        self._poll_source_id = None
+        try:
+            self.upower = UPowerManager()
+            self.device_path = self._find_mouse_device()
+        except Exception:
+            self.device_path = None
+
+        if not self.device_path:
+            self.set_no_show_all(True)
+            self.set_visible(False)
+            return
+
+        self._poll_source_id = GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self._update)
+        GLib.idle_add(self._update)
+
+    def _find_mouse_device(self):
+        for path in self.upower.detect_devices():
+            info = self.upower.get_full_device_information(path)
+            if info.get("Type") == self.DEVICE_TYPE_MOUSE:
+                return path
+        return None
+
+    def _on_scroll(self, widget, event) -> None:
+        return None
+
+    def _update(self) -> bool:
+        try:
+            info = self.upower.get_full_device_information(self.device_path)
+        except Exception:
+            self.set_visible(False)
+            return True
+
+        if not info.get("IsPresent", False):
+            self.set_visible(False)
+            return True
+
+        percentage = float(info.get("Percentage", 0))
+        state = int(info.get("State", 0))
+        model = (info.get("Model") or "").strip() or "Mouse"
+
+        self.set_visible(True)
+        self.progress_bar.value = percentage / 100
+
+        is_charging = state == self.STATE_CHARGING
+        is_low = percentage <= self.LOW_THRESHOLD and not is_charging
+
+        if is_charging:
+            self.control_label.set_markup(icons.charging)
+        elif is_low:
+            self.control_label.set_markup(icons.alert)
+        else:
+            self.control_label.set_markup(icons.battery)
+
+        style_op_bar = self.progress_bar.add_style_class if is_low else self.progress_bar.remove_style_class
+        style_op_lbl = self.control_label.add_style_class if is_low else self.control_label.remove_style_class
+        style_op_bar("alert")
+        style_op_lbl("alert")
+
+        self.set_tooltip_text(f"{model}: {round(percentage)}%")
+        return True
+
+    def destroy(self) -> None:
+        if self._poll_source_id:
+            GLib.source_remove(self._poll_source_id)
+            self._poll_source_id = None
+        super().destroy()
+
+
 class BaseIconControl(Box, DebouncedValueMixin):
     def __init__(self, name: str, label_name: str, label_markup: str, **kwargs):
         super().__init__(name=name, **kwargs)
@@ -660,7 +737,7 @@ class ControlSmall(Box):
         children = []
         if brightness.screen_brightness != -1:
             children.append(BrightnessSmall())
-        children.extend([VolumeSmall(), MicSmall()])
+        children.extend([VolumeSmall(), MicSmall(), MouseBattery()])
         super().__init__(
             name="control-small",
             orientation="h" if not data.VERTICAL else "v",
