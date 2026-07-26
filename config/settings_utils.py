@@ -403,7 +403,8 @@ decoration {{
       enabled = true
       range = 10
       render_power = 2
-      color = rgba(0, 0, 0, 0.25)
+      # Hyprland colors are hex only: rgba(RRGGBBAA) or 0xAARRGGBB — no CSS-style rgba(r, g, b, a.f)
+      color = rgba(00000040)
     }}
 }}
 
