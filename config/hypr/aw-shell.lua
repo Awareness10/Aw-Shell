@@ -1,6 +1,8 @@
 -- Converted from aw-shell.conf
 
-local colors = require("aw_shell.config.hypr.colors")
+-- Hyprland's Lua package.path only covers ~/.config/hypr/, so a sibling file
+-- in this directory must be loaded with an absolute dofile() path instead.
+local colors = dofile("/home/denzh/.config/aw-shell/config/hypr/colors.lua")
 
 local fabricSend = "fabric-cli exec aw-shell"
 
