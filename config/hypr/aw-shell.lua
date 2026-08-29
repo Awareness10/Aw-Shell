@@ -108,8 +108,8 @@ end)
 -- Exec (run every reload)
 hl.on("config.reloaded", function()
     hl.exec_cmd("pgrep -x \"hypridle\" > /dev/null || uwsm app -- hypridle")
-    hl.exec_cmd("uwsm app -- awww-daemon")
     hl.exec_cmd("cp " .. colors.wallpaper .. " ~/.current.wall")
+    hl.exec_cmd("/home/denzh/projects/Aw-Shell/scripts/start-awww.sh")
 end)
 
 return {

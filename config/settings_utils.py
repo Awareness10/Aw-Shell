@@ -340,7 +340,7 @@ def generate_hyprconf() -> str:
 
     return f"""exec-once = uwsm-app $({str(VENV_PYTHON)} {str(APP_MAIN)})
 exec = pgrep -x "hypridle" > /dev/null || uwsm app -- hypridle
-exec = uwsm app -- awww-daemon
+exec-once = {str(LOCAL_APP)}/scripts/start-awww.sh
 exec-once =  wl-paste --type text --watch cliphist store
 exec-once =  wl-paste --type image --watch cliphist store
 
