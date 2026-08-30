@@ -168,10 +168,10 @@ class TestWallpaperHelpers:
 
 
 class TestVenvPythonInHyprconf:
-    """Regression: generated hyprconf must use .venv/bin/python everywhere."""
+    """Regression: generated hyprlua must use .venv/bin/python everywhere."""
 
     def test_no_bare_python_in_hyprconf(self):
-        """Scan generate_hyprconf source for bare 'python' without .venv path."""
+        """Scan generate_hyprlua source for bare 'python' without .venv path."""
         import re
         settings_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "config", "settings_utils.py"
@@ -179,11 +179,11 @@ class TestVenvPythonInHyprconf:
         with open(settings_path) as f:
             source = f.read()
 
-        # Find the generate_hyprconf function body
+        # Find the generate_hyprlua function body
         in_func = False
         func_lines = []
         for i, line in enumerate(source.splitlines(), 1):
-            if "def generate_hyprconf" in line:
+            if "def generate_hyprlua" in line:
                 in_func = True
                 continue
             if in_func:
@@ -201,4 +201,4 @@ class TestVenvPythonInHyprconf:
                 break
 
         assert uses_venv, \
-            "generate_hyprconf must define and use VENV_PYTHON (.venv/bin/python)"
+            "generate_hyprlua must define and use VENV_PYTHON (.venv/bin/python)"

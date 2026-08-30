@@ -1,23 +1,21 @@
--- Converted from colors.conf
-
 return {
-    wallpaper = "/home/denzh/Pictures/Wallpapers/wallhaven-d85z1j.jpg",
-    background = "101410",
-    foreground = "e0e4db",
+    wallpaper = "/home/denzh/Pictures/Wallpapers/wallhaven-5y5ov1.jpg",
+    background = "13140d",
+    foreground = "e4e3d6",
 
-    primary = "9ed49d",
-    secondary = "b9ccb5",
-    tertiary = "a1ced6",
-    surface = "101410",
-    surface_bright = "363a34",
-    outline = "8c9389",
+    primary = "c1cd7d",
+    secondary = "c6c9a7",
+    tertiary = "a2d0c3",
+    surface = "13140d",
+    surface_bright = "393a31",
+    outline = "919283",
     error = "000000",
 
     shadow = "000000",
 
     red = "ffb595",
-    green = "a1d399",
-    yellow = "b8cf84",
+    green = "b3d089",
+    yellow = "c6cc79",
     blue = "afc6ff",
     magenta = "fcb0d5",
     cyan = "84d5c4",

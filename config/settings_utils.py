@@ -22,6 +22,7 @@ from fabric.utils.helpers import exec_shell_command_async
 
 CURRENT_WALL = HOME_DIR / ".current.wall"
 HYPR_COLORS = AW_CONFIG_DIR / "hypr" / "colors.conf"
+HYPR_COLORS_LUA = AW_CONFIG_DIR / "hypr" / "colors.lua"
 CSS_COLORS = AW_CONFIG_DIR / "styles" / "colors.css"
 
 # Global variable to store binding variables, managed by this module
@@ -80,10 +81,10 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
 
     hypr_config_dir = AW_CONFIG_DIR / "hypr"
     hypr_config_dir.mkdir(parents=True, exist_ok=True)
-    hypr_conf_path = hypr_config_dir / f"{APP_NAME}.conf"
+    hypr_lua_path = hypr_config_dir / f"{APP_NAME}.lua"
 
     try:
-        hypr_conf_path.write_text(generate_hyprconf(), encoding="utf-8")
+        hypr_lua_path.write_text(generate_hyprlua(), encoding="utf-8")
     except Exception as e:
         print(f"Error writing Hyprland config: {e}")
 
@@ -100,20 +101,20 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
             backup_and_replace(src, dest, "Hypridle")
 
     if get_bind_var("auto_append_hyprland"):
-        hypr_path = CONFIG_DIR / "hypr" / "hyprland.conf"
-        source_string = f"source = {AW_CONFIG_DIR}/hypr/{APP_NAME}.conf"
+        hypr_path = CONFIG_DIR / "hypr" / "hyprland.lua"
+        dofile_string = f'dofile("{AW_CONFIG_DIR}/hypr/{APP_NAME}.lua")'
         try:
             needs_append = True
             if hypr_path.exists():
-                if source_string in hypr_path.read_text(encoding="utf-8"):
+                if dofile_string in hypr_path.read_text(encoding="utf-8"):
                     needs_append = False
             else:
                 hypr_path.parent.mkdir(parents=True, exist_ok=True)
             if needs_append:
                 with open(hypr_path, "a") as f:
-                    f.write("\n" + source_string)
+                    f.write("\n" + dofile_string + "\n")
         except Exception as e:
-            print(f"Error updating hyprland.conf: {e}")
+            print(f"Error updating hyprland.lua: {e}")
 
     try:
         subprocess.run(["hyprctl", "reload"], capture_output=True)
@@ -198,6 +199,10 @@ def ensure_matugen_config():
             "hyprland": {
                 "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/hyprland-colors.conf",
                 "output_path": f"{str(AW_CONFIG_DIR)}/hypr/colors.conf",
+            },
+            "hyprland-lua": {
+                "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/hyprland-colors.lua",
+                "output_path": f"{str(AW_CONFIG_DIR)}/hypr/colors.lua",
             },
             f"{APP_NAME}": {
                 "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/{APP_NAME}.css",
@@ -326,95 +331,160 @@ def load_bind_vars() -> None:
             print(f"Error reading {CONFIG_FILE}: {e}. Using defaults.")
 
 
-def generate_hyprconf() -> str:
+def generate_hyprlua() -> str:
     """
-    Generate the Hypr configuration string using the current bind_vars.
+    Generate the Hyprland Lua configuration string using the current
+    bind_vars - the Lua-syntax equivalent of generate_hyprconf(), for
+    hyprland.lua's native Lua config support (which this setup now loads
+    instead of hyprland.conf).
     """
     LOCAL_APP = CONFIG_DIR / APP_NAME
     APP_MAIN = LOCAL_APP / "main.py"
     VENV_PYTHON = LOCAL_APP / ".venv" / "bin" / "python"
-    # Determine animation type based on bar position
     bar_position = get_bind_var("bar_position")
     is_vertical = bar_position in ["Left", "Right"]
     animation_type = "slidefadevert" if is_vertical else "slidefade"
 
-    return f"""exec-once = uwsm-app $({str(VENV_PYTHON)} {str(APP_MAIN)})
-exec = pgrep -x "hypridle" > /dev/null || uwsm app -- hypridle
-exec-once = {str(LOCAL_APP)}/scripts/start-awww.sh
-exec-once =  wl-paste --type text --watch cliphist store
-exec-once =  wl-paste --type image --watch cliphist store
+    def lua_str(s: str) -> str:
+        return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
-$fabricSend = fabric-cli exec {APP_NAME}
-$axMessage = notify-send "{USERNAME}" "Ya boi be cooking‼️🗣️🔥🕳️" -i "{LOCAL_APP}/assets/tanjiro-kamado-red.png" -A "🗣️" -A "🔥" -A "🕳️" -a "Source Code"
+    def mods_and_key(prefix_key: str, suffix_key: str) -> str:
+        return " + ".join(get_bind_var(prefix_key).split() + [get_bind_var(suffix_key)])
 
-bind = {get_bind_var("prefix_restart")}, {get_bind_var("suffix_restart")}, exec, killall {APP_NAME}; uwsm-app $({str(VENV_PYTHON)} {str(APP_MAIN)}) # Reload {APP_NAME_CAP}
-bind = {get_bind_var("prefix_axmsg")}, {get_bind_var("suffix_axmsg")}, exec, $axMessage # Message
-bind = {get_bind_var("prefix_dash")}, {get_bind_var("suffix_dash")}, exec, $fabricSend 'notch.open_notch("dashboard")' # Dashboard
-bind = {get_bind_var("prefix_bluetooth")}, {get_bind_var("suffix_bluetooth")}, exec, $fabricSend 'notch.open_notch("bluetooth")' # Bluetooth
-bind = {get_bind_var("prefix_pins")}, {get_bind_var("suffix_pins")}, exec, $fabricSend 'notch.open_notch("pins")' # Pins
-bind = {get_bind_var("prefix_kanban")}, {get_bind_var("suffix_kanban")}, exec, $fabricSend 'notch.open_notch("kanban")' # Kanban
-bind = {get_bind_var("prefix_launcher")}, {get_bind_var("suffix_launcher")}, exec, $fabricSend 'notch.open_notch("launcher")' # App Launcher
-bind = {get_bind_var("prefix_tmux")}, {get_bind_var("suffix_tmux")}, exec, $fabricSend 'notch.open_notch("tmux")' # Tmux
-bind = {get_bind_var("prefix_cliphist")}, {get_bind_var("suffix_cliphist")}, exec, $fabricSend 'notch.open_notch("cliphist")' # Clipboard History
-bind = {get_bind_var("prefix_toolbox")}, {get_bind_var("suffix_toolbox")}, exec, $fabricSend 'notch.open_notch("tools")' # Toolbox
-bind = {get_bind_var("prefix_overview")}, {get_bind_var("suffix_overview")}, exec, $fabricSend 'notch.open_notch("overview")' # Overview
-bind = {get_bind_var("prefix_wallpapers")}, {get_bind_var("suffix_wallpapers")}, exec, $fabricSend 'notch.open_notch("wallpapers")' # Wallpapers
-bind = {get_bind_var("prefix_randwall")}, {get_bind_var("suffix_randwall")}, exec, $fabricSend 'notch.dashboard.wallpapers.set_random_wallpaper(None, external=True)' # Random Wallpaper
-bind = {get_bind_var("prefix_mixer")}, {get_bind_var("suffix_mixer")}, exec, $fabricSend 'notch.open_notch("mixer")' # Audio Mixer
-bind = {get_bind_var("prefix_emoji")}, {get_bind_var("suffix_emoji")}, exec, $fabricSend 'notch.open_notch("emoji")' # Emoji Picker
-bind = {get_bind_var("prefix_power")}, {get_bind_var("suffix_power")}, exec, $fabricSend 'notch.open_notch("power")' # Power Menu
-bind = {get_bind_var("prefix_caffeine")}, {get_bind_var("suffix_caffeine")}, exec, $fabricSend 'notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit(external=True)' # Toggle Caffeine
-bind = {get_bind_var("prefix_toggle")}, {get_bind_var("suffix_toggle")}, exec, $fabricSend 'from utils.global_keybinds import get_global_keybind_handler; get_global_keybind_handler().toggle_bar()' # Toggle Bar
-bind = {get_bind_var("prefix_css")}, {get_bind_var("suffix_css")}, exec, $fabricSend 'app.set_css()' # Reload CSS
-bind = {get_bind_var("prefix_restart_inspector")}, {get_bind_var("suffix_restart_inspector")}, exec, killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive {str(VENV_PYTHON)} {str(APP_MAIN)}) # Restart with inspector
+    def notch_bind(prefix_key: str, suffix_key: str, expr: str, comment: str) -> str:
+        cmd = "fabricSend .. " + lua_str(f" '{expr}'")
+        return f'hl.bind({lua_str(mods_and_key(prefix_key, suffix_key))}, hl.dsp.exec_cmd({cmd})) -- {comment}'
 
-# Wallpapers directory: {get_bind_var("wallpapers_dir")}
+    notch_binds = [
+        ("prefix_dash", "suffix_dash", 'notch.open_notch("dashboard")', "Dashboard"),
+        ("prefix_bluetooth", "suffix_bluetooth", 'notch.open_notch("bluetooth")', "Bluetooth"),
+        ("prefix_pins", "suffix_pins", 'notch.open_notch("pins")', "Pins"),
+        ("prefix_kanban", "suffix_kanban", 'notch.open_notch("kanban")', "Kanban"),
+        ("prefix_launcher", "suffix_launcher", 'notch.open_notch("launcher")', "App Launcher"),
+        ("prefix_tmux", "suffix_tmux", 'notch.open_notch("tmux")', "Tmux"),
+        ("prefix_cliphist", "suffix_cliphist", 'notch.open_notch("cliphist")', "Clipboard History"),
+        ("prefix_toolbox", "suffix_toolbox", 'notch.open_notch("tools")', "Toolbox"),
+        ("prefix_overview", "suffix_overview", 'notch.open_notch("overview")', "Overview"),
+        ("prefix_wallpapers", "suffix_wallpapers", 'notch.open_notch("wallpapers")', "Wallpapers"),
+        ("prefix_randwall", "suffix_randwall",
+         'notch.dashboard.wallpapers.set_random_wallpaper(None, external=True)', "Random Wallpaper"),
+        ("prefix_mixer", "suffix_mixer", 'notch.open_notch("mixer")', "Audio Mixer"),
+        ("prefix_emoji", "suffix_emoji", 'notch.open_notch("emoji")', "Emoji Picker"),
+        ("prefix_power", "suffix_power", 'notch.open_notch("power")', "Power Menu"),
+        ("prefix_caffeine", "suffix_caffeine",
+         "notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit(external=True)", "Toggle Caffeine"),
+        ("prefix_toggle", "suffix_toggle",
+         "from utils.global_keybinds import get_global_keybind_handler; get_global_keybind_handler().toggle_bar()",
+         "Toggle Bar"),
+        ("prefix_css", "suffix_css", "app.set_css()", "Reload CSS"),
+    ]
 
-source = {str(HYPR_COLORS)}
+    bind_lines = [
+        f'hl.bind({lua_str(mods_and_key("prefix_restart", "suffix_restart"))}, '
+        f'hl.dsp.exec_cmd({lua_str(f"killall {APP_NAME}; uwsm-app $({VENV_PYTHON} {APP_MAIN})")})) '
+        f'-- Reload {APP_NAME_CAP}',
+        f'hl.bind({lua_str(mods_and_key("prefix_axmsg", "suffix_axmsg"))}, '
+        f'hl.dsp.exec_cmd(axMessage)) -- Message',
+    ]
+    bind_lines += [notch_bind(*spec) for spec in notch_binds]
+    bind_lines.append(
+        f'hl.bind({lua_str(mods_and_key("prefix_restart_inspector", "suffix_restart_inspector"))}, '
+        f'hl.dsp.exec_cmd({lua_str(f"killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive {VENV_PYTHON} {APP_MAIN})")})) '
+        f'-- Restart with inspector'
+    )
+    binds_block = "\n".join(bind_lines)
 
-layerrulev3 = animation 0, namespace:fabric
+    return f"""-- Generated by generate_hyprlua() in config/settings_utils.py - do not edit by hand,
+-- changes will be overwritten the next time settings are applied.
+local colors = dofile({lua_str(str(HYPR_COLORS_LUA))})
 
-exec = cp $wallpaper ~/.current.wall
+local fabricSend = "fabric-cli exec {APP_NAME}"
+local axMessage = {lua_str(f'notify-send "{USERNAME}" "Ya boi be cooking‼️\U0001f5e3️\U0001f525\U0001f573️" -i "{LOCAL_APP}/assets/tanjiro-kamado-red.png" -A "\U0001f5e3️" -A "\U0001f525" -A "\U0001f573️" -a "Source Code"')}
 
-general {{
-    col.active_border = rgb($primary)
-    col.inactive_border = rgb($surface)
-    gaps_in = 2
-    gaps_out = 4
-    border_size = 2
-    layout = dwindle
-}}
+{binds_block}
 
-cursor {{
-  no_warps=true
-}}
+-- Wallpapers directory: {get_bind_var("wallpapers_dir")}
 
-decoration {{
-    blur {{
-        enabled = yes
-        size = 1
-        passes = 3
-        new_optimizations = yes
-        contrast = 1
-        brightness = 1
-    }}
-    rounding = 14
-    shadow {{
-      enabled = true
-      range = 10
-      render_power = 2
-      # Hyprland colors are hex only: rgba(RRGGBBAA) or 0xAARRGGBB — no CSS-style rgba(r, g, b, a.f)
-      color = rgba(00000040)
-    }}
-}}
+-- layerrulev3 = animation 0, namespace:fabric
+-- TODO: manual review - layerrulev3 has no known hl.* equivalent yet, check the Hyprland wiki
 
-animations {{
-    enabled = yes
-    bezier = myBezier, 0.4, 0.0, 0.2, 1.0
-    animation = windows, 1, 2.5, myBezier, popin 80%
-    animation = border, 1, 2.5, myBezier
-    animation = fade, 1, 2.5, myBezier
-    animation = workspaces, 1, 2.5, myBezier, {animation_type} 20%
+hl.config({{
+    general = {{
+        gaps_in = 2,
+        gaps_out = 4,
+        border_size = 2,
+        layout = "dwindle",
+        col = {{
+            active_border = "rgb(" .. colors.primary .. ")",
+            inactive_border = "rgb(" .. colors.surface .. ")",
+        }},
+    }},
+}})
+
+hl.config({{
+    cursor = {{
+        no_warps = true,
+    }},
+}})
+
+hl.config({{
+    decoration = {{
+        blur = {{
+            enabled = true,
+            size = 1,
+            passes = 3,
+            new_optimizations = true,
+            contrast = 1,
+            brightness = 1,
+        }},
+        rounding = 14,
+        shadow = {{
+            enabled = true,
+            range = 10,
+            render_power = 2,
+            color = "rgba(00000040)",
+        }},
+    }},
+}})
+
+hl.config({{
+    animations = {{
+        enabled = true,
+    }},
+}})
+
+hl.curve("myBezier", {{
+    type = "bezier",
+    points = {{ {{ 0.4, 0.0 }}, {{ 0.2, 1.0 }} }},
+}})
+
+hl.animation({{ leaf = "windows", enabled = true, speed = 2.5, bezier = "myBezier", style = "popin 80%" }})
+hl.animation({{ leaf = "border", enabled = true, speed = 2.5, bezier = "myBezier" }})
+hl.animation({{ leaf = "fade", enabled = true, speed = 2.5, bezier = "myBezier" }})
+hl.animation({{ leaf = "workspaces", enabled = true, speed = 2.5, bezier = "myBezier", style = "{animation_type} 20%" }})
+
+-- Autostart
+hl.on("hyprland.start", function()
+    hl.exec_cmd({lua_str(f"uwsm-app $({VENV_PYTHON} {APP_MAIN})")})
+    hl.exec_cmd("wl-paste --type text --watch cliphist store")
+    hl.exec_cmd("wl-paste --type image --watch cliphist store")
+end)
+
+-- Exec (run every reload)
+hl.on("config.reloaded", function()
+    hl.exec_cmd("pgrep -x \\"hypridle\\" > /dev/null || uwsm app -- hypridle")
+    -- ~/.current.wall is a symlink (see modules/wallpapers.py). Relink it
+    -- rather than cp-ing into it - cp follows the symlink and overwrites
+    -- the real target file's bytes with colors.wallpaper's content, which
+    -- silently corrupts whichever wallpaper is currently selected any time
+    -- colors.wallpaper is stale relative to it.
+    hl.exec_cmd("ln -sf " .. colors.wallpaper .. " ~/.current.wall")
+    hl.exec_cmd({lua_str(f"{LOCAL_APP}/scripts/start-awww.sh")})
+end)
+
+return {{
+    fabricSend = fabricSend,
+    axMessage = axMessage,
 }}
 """
 
@@ -451,11 +521,11 @@ def start_config() -> None:
     print(f"{time.time():.4f}: start_config: Generating hypr conf...")
     hypr_config_dir = AW_CONFIG_DIR / "hypr"
     hypr_config_dir.mkdir(parents=True, exist_ok=True)
-    hypr_conf_path = hypr_config_dir / f"{APP_NAME}.conf"
+    hypr_lua_path = hypr_config_dir / f"{APP_NAME}.lua"
 
     try:
-        hypr_conf_path.write_text(generate_hyprconf(), encoding="utf-8")
-        print(f"Generated Hyprland config at {hypr_conf_path}")
+        hypr_lua_path.write_text(generate_hyprlua(), encoding="utf-8")
+        print(f"Generated Hyprland config at {hypr_lua_path}")
     except Exception as e:
         print(f"Error writing Hyprland config: {e}")
 

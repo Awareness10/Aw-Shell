@@ -19,7 +19,7 @@ from config.settings_utils import (
     ensure_matugen_config,
     ensure_face_icon,
     start_config,
-    generate_hyprconf,
+    generate_hyprlua,
     deep_update,
     backup_and_replace,
     bind_vars,
@@ -139,50 +139,61 @@ class TestLoadBindVars:
 
 
 # =========================================================================
-# generate_hyprconf
+# generate_hyprlua
 # =========================================================================
 
-class TestGenerateHyprconf:
+class TestGenerateHyprlua:
 
     def test_contains_keybindings(self):
-        conf = generate_hyprconf()
-        assert "bind =" in conf
+        conf = generate_hyprlua()
+        assert "hl.bind(" in conf
         assert get_bind_var("suffix_restart") in conf
         assert get_bind_var("suffix_launcher") in conf
 
     def test_horizontal_animation_for_top(self):
         set_bind_var("bar_position", "Top")
-        conf = generate_hyprconf()
+        conf = generate_hyprlua()
         assert "slidefade " in conf
         assert "slidefadevert" not in conf
 
     def test_vertical_animation_for_left(self):
         set_bind_var("bar_position", "Left")
-        conf = generate_hyprconf()
+        conf = generate_hyprlua()
         assert "slidefadevert" in conf
 
     def test_contains_wallpapers_dir_comment(self):
         set_bind_var("wallpapers_dir", "/home/user/walls")
-        conf = generate_hyprconf()
+        conf = generate_hyprlua()
         assert "/home/user/walls" in conf
 
     def test_contains_hyprland_sections(self):
-        conf = generate_hyprconf()
-        assert "general {" in conf
-        assert "decoration {" in conf
-        assert "animations {" in conf
+        conf = generate_hyprlua()
+        assert "general = {" in conf
+        assert "decoration = {" in conf
+        assert "animations = {" in conf
+
+    def test_relinks_current_wall_instead_of_copying(self):
+        """Regression: cp follows the ~/.current.wall symlink and overwrites
+        the real target file's bytes with colors.wallpaper's content,
+        silently corrupting whichever wallpaper is currently selected.
+        Must relink instead."""
+        conf = generate_hyprlua()
+        assert "ln -sf" in conf
+        exec_lines = [
+            line for line in conf.splitlines()
+            if "hl.exec_cmd" in line and not line.strip().startswith("--")
+        ]
+        assert not any(line.strip().startswith('hl.exec_cmd("cp ') for line in exec_lines)
 
     def test_uses_venv_python_in_exec(self):
-        """Regression: exec-once and keybinds must use .venv/bin/python, not bare 'python'.
+        """Regression: exec and keybinds must use .venv/bin/python, not bare 'python'.
 
         Bug: bare 'python' doesn't resolve to the project venv when the shell
         is launched via uwsm, causing silent startup failures.
         """
-        conf = generate_hyprconf()
-        # exec-once line that starts the shell
+        conf = generate_hyprlua()
         assert ".venv/bin/python" in conf, \
-            "Generated hyprconf must reference .venv/bin/python for shell startup"
-        # Must NOT contain bare 'python main.py' (without venv path)
+            "Generated hyprlua must reference .venv/bin/python for shell startup"
         lines = conf.splitlines()
         for line in lines:
             if "exec" in line.lower() and "main.py" in line:
@@ -191,7 +202,7 @@ class TestGenerateHyprconf:
 
     def test_restart_keybind_uses_venv_python(self):
         """Regression: the reload keybind must also use venv python."""
-        conf = generate_hyprconf()
+        conf = generate_hyprlua()
         for line in conf.splitlines():
             if "Reload" in line and "killall" in line:
                 assert ".venv/bin/python" in line, \
@@ -199,7 +210,7 @@ class TestGenerateHyprconf:
 
     def test_inspector_keybind_uses_venv_python(self):
         """Regression: the inspector restart keybind must use venv python."""
-        conf = generate_hyprconf()
+        conf = generate_hyprlua()
         for line in conf.splitlines():
             if "inspector" in line.lower() and "killall" in line:
                 assert ".venv/bin/python" in line, \
@@ -366,9 +377,9 @@ class TestApplyAndRestart:
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
         assert config_file.exists()
-        hypr_conf = aw_config_dir / "hypr" / "aw-shell.conf"
-        assert hypr_conf.exists()
-        assert "bind =" in hypr_conf.read_text()
+        hypr_lua = aw_config_dir / "hypr" / "aw-shell.lua"
+        assert hypr_lua.exists()
+        assert "hl.bind(" in hypr_lua.read_text()
 
     def test_replace_lock(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -405,9 +416,9 @@ class TestApplyAndRestart:
     def test_auto_append_hyprland_conf(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
         set_bind_var("auto_append_hyprland", True)
-        hypr_path = config_dir / "hypr" / "hyprland.conf"
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
         hypr_path.parent.mkdir(parents=True, exist_ok=True)
-        hypr_path.write_text("# existing config")
+        hypr_path.write_text("-- existing config")
         mock_popen = MagicMock()
         mock_popen.return_value.wait.return_value = None
         with self._patches(aw_config_dir, config_dir, config_file):
@@ -415,23 +426,23 @@ class TestApplyAndRestart:
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
         content = hypr_path.read_text()
-        assert "source =" in content
-        assert "aw-shell.conf" in content
+        assert "dofile(" in content
+        assert "aw-shell.lua" in content
 
     def test_no_duplicate_append(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
         set_bind_var("auto_append_hyprland", True)
-        hypr_path = config_dir / "hypr" / "hyprland.conf"
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
         hypr_path.parent.mkdir(parents=True, exist_ok=True)
-        source_line = f"source = {aw_config_dir}/hypr/aw-shell.conf"
-        hypr_path.write_text(source_line)
+        dofile_line = f'dofile("{aw_config_dir}/hypr/aw-shell.lua")'
+        hypr_path.write_text(dofile_line)
         mock_popen = MagicMock()
         mock_popen.return_value.wait.return_value = None
         with self._patches(aw_config_dir, config_dir, config_file):
             with patch("config.settings_utils.subprocess.run"):
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
-        assert hypr_path.read_text().count("source =") == 1
+        assert hypr_path.read_text().count("dofile(") == 1
 
     def test_creates_hyprland_conf_if_missing(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -442,9 +453,9 @@ class TestApplyAndRestart:
             with patch("config.settings_utils.subprocess.run"):
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
-        hypr_path = config_dir / "hypr" / "hyprland.conf"
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
         assert hypr_path.exists()
-        assert "source =" in hypr_path.read_text()
+        assert "dofile(" in hypr_path.read_text()
 
     def test_restart_uses_venv_python_not_bare(self, ar_env):
         """Regression: apply_and_restart must use .venv/bin/python, not bare 'python'.
@@ -782,9 +793,9 @@ class TestStartConfig:
                 with patch("config.settings_utils.ensure_face_icon"):
                     with patch("config.settings_utils.exec_shell_command_async"):
                         start_config()
-        hypr_conf = aw_config_dir / "hypr" / "aw-shell.conf"
-        assert hypr_conf.exists()
-        assert "bind =" in hypr_conf.read_text()
+        hypr_lua = aw_config_dir / "hypr" / "aw-shell.lua"
+        assert hypr_lua.exists()
+        assert "hl.bind(" in hypr_lua.read_text()
 
     def test_handles_write_error(self, tmp_path, capsys):
         aw_config_dir = tmp_path / "aw-shell" / "config"
