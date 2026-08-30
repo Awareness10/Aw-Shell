@@ -1,6 +1,6 @@
 [project]
 name = "aw-shell"
-version = "1.2.0.dev0"
+version = "1.2.0"
 description = "A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
 readme = "README.md"
 requires-python = ">=3.12"
