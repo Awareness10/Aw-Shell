@@ -1,7 +1,8 @@
 {
-  "version": "1.2.0",
-  "pkg_update": false,
+  "version": "1.2.1",
+  "pkg_update": true,
   "changelog": [
+    "<b>fix:</b> Rewrote Bluetooth on BlueZ D-Bus + bluetoothctl (pairing, trust, error feedback)",
     "<b>update:</b> Added regression tests for the latest breaking changes, updated to use .venv-python",
     "<b>hotfix:</b> Update Glaze version with matugen fix",
     "<b>hotfix:</b> Matugen 4.0.0 breaking api change, json decode changes",
