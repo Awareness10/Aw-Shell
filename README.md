@@ -82,7 +82,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
     - [Gray](https://github.com/Fabric-Development/gray)
     - [Matugen](https://github.com/InioX/matugen)
     - `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
-    - `gnome-bluetooth-3.0` `gobject-introspection` `gpu-screen-recorder`
+    - `bluez-utils` `gobject-introspection` `gpu-screen-recorder`
     - `hypridle` `hyprlock` `hyprpicker` `hyprshot` `hyprsunset`
     - `imagemagick` `libnotify` `networkmanager` `network-manager-applet`
     - `nm-connection-editor` `noto-fonts-emoji` `nvtop` `playerctl`

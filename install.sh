@@ -13,7 +13,7 @@ PACKAGES=(
   cliphist
   ddcutil
   fabric-cli-git
-  gnome-bluetooth-3.0
+  bluez-utils
   gobject-introspection
   gpu-screen-recorder
   hypridle
