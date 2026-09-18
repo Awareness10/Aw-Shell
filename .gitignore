@@ -8,7 +8,9 @@ config/config.json
 config/dock.json
 config/dock.json.bak
 config/hypr/aw-shell.conf
+config/hypr/aw-shell.lua
 config/hypr/colors.conf
+config/hypr/colors.lua
 config/matugen/matugen-state
 
 Aw-Shell.code-workspace

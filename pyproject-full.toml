@@ -1,17 +1,17 @@
-# "Pretty" coverage — omits GUI/runtime modules that can't be unit tested.
+# "Pretty" coverage - omits GUI/runtime modules that can't be unit tested.
 # Shows coverage only for testable code, giving a higher (more meaningful) percentage.
 # Usage: uv run pytest --cov-config=pyproject-full.toml
 
 [tool.coverage.run]
 source = ["config", "modules", "services", "utils", "widgets"]
 omit = [
-    # config — PySide6/GTK/Gdk at module level
+    # config - PySide6/GTK/Gdk at module level
     "config/__init__.py",
     "config/config.py",
     "config/data.py",
     "config/settings_gui.py",
     "config/settings/__init__.py",
-    # modules — all depend on fabric.widgets / GTK / cairo / OpenGL
+    # modules - all depend on fabric.widgets / GTK / cairo / OpenGL
     "modules/bar.py",
     "modules/bluetooth.py",
     "modules/buttons.py",
@@ -45,17 +45,17 @@ omit = [
     "modules/widgets.py",
     # modules with partial testability (mocked in test_weather_bdd)
     # "modules/weather.py",  - kept: tested via BDD scenarios
-    # services — fabric.core.service / GLib main loop
+    # services - fabric.core.service / GLib main loop
     "services/brightness.py",
     "services/mpris.py",
     "services/network.py",
-    # utils — Gdk/Gtk GUI state at runtime
+    # utils - Gdk/Gtk GUI state at runtime
     "utils/animator.py",
     "utils/async_subprocess.py",
     "utils/hyprland_monitor.py",
     "utils/icon_resolver.py",
     "utils/occlusion.py",
-    # widgets — fabric.widgets / GTK / cairo / OpenGL
+    # widgets - fabric.widgets / GTK / cairo / OpenGL
     "widgets/circle_image.py",
     "widgets/image.py",
     "widgets/shadertoy.py",
