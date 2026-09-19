@@ -146,6 +146,16 @@ class Sandbox:
         self.procs.append(proc)
         if proc.stdout.readline().strip() != "ready":
             raise RuntimeError("fake UPower failed to start")
+        self.upower = proc
+
+    def stop_upower(self):
+        """Take UPower off the bus, like a system without the upower daemon."""
+        self.upower.terminate()
+        self.upower.wait(timeout=5)
+        self.procs.remove(self.upower)
+
+    def start_upower(self):
+        self._start_fake_upower()
 
     def _start_compositor(self):
         if shutil.which("sway") is None:
@@ -205,6 +215,14 @@ from gi.repository import GLib  # noqa: E402
 def sandbox():
     """The isolated environment: .hyprland, .commands(), .home, .root."""
     return SANDBOX
+
+
+@pytest.fixture
+def no_upower():
+    """UPower is not running for the duration of the test."""
+    SANDBOX.stop_upower()
+    yield
+    SANDBOX.start_upower()
 
 
 @pytest.fixture(autouse=True)
