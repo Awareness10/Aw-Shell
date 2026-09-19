@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame,
     QGraphicsDropShadowEffect, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea,
-    QSizePolicy, QSlider,  QTabWidget, QVBoxLayout, QWidget
+    QSizePolicy, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 )
 from PySide6.QtGui import QColor, QPixmap
 
@@ -619,9 +619,9 @@ class AwShellSettings(FramelessMainWindow):
         section_layout = QVBoxLayout(section)
         section_layout.setSpacing(8)
 
-        self.auto_append_cb = QCheckBox("Auto-append to hyprland.conf")
+        self.auto_append_cb = QCheckBox("Auto-append to hyprland.lua")
         self.auto_append_cb.setChecked(get_bind_var("auto_append_hyprland", True))
-        self.auto_append_cb.setToolTip("Automatically append Aw-Shell source string to hyprland.conf")
+        self.auto_append_cb.setToolTip("Automatically append the Aw-Shell dofile() line to hyprland.lua")
         section_layout.addWidget(self.auto_append_cb)
 
         layout.addWidget(section)
@@ -670,12 +670,24 @@ class AwShellSettings(FramelessMainWindow):
         layout.addWidget(section)
 
     def _build_hypr_section(self, layout: QVBoxLayout) -> None:
-        if not self.show_lock_checkbox and not self.show_idle_checkbox:
-            return
-
         section = SettingsSection("Hyprland Integration")
         section_layout = QVBoxLayout(section)
         section_layout.setSpacing(8)
+
+        # Idle lock timeout (stored in seconds, shown in minutes)
+        idle_row = QHBoxLayout()
+        idle_row.setSpacing(12)
+        idle_label = QLabel("Lock After Idle:")
+        idle_label.setFixedWidth(120)
+        idle_row.addWidget(idle_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.idle_timeout_spin = QSpinBox()
+        self.idle_timeout_spin.setRange(1, 120)
+        self.idle_timeout_spin.setSuffix(" min")
+        self.idle_timeout_spin.setValue(int(get_bind_var("idle_lock_timeout", 600)) // 60)
+        self.idle_timeout_spin.setToolTip("Screen dims shortly before, turns off 30s after, suspends after 30 min (or 20 min after locking)")
+        idle_row.addWidget(self.idle_timeout_spin)
+        idle_row.addStretch()
+        section_layout.addLayout(idle_row)
 
         if self.show_lock_checkbox:
             self.lock_cb = QCheckBox("Replace Hyprlock config")
@@ -687,10 +699,11 @@ class AwShellSettings(FramelessMainWindow):
             self.idle_cb.setToolTip("Replace Hypridle configuration with Aw-Shell's custom config")
             section_layout.addWidget(self.idle_cb)
 
-        hint = QLabel("<small>Existing configs will be backed up</small>")
-        hint.setTextFormat(Qt.TextFormat.RichText)
-        hint.setObjectName("subtitle")
-        section_layout.addWidget(hint)
+        if self.show_lock_checkbox or self.show_idle_checkbox:
+            hint = QLabel("<small>Existing configs will be backed up</small>")
+            hint.setTextFormat(Qt.TextFormat.RichText)
+            hint.setObjectName("subtitle")
+            section_layout.addWidget(hint)
 
         layout.addWidget(section)
 
@@ -915,6 +928,9 @@ class AwShellSettings(FramelessMainWindow):
         settings["bar_metrics_disks"] = disk_paths if disk_paths else ["/"]
 
         # Notification apps
+        # Idle
+        settings["idle_lock_timeout"] = self.idle_timeout_spin.value() * 60
+
         settings["limited_apps_history"] = self._parse_app_list(self.limited_apps_entry.text())
         settings["history_ignored_apps"] = self._parse_app_list(self.ignored_apps_entry.text())
 
@@ -1006,6 +1022,7 @@ class AwShellSettings(FramelessMainWindow):
         # System
         self.auto_append_cb.setChecked(get_bind_var("auto_append_hyprland", True))
         self.terminal_entry.setText(str(get_bind_var("terminal_command", "kitty -e")))
+        self.idle_timeout_spin.setValue(int(get_bind_var("idle_lock_timeout", 600)) // 60)
 
         # Monitors
         current_selection = get_bind_var("selected_monitors", [])

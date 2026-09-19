@@ -474,7 +474,7 @@ class Dock(Window):
             focused = self.get_focused()
             idx = next((i for i, inst in enumerate(instances) if inst["address"] == focused), -1)
             next_inst = instances[(idx + 1) % len(instances)]
-            exec_shell_command(f"hyprctl dispatch focuswindow address:{next_inst['address']}")
+            exec_shell_command(f"hyprctl dispatch 'hl.dsp.focus({{ window = \"address:{next_inst['address']}\" }})'")
 
     def _on_child_enter(self, widget, event):
         if self.integrated_mode: return False 
@@ -747,7 +747,7 @@ class Dock(Window):
                 elif instances_dragged:
                     address = instances_dragged[0].get("address")
                     if address:
-                        exec_shell_command(f"hyprctl dispatch focuswindow address:{address}")
+                        exec_shell_command(f"hyprctl dispatch 'hl.dsp.focus({{ window = \"address:{address}\" }})'")
 
             self._drag_in_progress = False
             if not self.integrated_mode:

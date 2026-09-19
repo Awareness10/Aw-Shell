@@ -616,7 +616,7 @@ class Bar(Window):
             # Ensure notch is above bar when bar is shown
             if self.notch:
                 # Focus the notch window to bring it to front
-                GLib.idle_add(lambda: exec_shell_command_async("hyprctl dispatch focuswindow class:notch") if self.notch else None)
+                GLib.idle_add(lambda: exec_shell_command_async("hyprctl dispatch 'hl.dsp.focus({ window = \"class:notch\" })'") if self.notch else None)
 
     def runic_numbers(self):
         if data.BAR_WORKSPACE_USE_RUNES:

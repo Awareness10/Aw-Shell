@@ -22,6 +22,8 @@ from config.settings_utils import (
     generate_hyprlua,
     deep_update,
     backup_and_replace,
+    generate_hypridle,
+    HYPRIDLE_HEADER,
     bind_vars,
 )
 from config.settings_constants import DEFAULTS
@@ -397,21 +399,63 @@ class TestApplyAndRestart:
         assert lock_dest.exists()
         assert lock_dest.read_text() == "lock config"
 
-    def test_replace_idle(self, ar_env):
-        tmp_path, aw_config_dir, config_dir, config_file = ar_env
-        set_bind_var("auto_append_hyprland", False)
-        idle_src = aw_config_dir / "hypr" / "hypridle.conf"
-        idle_src.parent.mkdir(parents=True, exist_ok=True)
-        idle_src.write_text("idle config")
+    def _apply(self, aw_config_dir, config_dir, config_file, **kwargs):
         mock_popen = MagicMock()
         mock_popen.return_value.wait.return_value = None
         with self._patches(aw_config_dir, config_dir, config_file):
             with patch("config.settings_utils.subprocess.run"):
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
-                    apply_and_restart(replace_idle=True)
+                    apply_and_restart(**kwargs)
+        return mock_popen
+
+    def _hypridle_restarted(self, mock_popen):
+        return call(["uwsm", "app", "--", "hypridle"], stdout=-3, stderr=-3, start_new_session=True) in mock_popen.call_args_list
+
+    def test_replace_idle(self, ar_env):
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        set_bind_var("idle_lock_timeout", 900)
         idle_dest = config_dir / "hypr" / "hypridle.conf"
-        assert idle_dest.exists()
-        assert idle_dest.read_text() == "idle config"
+        idle_dest.parent.mkdir(parents=True, exist_ok=True)
+        idle_dest.write_text("user idle config")
+        mock_popen = self._apply(aw_config_dir, config_dir, config_file, replace_idle=True)
+        assert idle_dest.read_text() == generate_hypridle()
+        assert "timeout = 900" in idle_dest.read_text()
+        assert idle_dest.with_name("hypridle.conf.bak").read_text() == "user idle config"
+        assert self._hypridle_restarted(mock_popen)
+
+    def test_syncs_aw_generated_hypridle(self, ar_env):
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        set_bind_var("idle_lock_timeout", 600)
+        idle_dest = config_dir / "hypr" / "hypridle.conf"
+        idle_dest.parent.mkdir(parents=True, exist_ok=True)
+        idle_dest.write_text(generate_hypridle())
+        set_bind_var("idle_lock_timeout", 1200)
+        mock_popen = self._apply(aw_config_dir, config_dir, config_file)
+        assert "timeout = 1200" in idle_dest.read_text()
+        assert not idle_dest.with_name("hypridle.conf.bak").exists()
+        assert self._hypridle_restarted(mock_popen)
+
+    def test_unchanged_hypridle_not_restarted(self, ar_env):
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        set_bind_var("idle_lock_timeout", 600)
+        idle_dest = config_dir / "hypr" / "hypridle.conf"
+        idle_dest.parent.mkdir(parents=True, exist_ok=True)
+        idle_dest.write_text(generate_hypridle())
+        mock_popen = self._apply(aw_config_dir, config_dir, config_file)
+        assert not self._hypridle_restarted(mock_popen)
+
+    def test_leaves_user_hypridle_alone(self, ar_env):
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        idle_dest = config_dir / "hypr" / "hypridle.conf"
+        idle_dest.parent.mkdir(parents=True, exist_ok=True)
+        idle_dest.write_text("user idle config")
+        mock_popen = self._apply(aw_config_dir, config_dir, config_file)
+        assert idle_dest.read_text() == "user idle config"
+        assert not self._hypridle_restarted(mock_popen)
 
     def test_auto_append_hyprland_conf(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -807,3 +851,35 @@ class TestStartConfig:
                         with patch.object(Path, "write_text", side_effect=OSError("nope")):
                             start_config()
         assert "Error writing Hyprland config" in capsys.readouterr().out
+
+
+# =========================================================================
+# generate_hypridle
+# =========================================================================
+
+class TestGenerateHypridle:
+
+    def _timeouts(self):
+        return [int(line.split("=")[1]) for line in generate_hypridle().splitlines() if line.strip().startswith("timeout")]
+
+    def test_default_locks_after_ten_minutes(self):
+        reset_to_defaults()
+        assert DEFAULTS["idle_lock_timeout"] == 600
+        assert self._timeouts() == [450, 600, 630, 1800]
+
+    def test_starts_with_header(self):
+        assert generate_hypridle().startswith(HYPRIDLE_HEADER)
+
+    def test_uses_lua_dpms_dispatch(self):
+        content = generate_hypridle()
+        assert "hl.dsp.dpms({ action = \"disable\" })" in content
+        assert "dispatch dpms" not in content
+
+    def test_long_timeout_pushes_suspend_back(self):
+        set_bind_var("idle_lock_timeout", 3600)
+        assert self._timeouts() == [3450, 3600, 3630, 4800]
+
+    def test_short_timeout_keeps_order(self):
+        set_bind_var("idle_lock_timeout", 60)
+        dim, lock, off, suspend = self._timeouts()
+        assert 0 < dim < lock < off < suspend

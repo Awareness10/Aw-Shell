@@ -57,6 +57,7 @@ DEFAULTS = {
     "datetime_12h_format": False,
     "terminal_command": "kitty -e",
     "auto_append_hyprland": True,
+    "idle_lock_timeout": 600,
     "dock_enabled": True,
     "dock_icon_size": 28,
     "dock_always_show": False,
