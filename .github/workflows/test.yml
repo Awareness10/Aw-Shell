@@ -9,22 +9,31 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v5
-        with:
-          version: "latest"
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y --no-install-recommends libegl1
-
-      - name: Install test dependencies
-        run: |
-          uv venv
-          uv pip install pytest pytest-cov toml psutil loguru requests PySide6 "glaze @ git+https://github.com/awareness10/glaze"
-
+      # Unit tests + real-GTK tests (headless sway), same image as local runs
       - name: Run tests with coverage
+        run: scripts/test-gtk.sh --all --tb=short
+
+      - name: Publish coverage badge
+        # Pushes to main and dev (see `on:`); PRs can't write to the repo
+        if: github.event_name == 'push'
         env:
-          PYTHONPATH: .
-        run: uv run --no-project pytest --tb=short --cov-report=json:coverage.json
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pct=$(python3 -c "import json; print(round(json.load(open('coverage.json'))['totals']['percent_covered']))")
+          if [ "$pct" -ge 80 ]; then color=brightgreen
+          elif [ "$pct" -ge 60 ]; then color=yellow
+          elif [ "$pct" -ge 40 ]; then color=orange
+          else color=red; fi
+          mkdir badges && cd badges
+          printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' "$pct" "$color" > coverage.json
+          git init -q -b badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage.json
+          git commit -q -m "coverage: ${pct}%"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
