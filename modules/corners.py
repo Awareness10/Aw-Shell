@@ -23,9 +23,10 @@ class MyCorner(Box):
 
 
 class Corners(Window):
-    def __init__(self):
+    def __init__(self, monitor_id: int = 0):
         super().__init__(
             name="corners",
+            monitor=monitor_id,
             layer="bottom",
             anchor="top bottom left right",
             exclusivity="normal",
