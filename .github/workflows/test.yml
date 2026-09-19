@@ -14,25 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v5
-        with:
-          version: "latest"
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y --no-install-recommends libegl1
-
-      - name: Install test dependencies
-        run: |
-          uv venv
-          uv pip install pytest pytest-cov toml psutil loguru requests PySide6 "glaze @ git+https://github.com/awareness10/glaze"
-
+      # Unit tests + real-GTK tests (headless sway), same image as local runs
       - name: Run tests with coverage
-        env:
-          PYTHONPATH: .
-        run: uv run --no-project pytest --tb=short --cov-report=json:coverage.json
+        run: scripts/test-gtk.sh --all --tb=short
 
       - name: Publish coverage badge
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # Pushes to main and dev (see `on:`); PRs can't write to the repo
+        if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

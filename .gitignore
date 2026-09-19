@@ -19,6 +19,7 @@ Aw-Shell.code-workspace
 *.md
 !README.md
 .coverage
+coverage.json
 coverage/
 htmlcov/
 
