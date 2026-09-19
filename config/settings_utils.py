@@ -15,6 +15,7 @@ from .data import (
     CONFIG_FILE,
     FACE_ICON,
     DEFAULT_FACE_ICON,
+    DEFAULT_WALLPAPER,
     get_default,
 )
 
@@ -256,32 +257,7 @@ def ensure_matugen_config():
     HYPR_COLORS.parent.mkdir(parents=True, exist_ok=True)
     CSS_COLORS.parent.mkdir(parents=True, exist_ok=True)
 
-    example_wallpaper = CONFIG_DIR / f"{APP_NAME}" / "assets" / "wallpapers_example" / "example-1.jpg"
-
-    image_path: Path | None = None
-
-    # Resolve current wallpaper (symlink or direct file)
-    try:
-        if CURRENT_WALL.is_symlink():
-            image_path = CURRENT_WALL.resolve(strict=True)
-        elif CURRENT_WALL.exists():
-            image_path = CURRENT_WALL
-    except FileNotFoundError:
-        pass
-
-    # If no valid wallpaper, create default symlink
-    if not image_path or not image_path.exists():
-        CURRENT_WALL.unlink(missing_ok=True)  # Clean broken/old
-        if example_wallpaper.exists():
-            try:
-                CURRENT_WALL.symlink_to(example_wallpaper)
-                image_path = example_wallpaper
-            except Exception as e:
-                print(f"Error creating symlink for wallpaper: {e}")
-                image_path = None
-        else:
-            print("Example wallpaper not found.")
-            image_path = None
+    image_path = ensure_current_wallpaper()
 
     # Generate theme if valid image exists
     if image_path and image_path.exists():
@@ -563,6 +539,29 @@ def restart_hypridle() -> None:
         )
     except Exception as e:
         print(f"Error restarting hypridle: {e}")
+
+
+def ensure_current_wallpaper() -> Path | None:
+    """Return the current wallpaper, linking ~/.current.wall to the default if
+    it is missing or a broken link. None if no wallpaper is available."""
+    try:
+        if CURRENT_WALL.is_symlink():
+            return CURRENT_WALL.resolve(strict=True)
+        if CURRENT_WALL.exists():
+            return CURRENT_WALL
+    except FileNotFoundError:
+        pass
+
+    CURRENT_WALL.unlink(missing_ok=True)  # Clean broken link
+    if not DEFAULT_WALLPAPER.exists():
+        print(f"Default wallpaper not found: {DEFAULT_WALLPAPER}")
+        return None
+    try:
+        CURRENT_WALL.symlink_to(DEFAULT_WALLPAPER)
+    except OSError as e:
+        print(f"Error creating symlink for wallpaper: {e}")
+        return None
+    return DEFAULT_WALLPAPER
 
 
 def ensure_face_icon() -> None:

@@ -24,6 +24,7 @@ CONFIG_FILE = AW_CONFIG_DIR / "config.json"
 
 FACE_ICON = HOME_DIR / ".face.icon"
 DEFAULT_FACE_ICON = CONFIG_DIR / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
+DEFAULT_WALLPAPER = CONFIG_DIR / f"{APP_NAME}" / "assets" / "wallpapers_example" / "ax-red.jpg"
 
 MATUGEN_STATE_FILE = AW_CONFIG_DIR / "matugen" / "matugen-state"
 
