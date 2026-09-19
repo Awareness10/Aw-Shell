@@ -25,6 +25,7 @@ from config.settings_utils import (
     backup_and_replace,
     generate_hypridle,
     HYPRIDLE_HEADER,
+    HYPRIDLE_START,
     bind_vars,
 )
 from config.settings_constants import DEFAULTS
@@ -410,7 +411,7 @@ class TestApplyAndRestart:
         return mock_popen
 
     def _hypridle_restarted(self, mock_popen):
-        return call(["uwsm", "app", "--", "hypridle"], stdout=-3, stderr=-3, start_new_session=True) in mock_popen.call_args_list
+        return call(HYPRIDLE_START, shell=True, stdout=-3, stderr=-3, start_new_session=True) in mock_popen.call_args_list
 
     def test_replace_idle(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -887,6 +888,10 @@ class TestGenerateHypridle:
         set_bind_var("idle_lock_timeout", 60)
         dim, lock, off, suspend = self._timeouts()
         assert 0 < dim < lock < off < suspend
+
+    def test_start_is_single_instance(self):
+        assert HYPRIDLE_START.startswith("uwsm app -- flock -w ")
+        assert HYPRIDLE_START in generate_hyprlua()
 
     def test_suspend_enabled_by_default(self):
         reset_to_defaults()
