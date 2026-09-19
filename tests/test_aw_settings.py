@@ -337,6 +337,20 @@ class TestCollectSettings:
         result = settings._collect_settings()
         assert result["selected_monitors"] == []
 
+    def test_empty_monitor_selection_shows_unchecked(self, settings):
+        """[] means "all monitors" and must survive open + Apply unchanged."""
+        set_bind_var("selected_monitors", [])
+        settings._reload_widgets()
+        assert not any(cb.isChecked() for cb in settings.monitor_checkboxes.values())
+        assert settings._collect_settings()["selected_monitors"] == []
+
+    def test_saved_monitor_selection_shows_checked(self, settings):
+        set_bind_var("selected_monitors", ["DP-1"])
+        settings._reload_widgets()
+        assert {n: cb.isChecked() for n, cb in settings.monitor_checkboxes.items()} == {
+            "HDMI-A-1": False, "DP-1": True,
+        }
+
     def test_empty_disk_paths_default_to_root(self, settings):
         # Remove all disk entries
         for container in settings.disk_entries[:]:

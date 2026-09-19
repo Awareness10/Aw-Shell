@@ -637,8 +637,7 @@ class AwShellSettings(FramelessMainWindow):
         for mon in monitors:
             name = mon.get("name", f'monitor-{mon.get("id", 0)}')
             cb = QCheckBox(name)
-            is_selected = len(current_selection) == 0 or name in current_selection
-            cb.setChecked(is_selected)
+            cb.setChecked(name in current_selection)  # [] = all monitors, shown unchecked
             section_layout.addWidget(cb)
             self.monitor_checkboxes[name] = cb
 
@@ -1037,8 +1036,7 @@ class AwShellSettings(FramelessMainWindow):
         # Monitors
         current_selection = get_bind_var("selected_monitors", [])
         for name, cb in self.monitor_checkboxes.items():
-            is_selected = len(current_selection) == 0 or name in current_selection
-            cb.setChecked(is_selected)
+            cb.setChecked(name in current_selection)  # [] = all monitors, shown unchecked
 
         # Metrics
         metrics_vis = get_bind_var("metrics_visible", {})
