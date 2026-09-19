@@ -48,6 +48,23 @@ def createSurfaceFromWidget(widget: Gtk.Widget) -> cairo.ImageSurface:
     return surface
 
 
+# Hyprland 0.56+ (Lua config): `dispatch` takes a Lua expression
+def focus_window(address: str) -> None:
+    connection.send_command(f'/dispatch hl.dsp.focus({{ window = "address:{address}" }})')
+
+
+def close_window(address: str) -> None:
+    connection.send_command(f'/dispatch hl.dsp.window.close({{ window = "address:{address}" }})')
+
+
+def move_window_to_workspace(address: str, workspace_id: int) -> None:
+    """Move without following the window (the old movetoworkspacesilent)."""
+    connection.send_command(
+        f'/dispatch hl.dsp.window.move({{ workspace = "{workspace_id}", '
+        f'window = "address:{address}", follow = false }})'
+    )
+
+
 class HyprlandWindowButton(Button):
     def __init__(
         self,
@@ -101,9 +118,7 @@ class HyprlandWindowButton(Button):
             tooltip_text=title,
             size=size,
             on_clicked=self.on_button_click,
-            on_button_press_event=lambda _, event: connection.send_command(
-                f"/dispatch closewindow address:{address}"
-            )
+            on_button_press_event=lambda _, event: close_window(address)
             if event.button == 3
             else None,
             on_drag_data_get=lambda _s, _c, data, *_: data.set_text(
@@ -128,7 +143,7 @@ class HyprlandWindowButton(Button):
     def on_key_press_event(self, widget, event):
         if event.get_state() & Gdk.ModifierType.SHIFT_MASK:
             if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
-                connection.send_command(f"/dispatch closewindow address:{self.address}")
+                close_window(self.address)
                 return True
         return False
 
@@ -171,12 +186,13 @@ class HyprlandWindowButton(Button):
         )
 
     def on_button_click(self, *_):
-        connection.send_command(f"/dispatch focuswindow address:{self.address}")
+        focus_window(self.address)
 
 
 class WorkspaceEventBox(EventBox):
     def __init__(self, workspace_id: int, fixed: Gtk.Fixed | None = None, monitor_width: int = None, monitor_height: int = None, monitor_scale: float = 1.0):
         self.fixed = fixed
+        self.workspace_id = workspace_id
         
         # Use provided monitor dimensions or fallback to current screen
         width = monitor_width or CURRENT_WIDTH
@@ -199,9 +215,7 @@ class WorkspaceEventBox(EventBox):
                 v_expand=True,
                 markup=icons.circle_plus,
             ),
-            on_drag_data_received=lambda _w, _c, _x, _y, data, *_: connection.send_command(
-                f"/dispatch movetoworkspacesilent {workspace_id},address:{data.get_data().decode()}"
-            ),
+            on_drag_data_received=self.on_drag_data_received,
         )
         self.drag_dest_set(
             Gtk.DestDefaults.ALL,
@@ -210,6 +224,9 @@ class WorkspaceEventBox(EventBox):
         )
         if fixed:
             fixed.show_all()
+
+    def on_drag_data_received(self, _widget, _context, _x, _y, data, *_):
+        move_window_to_workspace(data.get_data().decode(), self.workspace_id)
 
 
 
