@@ -6,22 +6,14 @@
 
 <p align="center">
   <sub><sup><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Telegram-Animated-Emojis/main/Activity/Sparkles.webp" alt="Sparkles" width="25" height="25"/></sup></sub>
-  <a href="https://github.com/hyprwm/Hyprland">
-    <img src="https://img.shields.io/badge/A%20hackable%20shell%20for-Hyprland-0092CD?style=for-the-badge&logo=linux&color=0092CD&logoColor=D9E0EE&labelColor=000000" alt="A hackable shell for Hyprland">
-  </a>
-  <a href="https://github.com/Fabric-Development/fabric/">
-    <img src="https://img.shields.io/badge/Powered%20by-Fabric-FAFAFA?style=for-the-badge&logo=python&color=FAFAFA&logoColor=D9E0EE&labelColor=000000" alt="Powered by Fabric">
+  <a href="https://github.com/hyprwm/Hyprland"><img src="https://img.shields.io/badge/A%20hackable%20shell%20for-Hyprland-0092CD?style=for-the-badge&logo=linux&color=0092CD&logoColor=D9E0EE&labelColor=000000" alt="A hackable shell for Hyprland"></a>
+  <a href="https://github.com/Fabric-Development/fabric/"><img src="https://img.shields.io/badge/Powered%20by-Fabric-FAFAFA?style=for-the-badge&logo=python&color=FAFAFA&logoColor=D9E0EE&labelColor=000000" alt="Powered by Fabric"></a>
   <sub><sup><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Telegram-Animated-Emojis/main/Activity/Sparkles.webp" alt="Sparkles" width="25" height="25"/></sup></sub>
-  </a>
-  </p>
+</p>
 
-  <p align="center">
-  <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/awareness10/Aw-Shell/test.yml?style=for-the-badge&logo=github-actions&logoColor=D9E0EE&labelColor=000000&label=tests" alt="Tests">
-  </a>
-  <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml">
-    <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Awareness10/f92c9f225879c8ab92110340e6e56c9f/raw/coverage.json&style=for-the-badge&logoColor=D9E0EE&labelColor=000000" alt="Coverage">
-  </a>
+<p align="center">
+  <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/awareness10/Aw-Shell/test.yml?style=for-the-badge&logo=github-actions&logoColor=D9E0EE&labelColor=000000&label=tests" alt="Tests"></a>
+  <a href="https://github.com/awareness10/Aw-Shell/actions/workflows/test.yml"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Awareness10/Aw-Shell/badges/coverage.json&style=for-the-badge&logo=pytest&logoColor=D9E0EE&labelColor=000000" alt="Coverage"></a>
 </p>
 
 > Forked from [Axenide/Ax-Shell](https://github.com/Axenide/Ax-Shell) - A hackable shell for Hyprland
