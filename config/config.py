@@ -45,11 +45,11 @@ _configure_sys_path_for_direct_execution()
 if __name__ == "__main__" and not __package__:
     from config.settings_constants import APP_NAME
     from config.settings_gui import AwShellSettings # AwShellSettings
-    from config.settings_utils import load_bind_vars
+    from config.settings_utils import load_bind_vars, write_hypridle
 else:
     from .settings_constants import APP_NAME
     from .settings_gui import AwShellSettings
-    from .settings_utils import load_bind_vars
+    from .settings_utils import load_bind_vars, write_hypridle
 
 
 def open_config():
@@ -74,7 +74,7 @@ def open_config():
 
     #show_idle_checkbox = True
     dest_idle = Path.home() / ".config/hypr/hypridle.conf"
-    src_idle = Path.home() / f".config/{APP_NAME}/config/hypr/hypridle.conf"
+    src_idle = write_hypridle()
     if not os.path.exists(dest_idle) and os.path.exists(src_idle):
         try:
             os.makedirs(os.path.dirname(dest_idle), exist_ok=True)

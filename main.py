@@ -98,31 +98,28 @@ if __name__ == "__main__":
     
     # Create application components list
     app_components = []
-    corners = None
     notification = None
     
     # Create components for each monitor
     for monitor in monitors:
         monitor_id = monitor['id']
         
-        # Create corners only for the first monitor (shared across all)
-        if monitor_id == 0:
-            corners = Corners()
-            # Set corners visibility based on config
-            corners_visible = config.get("corners_visible", True)
-            corners.set_visible(corners_visible)
-            app_components.append(corners)
-        
         # Create monitor-specific components
         if multi_monitor_enabled:
+            corners = Corners(monitor_id=monitor_id)
             bar = Bar(monitor_id=monitor_id)
             notch = Notch(monitor_id=monitor_id)
             dock = Dock(monitor_id=monitor_id)
         else:
             # Single monitor fallback
+            corners = Corners()
             bar = Bar()
             notch = Notch()
             dock = Dock()
+
+        # Layer surfaces are per-output, so each monitor needs its own corners
+        corners.set_visible(config.get("corners_visible", True))
+        app_components.append(corners)
         
         # Connect bar and notch
         bar.notch = notch
@@ -139,7 +136,7 @@ if __name__ == "__main__":
                 'bar': bar,
                 'notch': notch,
                 'dock': dock,
-                'corners': corners if monitor_id == 0 else None
+                'corners': corners
             })
         
         # Add components to app list

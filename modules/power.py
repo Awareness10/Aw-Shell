@@ -117,7 +117,7 @@ class PowerMenu(Box):
 
     def logout(self, *args):
         print("Logging out...")
-        exec_shell_command_async("hyprctl dispatch exit")
+        exec_shell_command_async("hyprctl dispatch 'hl.dsp.exit()'")
         self.close_menu()
 
     def reboot(self, *args):

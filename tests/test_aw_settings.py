@@ -11,7 +11,7 @@ import pytest
 from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
 from PySide6.QtCore import Qt
 
-from config.settings_utils import bind_vars, set_bind_var, reset_to_defaults
+from config.settings_utils import bind_vars, get_bind_var, set_bind_var, reset_to_defaults
 from config.settings_constants import DEFAULTS
 from config.settings.aw_settings import (
     AwShellSettings,
@@ -590,4 +590,21 @@ class TestHyprSection:
         # The hypr section should not have lock/idle checkboxes
         assert not hasattr(win, 'lock_cb')
         assert not hasattr(win, 'idle_cb')
+        win.close()
+
+
+class TestIdleTimeout:
+
+    def test_spin_shows_minutes(self, settings):
+        assert settings.idle_timeout_spin.value() == int(get_bind_var("idle_lock_timeout", 600)) // 60
+
+    def test_collect_stores_seconds(self, settings):
+        settings.idle_timeout_spin.setValue(15)
+        assert settings._collect_settings()["idle_lock_timeout"] == 900
+
+    def test_shown_without_lock_idle_configs(self, qapp):
+        with patch("config.settings.aw_settings.get_available_monitors", return_value=[]):
+            with patch("pathlib.Path.exists", return_value=False):
+                win = AwShellSettings()
+        assert hasattr(win, "idle_timeout_spin")
         win.close()
