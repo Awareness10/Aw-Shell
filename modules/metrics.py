@@ -3,6 +3,7 @@ import logging
 import subprocess
 import time
 
+import dbus
 import psutil
 from fabric.core.fabricator import Fabricator
 from fabric.utils.helpers import invoke_repeater
@@ -34,8 +35,14 @@ class MetricsProvider:
         self.mem = 0.0
         self.disk = []
 
-        self.upower = UPowerManager()
-        self.display_device = self.upower.get_display_device()
+        # No UPower (e.g. a desktop without the upower daemon) means no battery
+        self.upower = None
+        self.display_device = None
+        try:
+            self.upower = UPowerManager()
+            self.display_device = self.upower.get_display_device()
+        except dbus.exceptions.DBusException as e:
+            logger.warning(f"UPower unavailable, battery metrics disabled: {e}")
         self.bat_percent = 0.0
         self.bat_charging = None
         self.bat_time = 0
@@ -56,7 +63,7 @@ class MetricsProvider:
             if not self._gpu_update_running:
                 self._start_gpu_update_async()
 
-        battery = self.upower.get_full_device_information(self.display_device)
+        battery = self._read_battery()
         if battery is None:
             self.bat_percent = 0.0
             self.bat_charging = None
@@ -67,6 +74,16 @@ class MetricsProvider:
             self.bat_time = battery['TimeToFull'] if self.bat_charging else battery['TimeToEmpty']
 
         return True
+
+    def _read_battery(self):
+        """Battery info, or None without a battery or if UPower went away.
+        Must not raise: _update runs on a GLib timer that stops on errors."""
+        if self.display_device is None:
+            return None
+        try:
+            return self.upower.get_full_device_information(self.display_device)
+        except dbus.exceptions.DBusException:
+            return None
 
     def _start_gpu_update_async(self):
         """Starts a new GLib thread to run nvtop in the background."""

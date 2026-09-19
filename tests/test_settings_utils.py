@@ -18,12 +18,14 @@ from config.settings_utils import (
     apply_and_restart,
     ensure_matugen_config,
     ensure_face_icon,
+    ensure_current_wallpaper,
     start_config,
     generate_hyprlua,
     deep_update,
     backup_and_replace,
     generate_hypridle,
     HYPRIDLE_HEADER,
+    HYPRIDLE_START,
     bind_vars,
 )
 from config.settings_constants import DEFAULTS
@@ -409,7 +411,7 @@ class TestApplyAndRestart:
         return mock_popen
 
     def _hypridle_restarted(self, mock_popen):
-        return call(["uwsm", "app", "--", "hypridle"], stdout=-3, stderr=-3, start_new_session=True) in mock_popen.call_args_list
+        return call(HYPRIDLE_START, shell=True, stdout=-3, stderr=-3, start_new_session=True) in mock_popen.call_args_list
 
     def test_replace_idle(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -680,13 +682,14 @@ class TestEnsureMatugenConfig:
 
     def test_creates_default_symlink_when_no_wallpaper(self, matugen_env):
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
-        example = config_dir / "aw-shell" / "assets" / "wallpapers_example" / "example-1.jpg"
+        example = config_dir / "aw-shell" / "assets" / "wallpapers_example" / "ax-red.jpg"
         example.parent.mkdir(parents=True, exist_ok=True)
         example.write_text("example image")
         current_wall.parent.mkdir(parents=True, exist_ok=True)
         matugen_config = config_dir / "matugen" / "config.toml"
         mock_exec = MagicMock()
-        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors), \
+                patch("config.settings_utils.DEFAULT_WALLPAPER", example):
             with patch("config.settings_utils.os.path.expanduser",
                        return_value=str(matugen_config)):
                 with patch("config.settings_utils.exec_shell_command_async", mock_exec):
@@ -698,13 +701,15 @@ class TestEnsureMatugenConfig:
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
         current_wall.parent.mkdir(parents=True, exist_ok=True)
         matugen_config = config_dir / "matugen" / "config.toml"
-        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+        missing = tmp_path / "missing.jpg"
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors), \
+                patch("config.settings_utils.DEFAULT_WALLPAPER", missing):
             with patch("config.settings_utils.os.path.expanduser",
                        return_value=str(matugen_config)):
                 with patch("config.settings_utils.exec_shell_command_async"):
                     ensure_matugen_config()
         output = capsys.readouterr().out
-        assert "Example wallpaper not found" in output
+        assert "Default wallpaper not found" in output
 
     def test_matugen_uses_source_color_index(self, matugen_env):
         """Regression: matugen 4.0.0 requires --source-color-index 0 to avoid TTY prompt.
@@ -883,3 +888,73 @@ class TestGenerateHypridle:
         set_bind_var("idle_lock_timeout", 60)
         dim, lock, off, suspend = self._timeouts()
         assert 0 < dim < lock < off < suspend
+
+    def test_start_is_single_instance(self):
+        assert HYPRIDLE_START.startswith("uwsm app -- flock -w ")
+        assert HYPRIDLE_START in generate_hyprlua()
+
+    def test_suspend_enabled_by_default(self):
+        reset_to_defaults()
+        assert DEFAULTS["idle_suspend_enabled"] is True
+        assert "systemctl suspend" in generate_hypridle()
+
+    def test_suspend_disabled_drops_suspend_listener(self):
+        reset_to_defaults()
+        set_bind_var("idle_suspend_enabled", False)
+        assert "systemctl suspend" not in generate_hypridle()
+        assert self._timeouts() == [450, 600, 630]
+
+
+# =========================================================================
+# ensure_current_wallpaper
+# =========================================================================
+
+class TestEnsureCurrentWallpaper:
+
+    @pytest.fixture
+    def wall_env(self, tmp_path):
+        current_wall = tmp_path / ".current.wall"
+        default = tmp_path / "default.jpg"
+        default.write_text("default image")
+        with patch("config.settings_utils.CURRENT_WALL", current_wall):
+            with patch("config.settings_utils.DEFAULT_WALLPAPER", default):
+                yield tmp_path, current_wall, default
+
+    def test_default_wallpaper_ships_with_repo(self):
+        import config.settings_utils as su
+        from config.settings_constants import APP_NAME
+
+        repo = Path(__file__).resolve().parent.parent
+        assert (repo / su.DEFAULT_WALLPAPER.relative_to(su.CONFIG_DIR / APP_NAME)).is_file()
+
+    def test_creates_link_when_missing(self, wall_env):
+        _, current_wall, default = wall_env
+        assert ensure_current_wallpaper() == default
+        assert current_wall.is_symlink()
+        assert current_wall.resolve() == default
+
+    def test_replaces_broken_link(self, wall_env):
+        tmp_path, current_wall, default = wall_env
+        current_wall.symlink_to(tmp_path / "deleted.jpg")
+        assert ensure_current_wallpaper() == default
+        assert current_wall.resolve() == default
+
+    def test_keeps_valid_link(self, wall_env):
+        tmp_path, current_wall, _ = wall_env
+        chosen = tmp_path / "chosen.jpg"
+        chosen.write_text("user's wallpaper")
+        current_wall.symlink_to(chosen)
+        assert ensure_current_wallpaper() == chosen
+        assert current_wall.resolve() == chosen
+
+    def test_keeps_regular_file(self, wall_env):
+        _, current_wall, _ = wall_env
+        current_wall.write_text("copied wallpaper")
+        assert ensure_current_wallpaper() == current_wall
+        assert not current_wall.is_symlink()
+
+    def test_no_link_when_default_missing(self, wall_env):
+        _, current_wall, default = wall_env
+        default.unlink()
+        assert ensure_current_wallpaper() is None
+        assert not current_wall.is_symlink()
