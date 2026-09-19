@@ -8,11 +8,8 @@ from threading import Event
 
 import setproctitle
 from pywayland.client.display import Display
-from pywayland.protocol.idle_inhibit_unstable_v1.zwp_idle_inhibit_manager_v1 import \
-    ZwpIdleInhibitManagerV1
-from pywayland.protocol.wayland.wl_compositor import WlCompositor
-from pywayland.protocol.wayland.wl_registry import WlRegistryProxy
-from pywayland.protocol.wayland.wl_surface import WlSurface
+from pywayland.protocol.idle_inhibit_unstable_v1 import ZwpIdleInhibitManagerV1
+from pywayland.protocol.wayland import WlCompositor, WlRegistryProxy, WlSurface
 
 
 @dataclass

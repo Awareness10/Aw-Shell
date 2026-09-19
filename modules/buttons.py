@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 import gi
 from fabric.utils.helpers import exec_shell_command_async
@@ -404,17 +405,18 @@ class CaffeineButton(Button):
         try:
             subprocess.check_output(["pgrep", "ax-inhibit"])
             exec_shell_command_async("pkill ax-inhibit")
-            GLib.idle_add(self.caffeine_status.set_label, "Disabled")
-            GLib.idle_add(self._add_disabled_style)
+            enabled = False
         except subprocess.CalledProcessError:
             exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/scripts/inhibit.py")
-            GLib.idle_add(self.caffeine_status.set_label, "Enabled")
-            GLib.idle_add(self._remove_disabled_style)
+            # Report what actually happened: the script exits if it can't inhibit
+            time.sleep(1)
+            enabled = subprocess.run(["pgrep", "ax-inhibit"], capture_output=True).returncode == 0
+
+        GLib.idle_add(self.caffeine_status.set_label, "Enabled" if enabled else "Disabled")
+        GLib.idle_add(self._remove_disabled_style if enabled else self._add_disabled_style)
 
         if external:
-            # Different if enabled or disabled
-            status = "Disabled" if self.caffeine_status.get_label() == "Disabled" else "Enabled"
-            message = "Disabled 💤" if status == "Disabled" else "Enabled ☀️"
+            message = "Enabled ☀️" if enabled else "Disabled 💤"
             exec_shell_command_async(f"notify-send '☕ Caffeine' '{message}' -a '{data.APP_NAME_CAP}' -e")
     
     def _add_disabled_style(self):
