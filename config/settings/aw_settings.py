@@ -13,11 +13,11 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame,
+    QAbstractSlider, QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
     QGraphicsDropShadowEffect, QGridLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea,
+    QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QScrollBar,
     QSizePolicy, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 )
 from PySide6.QtGui import QColor, QPixmap
@@ -91,6 +91,23 @@ class SettingsSection(QGroupBox):
     def __init__(self, title: str, parent=None):
         super().__init__(title, parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+
+class WheelGuard(QObject):
+    """Stop the mouse wheel changing inputs the user hasn't clicked.
+
+    Scrolling the settings page over a spin box, combo box or slider would
+    otherwise silently change its value; the wheel scrolls the page instead.
+    """
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() != QEvent.Type.Wheel or obj.hasFocus():
+            return False
+        parent = obj.parentWidget()
+        while parent is not None and not isinstance(parent, QScrollArea):
+            parent = parent.parentWidget()
+        if parent is not None:
+            QApplication.sendEvent(parent.verticalScrollBar(), event)
+        return True
 
 
 class AwShellSettings(FramelessMainWindow):
@@ -182,6 +199,13 @@ class AwShellSettings(FramelessMainWindow):
         row.addWidget(self.apply_btn)
 
         self.content_layout.addLayout(row)
+
+        self.wheel_guard = WheelGuard(self)
+        for widget in self.findChildren(QWidget):
+            is_input = isinstance(widget, (QAbstractSpinBox, QComboBox, QAbstractSlider))
+            if is_input and not isinstance(widget, QScrollBar):
+                widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                widget.installEventFilter(self.wheel_guard)
 
     def get_extra_stylesheet(self) -> str:
         """Return dialog-specific styles."""

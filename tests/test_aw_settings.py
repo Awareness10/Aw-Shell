@@ -629,3 +629,64 @@ class TestIdleTimeout:
                 win = AwShellSettings()
         assert hasattr(win, "idle_timeout_spin")
         win.close()
+
+
+# =========================================================================
+# Mouse wheel over unfocused inputs
+# =========================================================================
+
+class TestWheelGuard:
+    """Scrolling the page must not change inputs the user never clicked."""
+
+    @staticmethod
+    def _wheel(widget):
+        from PySide6.QtCore import QPoint, QPointF
+        from PySide6.QtGui import QWheelEvent
+        event = QWheelEvent(
+            QPointF(5, 5), QPointF(5, 5), QPoint(0, 0), QPoint(0, -120),
+            Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+            Qt.ScrollPhase.NoScrollPhase, False,
+        )
+        QApplication.sendEvent(widget, event)
+
+    def test_unfocused_spin_ignores_wheel(self, settings):
+        before = settings.idle_timeout_spin.value()
+        self._wheel(settings.idle_timeout_spin)
+        assert settings.idle_timeout_spin.value() == before
+
+    def test_unfocused_combo_ignores_wheel(self, settings):
+        before = settings.position_combo.currentText()
+        self._wheel(settings.position_combo)
+        assert settings.position_combo.currentText() == before
+
+    def test_unfocused_slider_ignores_wheel(self, settings):
+        before = settings.dock_size_slider.value()
+        self._wheel(settings.dock_size_slider)
+        assert settings.dock_size_slider.value() == before
+
+    def test_wheel_scrolls_page_instead(self, settings):
+        from PySide6.QtWidgets import QScrollArea
+        settings.resize(560, 500)
+        settings.show()
+        settings.tabs.setCurrentIndex(2)
+        QApplication.processEvents()
+        area = settings.idle_timeout_spin.parentWidget()
+        while not isinstance(area, QScrollArea):
+            area = area.parentWidget()
+        bar = area.verticalScrollBar()
+        assert bar.maximum() > 0
+        bar.setValue(0)
+        spin_before = settings.idle_timeout_spin.value()
+        self._wheel(settings.idle_timeout_spin)  # one notch down
+        assert 0 < bar.value() < bar.maximum()
+        assert settings.idle_timeout_spin.value() == spin_before
+
+    def test_scrollbars_not_guarded(self, settings):
+        from PySide6.QtWidgets import QScrollBar
+        bars = settings.findChildren(QScrollBar)
+        assert bars and all(b.focusPolicy() != Qt.FocusPolicy.StrongFocus for b in bars)
+
+    def test_inputs_need_click_focus(self, settings):
+        widgets = (settings.idle_timeout_spin, settings.position_combo, settings.dock_size_slider)
+        for widget in widgets:
+            assert widget.focusPolicy() == Qt.FocusPolicy.StrongFocus
