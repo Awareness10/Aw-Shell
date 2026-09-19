@@ -129,10 +129,12 @@ class Sandbox:
     def _start_dbus(self):
         proc = subprocess.Popen(
             ["dbus-daemon", "--session", "--nofork", "--print-address=1"],
-            stdout=subprocess.PIPE, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
         self.procs.append(proc)
         address = proc.stdout.readline().strip()
+        if not address:
+            raise RuntimeError(f"dbus-daemon failed to start:\n{proc.stderr.read()}")
         os.environ["DBUS_SESSION_BUS_ADDRESS"] = address
         os.environ["DBUS_SYSTEM_BUS_ADDRESS"] = address
 

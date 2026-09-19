@@ -22,6 +22,11 @@ RUN git clone https://github.com/Fabric-Development/gray /tmp/gray \
     && ninja -C /tmp/gray/build install \
     && rm -rf /tmp/gray
 
+# scripts/test-gtk.sh runs as the caller's UID (so files in the mounted repo
+# aren't root-owned) and adds that UID here; dbus-daemon won't start for a UID
+# without a passwd entry
+RUN chmod 666 /etc/passwd
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Keep the container's venv out of the mounted repo's .venv
