@@ -888,6 +888,17 @@ class TestGenerateHypridle:
         dim, lock, off, suspend = self._timeouts()
         assert 0 < dim < lock < off < suspend
 
+    def test_suspend_enabled_by_default(self):
+        reset_to_defaults()
+        assert DEFAULTS["idle_suspend_enabled"] is True
+        assert "systemctl suspend" in generate_hypridle()
+
+    def test_suspend_disabled_drops_suspend_listener(self):
+        reset_to_defaults()
+        set_bind_var("idle_suspend_enabled", False)
+        assert "systemctl suspend" not in generate_hypridle()
+        assert self._timeouts() == [450, 600, 630]
+
 
 # =========================================================================
 # ensure_current_wallpaper

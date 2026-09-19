@@ -471,13 +471,20 @@ return {{
 
 
 def generate_hypridle() -> str:
-    """Generate hypridle.conf; lock after `idle_lock_timeout` seconds."""
+    """Generate hypridle.conf; lock after `idle_lock_timeout` seconds and,
+    unless `idle_suspend_enabled` is off, suspend 20 min after that."""
     lock = max(60, int(get_bind_var("idle_lock_timeout")))
     dim = max(lock - 150, lock // 2)
     screen_off = lock + 30
     suspend = max(1800, lock + 1200)
     dpms_on = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'"
     dpms_off = "hyprctl dispatch 'hl.dsp.dpms({ action = \"disable\" })'"
+    suspend_listener = f"""
+listener {{
+    timeout = {suspend}
+    on-timeout = systemctl suspend                # suspend pc
+}}
+""" if get_bind_var("idle_suspend_enabled", True) else ""
     return f"""{HYPRIDLE_HEADER}
 general {{
     lock_cmd = pidof hyprlock || hyprlock       # avoid starting multiple hyprlock instances.
@@ -501,12 +508,7 @@ listener {{
     on-timeout = {dpms_off}  # screen off when timeout has passed
     on-resume = {dpms_on}  # screen on when activity is detected after timeout has fired.
 }}
-
-listener {{
-    timeout = {suspend}
-    on-timeout = systemctl suspend                # suspend pc
-}}
-"""
+{suspend_listener}"""
 
 
 def write_hypridle() -> Path:

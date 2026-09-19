@@ -602,6 +602,13 @@ class TestIdleTimeout:
         settings.idle_timeout_spin.setValue(15)
         assert settings._collect_settings()["idle_lock_timeout"] == 900
 
+    def test_suspend_checkbox_reflects_setting(self, settings):
+        assert settings.idle_suspend_cb.isChecked() == get_bind_var("idle_suspend_enabled", True)
+
+    def test_collect_stores_suspend_choice(self, settings):
+        settings.idle_suspend_cb.setChecked(False)
+        assert settings._collect_settings()["idle_suspend_enabled"] is False
+
     def test_shown_without_lock_idle_configs(self, qapp):
         with patch("config.settings.aw_settings.get_available_monitors", return_value=[]):
             with patch("pathlib.Path.exists", return_value=False):

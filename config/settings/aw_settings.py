@@ -689,6 +689,14 @@ class AwShellSettings(FramelessMainWindow):
         idle_row.addStretch()
         section_layout.addLayout(idle_row)
 
+        self.idle_suspend_cb = QCheckBox("Suspend when idle")
+        self.idle_suspend_cb.setChecked(get_bind_var("idle_suspend_enabled", True))
+        self.idle_suspend_cb.setToolTip(
+            "Suspend 30 min after idle (or 20 min after locking). "
+            "Turn off for desktops and remote streaming."
+        )
+        section_layout.addWidget(self.idle_suspend_cb)
+
         if self.show_lock_checkbox:
             self.lock_cb = QCheckBox("Replace Hyprlock config")
             self.lock_cb.setToolTip("Replace Hyprlock configuration with Aw-Shell's custom config")
@@ -930,6 +938,7 @@ class AwShellSettings(FramelessMainWindow):
         # Notification apps
         # Idle
         settings["idle_lock_timeout"] = self.idle_timeout_spin.value() * 60
+        settings["idle_suspend_enabled"] = self.idle_suspend_cb.isChecked()
 
         settings["limited_apps_history"] = self._parse_app_list(self.limited_apps_entry.text())
         settings["history_ignored_apps"] = self._parse_app_list(self.ignored_apps_entry.text())
@@ -1023,6 +1032,7 @@ class AwShellSettings(FramelessMainWindow):
         self.auto_append_cb.setChecked(get_bind_var("auto_append_hyprland", True))
         self.terminal_entry.setText(str(get_bind_var("terminal_command", "kitty -e")))
         self.idle_timeout_spin.setValue(int(get_bind_var("idle_lock_timeout", 600)) // 60)
+        self.idle_suspend_cb.setChecked(get_bind_var("idle_suspend_enabled", True))
 
         # Monitors
         current_selection = get_bind_var("selected_monitors", [])
