@@ -45,6 +45,15 @@ if "gi" not in sys.modules:
     _mock_gi_repo.Gtk = _mock_gtk
     _mock_gi_repo.GLib = _mock_glib
     _mock_gi_repo.Vte = _mock_vte
+    _mock_gdkpixbuf = MagicMock()
+    _mock_gio = MagicMock()
+    _mock_pango = MagicMock()
+    _mock_gi_repo.GdkPixbuf = _mock_gdkpixbuf
+    _mock_gi_repo.Gio = _mock_gio
+    _mock_gi_repo.Pango = _mock_pango
+    sys.modules["gi.repository.GdkPixbuf"] = _mock_gdkpixbuf
+    sys.modules["gi.repository.Gio"] = _mock_gio
+    sys.modules["gi.repository.Pango"] = _mock_pango
     sys.modules["gi"] = _mock_gi
     sys.modules["gi.repository"] = _mock_gi_repo
     sys.modules["gi.repository.Gdk"] = _mock_gdk

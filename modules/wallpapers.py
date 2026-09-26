@@ -249,6 +249,10 @@ class WallpaperSelector(Box):
         # Final sort of the complete list
         self.files.sort()
 
+        # Drop thumbnails left behind by wallpapers that were removed or
+        # replaced while the shell was not running.
+        self._prune_cache()
+
         # Start thumbnail loading after files are processed
         self._start_thumbnail_thread()
 
@@ -313,12 +317,7 @@ class WallpaperSelector(Box):
         if event_type == Gio.FileMonitorEvent.DELETED:
             if file_name in self.files:
                 self.files.remove(file_name)
-                cache_path = self._get_cache_path(file_name)
-                if os.path.exists(cache_path):
-                    try:
-                        os.remove(cache_path)
-                    except Exception as e:
-                        print(f"Error deleting cache {cache_path}: {e}")
+                self._prune_cache()
                 self.thumbnails = [(p, n) for p, n in self.thumbnails if n != file_name]
                 GLib.idle_add(self.arrange_viewport, self.search_entry.get_text())
         elif event_type == Gio.FileMonitorEvent.CREATED:
@@ -340,12 +339,8 @@ class WallpaperSelector(Box):
                     self.executor.submit(self._process_file, file_name)
         elif event_type == Gio.FileMonitorEvent.CHANGED:
             if self._is_image(file_name) and file_name in self.files:
-                cache_path = self._get_cache_path(file_name)
-                if os.path.exists(cache_path):
-                    try:
-                        os.remove(cache_path)
-                    except Exception as e:
-                        print(f"Error deleting cache for changed file {file_name}: {e}")
+                # New content means a new cache key, so the stale entry is
+                # simply bypassed; it gets swept on the next prune.
                 self.executor.submit(self._process_file, file_name)
 
     def arrange_viewport(self, query: str = ""):
@@ -554,20 +549,68 @@ class WallpaperSelector(Box):
     def _process_batch(self):
         batch = self.thumbnail_queue[:10]
         del self.thumbnail_queue[:10]
+        replaced = False
         for cache_path, file_name in batch:
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file(cache_path)
-                self.thumbnails.append((pixbuf, file_name))
-                self.viewport.get_model().append([pixbuf, file_name])
             except Exception as e:
                 print(f"Error loading thumbnail {cache_path}: {e}")
+                continue
+            existing = next(
+                (i for i, (_, n) in enumerate(self.thumbnails) if n == file_name), None
+            )
+            if existing is None:
+                self.thumbnails.append((pixbuf, file_name))
+                self.viewport.get_model().append([pixbuf, file_name])
+            else:
+                # The wallpaper was replaced in place: swap its preview instead
+                # of showing the old and the new image side by side.
+                self.thumbnails[existing] = (pixbuf, file_name)
+                replaced = True
+        if replaced:
+            self.arrange_viewport(self.search_entry.get_text())
         if self.thumbnail_queue:
             GLib.idle_add(self._process_batch)
         return False
 
     def _get_cache_path(self, file_name: str) -> str:
-        file_hash = hashlib.md5(file_name.encode("utf-8")).hexdigest()
+        """Cache path for a wallpaper's thumbnail.
+
+        The key covers the file's size and mtime as well as its name: a
+        wallpaper replaced while the shell was not running (a `cp -p` batch
+        copy, a restore from backup, or a same-named file in another
+        wallpapers dir) keeps its name and can even keep an older timestamp,
+        and a name-only key would serve the previous image's thumbnail forever.
+        """
+        full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
+        try:
+            stat = os.stat(full_path)
+            key = f"{file_name}:{stat.st_size}:{stat.st_mtime_ns}"
+        except OSError:
+            key = file_name
+        file_hash = hashlib.md5(key.encode("utf-8")).hexdigest()
         return os.path.join(self.CACHE_DIR, f"{file_hash}.png")
+
+    def _prune_cache(self):
+        """Drop cached thumbnails that no wallpaper currently maps to."""
+        valid = {self._get_cache_path(file_name) for file_name in self.files}
+        try:
+            with os.scandir(self.CACHE_DIR) as entries:
+                stale = [
+                    entry.path
+                    for entry in entries
+                    if entry.is_file()
+                    and entry.name.endswith(".png")
+                    and entry.path not in valid
+                ]
+        except OSError as e:
+            print(f"Error scanning thumbnail cache: {e}")
+            return
+        for path in stale:
+            try:
+                os.remove(path)
+            except OSError as e:
+                print(f"Error deleting stale cache {path}: {e}")
 
     @staticmethod
     def _is_image(file_name: str) -> bool:

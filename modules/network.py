@@ -53,7 +53,9 @@ class WifiAccessPointSlot(CenterBox):
         if not self.is_active and self.ap_data.get("bssid"):
             self.connect_button.set_label("Connecting...")
             self.connect_button.set_sensitive(False)
-            self.network_service.connect_wifi_bssid(self.ap_data["bssid"])
+            self.network_service.connect_wifi_bssid(
+                self.ap_data["bssid"], self.ap_data.get("ssid")
+            )
 
 
 class NetworkConnections(Box):
