@@ -312,11 +312,28 @@ class NetworkClient(Service):
             else None
         )
 
-    def connect_wifi_bssid(self, bssid):
-        # We are using nmcli here, idk im lazy
-        exec_shell_command_async(
-            f"nmcli device wifi connect {bssid}", lambda *args: print(args)
+    def _find_saved_wifi_connection(self, ssid: str | None) -> NM.RemoteConnection | None:
+        if not self._client or not ssid:
+            return None
+        for conn in self._client.get_connections():
+            wireless = conn.get_setting_wireless()
+            if wireless and wireless.get_ssid() and NM.utils_ssid_to_utf8(
+                wireless.get_ssid().get_data()
+            ) == ssid:
+                return conn
+        return None
+
+    def connect_wifi_bssid(self, bssid, ssid=None):
+        # Reuse a saved profile for this SSID; `nmcli device wifi connect <bssid>`
+        # creates a duplicate "<ssid> 1" profile when the saved one doesn't match
+        # this BSSID (e.g. band-locked to 5 GHz but the 2.4 GHz BSSID was clicked)
+        saved = self._find_saved_wifi_connection(ssid)
+        command = (
+            f"nmcli connection up uuid {saved.get_uuid()}"
+            if saved
+            else f"nmcli device wifi connect {bssid}"
         )
+        exec_shell_command_async(command, lambda *args: print(args))
 
     @Property(str, "readable")
     def primary_device(self) -> Literal["wifi", "wired"] | None:
