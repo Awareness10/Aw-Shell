@@ -1,7 +1,9 @@
 {
-  "version": "1.2.3",
+  "version": "1.2.4",
   "pkg_update": true,
   "changelog": [
+    "<b>fix:</b> Connecting to a saved Wi-Fi network reuses its profile instead of creating a duplicate",
+    "<b>fix:</b> Wallpaper thumbnails refresh when a wallpaper's content changes",
     "<b>fix:</b> Caffeine works again (pywayland 0.4.19) and shows its real state",
     "<b>feat:</b> \"Suspend when idle\" option in Settings → Hyprland Integration",
     "<b>fix:</b> Only one hypridle runs after Apply, so idle timers no longer fire twice",
