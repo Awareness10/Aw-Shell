@@ -1,7 +1,9 @@
 {
-  "version": "1.2.5",
+  "version": "1.2.6",
   "pkg_update": true,
   "changelog": [
+    "<b>feat:</b> Window border colors follow a new wallpaper instantly, no Hyprland reload needed",
+    "<b>fix:</b> Dashboard microphone icon shows again",
     "<b>fix:</b> Shell no longer keeps a CPU core and upowerd busy (mouse battery update loop)",
     "<b>perf:</b> Notch occlusion is event-driven over Hyprland IPC and checks each monitor separately",
     "<b>perf:</b> Toolbox status checks run in-process instead of spawning pgrep and scripts every 2s",
