@@ -11,8 +11,10 @@ config/hypr/aw-shell.conf
 config/hypr/aw-shell.lua
 config/hypr/colors.conf
 config/hypr/colors.lua
+config/colors.json
 config/hypr/hypridle.conf
 config/matugen/matugen-state
+config/matugen/matugen-scheme
 
 Aw-Shell.code-workspace
 

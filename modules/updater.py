@@ -16,7 +16,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QProcess, QThread, Qt, QTimer, Signal, Slot
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QSizePolicy, QTextEdit, QVBoxLayout,
+    QPushButton, QScrollArea, QSizePolicy, QTextEdit, QVBoxLayout, QWidget,
 )
 from PySide6.QtGui import QColor
 
@@ -103,15 +103,43 @@ def get_local_version():
     return "0.0.0", []
 
 
+def parse_releases(data: dict) -> list[dict]:
+    """Changes grouped by version, newest first, as ``{"version", "changes"}``.
+
+    version.json files from 1.2.6 and earlier only have a flat ``changelog``
+    for the latest version.
+    """
+    releases = data.get("releases")
+    if isinstance(releases, list) and releases:
+        return [
+            {"version": str(r.get("version", "")), "changes": list(r.get("changes") or [])}
+            for r in releases
+            if isinstance(r, dict)
+        ]
+    changelog = data.get("changelog") or []
+    if not changelog:
+        return []
+    return [{"version": data.get("version", "0.0.0"), "changes": list(changelog)}]
+
+
+def new_versions(releases: list[dict], current_version: str) -> set[str]:
+    """Versions newer than the installed one; the latest if none are
+    (forced/preview runs while up to date), so something is marked new."""
+    new = {r["version"] for r in releases if _version_is_newer(r["version"], current_version)}
+    if not new and releases:
+        new = {releases[0]["version"]}
+    return new
+
+
 def get_remote_version():
-    """Read the remote version file and return *(version, changelog, download_url, pkg_update)*."""
+    """Read the remote version file and return *(version, releases, download_url, pkg_update)*."""
     if os.path.exists(REMOTE_VERSION_FILE):
         try:
             with open(REMOTE_VERSION_FILE, "r") as f:
                 data = json.load(f)
                 return (
                     data.get("version", "0.0.0"),
-                    data.get("changelog", []),
+                    parse_releases(data),
                     data.get("download_url", "#"),
                     data.get("pkg_update", True),
                 )
@@ -214,7 +242,7 @@ def _version_is_newer(latest: str, current: str) -> bool:
 class UpdateCheckWorker(QObject):
     """Runs the update-check logic on a background QThread."""
 
-    update_available = Signal(str, list, bool)  # version, changelog, pkg_update
+    update_available = Signal(str, list, bool)  # version, releases, pkg_update
     no_update = Signal()
     finished = Signal()
 
@@ -236,11 +264,11 @@ class UpdateCheckWorker(QObject):
                 return
 
             fetch_remote_version()
-            latest_version, changelog, _, pkg_update = get_remote_version()
+            latest_version, releases, _, pkg_update = get_remote_version()
 
             if self._force:
                 print(f"Force mode — opening updater for version {latest_version}.")
-                self.update_available.emit(latest_version, changelog, pkg_update)
+                self.update_available.emit(latest_version, releases, pkg_update)
                 return
 
             if is_snoozed():
@@ -250,7 +278,7 @@ class UpdateCheckWorker(QObject):
 
             current_version, _ = get_local_version()
             if _version_is_newer(latest_version, current_version) and latest_version != "0.0.0":
-                self.update_available.emit(latest_version, changelog, pkg_update)
+                self.update_available.emit(latest_version, releases, pkg_update)
             else:
                 print(f"{APP_NAME_CAP} is up to date.")
                 self.no_update.emit()
@@ -269,15 +297,27 @@ class UpdaterWindow(FramelessMainWindow):
     def __init__(
         self,
         latest_version: str = "0.0.0",
-        changelog: list | None = None,
+        releases: list | None = None,
         pkg_update: bool = True,
+        current_version: str | None = None,
+        preview: bool = False,
     ):
         self._latest_version = latest_version
-        self._changelog = changelog or []
+        releases = releases or []
+        # Accept a legacy flat changelog (list of strings) too
+        if releases and all(isinstance(r, str) for r in releases):
+            releases = [{"version": latest_version, "changes": releases}]
+        self._releases = releases
+        if current_version is None:
+            current_version, _ = get_local_version()
+        self._new_versions = new_versions(releases, current_version)
         self._pkg_update = pkg_update
+        self._preview = preview
+        self._preview_disabled = False
         self._process: QProcess | None = None
 
-        super().__init__(width=500, height=480, title=f"{APP_NAME_CAP} Updater")
+        title = f"{APP_NAME_CAP} Updater" + (" (preview)" if preview else "")
+        super().__init__(width=500, height=480, title=title)
         self.setMinimumSize(400, 380)
 
     # -- FramelessMainWindow overrides --
@@ -306,7 +346,7 @@ class UpdaterWindow(FramelessMainWindow):
         inner.setSpacing(10)
 
         # Title
-        title = QLabel("Update Available")
+        title = QLabel("Update Available" + (" (preview)" if self._preview else ""))
         title.setObjectName("updaterTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         inner.addWidget(title)
@@ -330,18 +370,7 @@ class UpdaterWindow(FramelessMainWindow):
         )
         scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-        if self._changelog:
-            joined = "<br>".join(f"&bull; {c}" for c in self._changelog)
-        else:
-            joined = "No specific changes listed for this version."
-
-        self.changelog_label = QLabel(joined)
-        self.changelog_label.setTextFormat(Qt.TextFormat.RichText)
-        self.changelog_label.setWordWrap(True)
-        self.changelog_label.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
-        )
-        scroll.setWidget(self.changelog_label)
+        scroll.setWidget(self._build_changelog())
         inner.addWidget(scroll, 1)
 
         # Log area (hidden by default)
@@ -410,6 +439,23 @@ class UpdaterWindow(FramelessMainWindow):
                 background-color: {t.surface_variant};
                 color: {t.text_secondary};
             }}
+            #releaseBlock, #releaseBlockNew {{
+                border-left: 3px solid transparent;
+                border-radius: 0;
+            }}
+            #releaseBlockNew {{
+                border-left: 3px solid {t.accent_text};
+                background-color: {t.accent_container};
+                border-radius: 6px;
+            }}
+            #releaseHeader {{
+                font-weight: bold;
+                color: {t.text_primary};
+            }}
+            #releaseHeaderNew {{
+                font-weight: bold;
+                color: {t.accent_text};
+            }}
             #updaterLog {{
                 font-family: monospace;
                 background-color: {t.bg_tertiary};
@@ -430,29 +476,59 @@ class UpdaterWindow(FramelessMainWindow):
             }}
         """
 
+    def _build_changelog(self) -> QWidget:
+        """One section per release, newest first; versions newer than the
+        installed one get "(new)" and an accent bar."""
+        self.changelog_widget = QWidget()
+        layout = QVBoxLayout(self.changelog_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        if not self._releases:
+            layout.addWidget(QLabel("No specific changes listed for this version."))
+
+        for release in self._releases:
+            is_new = release["version"] in self._new_versions
+            block = QFrame()
+            block.setObjectName("releaseBlockNew" if is_new else "releaseBlock")
+            block_layout = QVBoxLayout(block)
+            block_layout.setContentsMargins(10, 6, 6, 6)
+            block_layout.setSpacing(4)
+
+            header = QLabel(f"v{release['version']}" + (" (new)" if is_new else ""))
+            header.setObjectName("releaseHeaderNew" if is_new else "releaseHeader")
+            block_layout.addWidget(header)
+
+            changes = QLabel("<br>".join(f"&bull; {c}" for c in release["changes"]))
+            changes.setTextFormat(Qt.TextFormat.RichText)
+            changes.setWordWrap(True)
+            changes.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            block_layout.addWidget(changes)
+
+            layout.addWidget(block)
+
+        layout.addStretch(1)
+        return self.changelog_widget
+
     # -- Button handlers --
 
     def _on_toggle_updater(self) -> None:
-        now_disabled = toggle_updater_disabled()
+        if self._preview:
+            # Preview never touches the disable flag file
+            self._preview_disabled = not self._preview_disabled
+            now_disabled = self._preview_disabled
+        else:
+            now_disabled = toggle_updater_disabled()
         self.toggle_btn.setText(
             "Enable Updater" if now_disabled else "Disable Updater"
         )
 
     def _on_later(self) -> None:
-        write_snooze()
+        if not self._preview:
+            write_snooze()
         self.close()
 
-    def _on_update(self) -> None:
-        # Disable all buttons
-        self.update_btn.setEnabled(False)
-        self.later_btn.setEnabled(False)
-        self.toggle_btn.setEnabled(False)
-
-        # Show log area and resize
-        self.log_area.setVisible(True)
-        self.resize(500, 600)
-
-        # Build command
+    def _update_command(self) -> str:
         if self._pkg_update:
             cmd = (
                 "curl -fsSL "
@@ -468,6 +544,22 @@ class UpdaterWindow(FramelessMainWindow):
                 f'killall {APP_NAME} && '
                 f'setsid python "{REPO_DIR}/main.py"'
             )
+        return cmd
+
+    def _on_update(self) -> None:
+        # Show log area and resize
+        self.log_area.setVisible(True)
+        self.resize(500, 600)
+        cmd = self._update_command()
+
+        if self._preview:
+            self.log_area.setPlainText(f"Preview: nothing was run. Update would execute:\n\n{cmd}")
+            return
+
+        # Disable all buttons
+        self.update_btn.setEnabled(False)
+        self.later_btn.setEnabled(False)
+        self.toggle_btn.setEnabled(False)
 
         self._process = QProcess(self)
         self._process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -547,12 +639,12 @@ def _ensure_theme() -> None:
             print(f"Warning: Could not generate theme from wallpaper: {e}")
 
 
-def _show_updater(version: str, changelog: list, pkg_update: bool) -> None:
+def _show_updater(version: str, releases: list, pkg_update: bool) -> None:
     """Create and display the UpdaterWindow (must be called on the main thread)."""
     _ensure_theme()
     win = UpdaterWindow(
         latest_version=version,
-        changelog=changelog,
+        releases=releases,
         pkg_update=pkg_update,
     )
     _active_windows.append(win)
@@ -587,12 +679,16 @@ def run_updater(force: bool = False) -> None:
     check_for_updates(force=force)
 
 
-def _run_standalone(force: bool = False) -> None:
+def _run_standalone(force: bool = False, preview: bool = False) -> None:
     """Run the updater as a standalone Qt application.
 
     Runs the update check synchronously (before the event loop) to avoid
     cross-thread Qt warnings that occur with the QThread approach.
+
+    *preview* implies *force* and opens a window whose buttons change nothing,
+    for checking the dialog and changelog while already up to date.
     """
+    force = force or preview
     # Check synchronously — network calls are fast enough for standalone
     if is_updater_disabled() and not force:
         print(f"Updater is disabled via {UPDATER_DISABLE_FILE_NAME}. Skipping.")
@@ -603,7 +699,7 @@ def _run_standalone(force: bool = False) -> None:
         return
 
     fetch_remote_version()
-    latest, changelog, _, pkg_update = get_remote_version()
+    latest, releases, _, pkg_update = get_remote_version()
 
     if not force:
         if is_snoozed():
@@ -621,7 +717,7 @@ def _run_standalone(force: bool = False) -> None:
     app.setQuitOnLastWindowClosed(True)
 
     _ensure_theme()
-    win = UpdaterWindow(latest_version=latest, changelog=changelog, pkg_update=pkg_update)
+    win = UpdaterWindow(latest_version=latest, releases=releases, pkg_update=pkg_update, preview=preview)
     _active_windows.append(win)
     win.destroyed.connect(lambda: _active_windows.remove(win) if win in _active_windows else None)
     win.show()
@@ -630,5 +726,4 @@ def _run_standalone(force: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    _force = "--force" in sys.argv
-    _run_standalone(force=_force)
+    _run_standalone(force="--force" in sys.argv, preview="--preview" in sys.argv)

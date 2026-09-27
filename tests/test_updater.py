@@ -95,6 +95,44 @@ class TestGetRemoteVersion:
             assert pkg_update is True
 
 
+class TestParseReleases:
+    def test_grouped_releases(self):
+        from modules.updater import parse_releases
+        data = {"version": "1.2.0", "releases": [
+            {"version": "1.2.0", "changes": ["b"]},
+            {"version": "1.1.0", "changes": ["a"]},
+        ]}
+        assert parse_releases(data) == [
+            {"version": "1.2.0", "changes": ["b"]},
+            {"version": "1.1.0", "changes": ["a"]},
+        ]
+
+    def test_legacy_flat_changelog_becomes_one_release(self):
+        from modules.updater import parse_releases
+        data = {"version": "1.1.0", "changelog": ["<b>feat:</b> New feature"]}
+        assert parse_releases(data) == [{"version": "1.1.0", "changes": ["<b>feat:</b> New feature"]}]
+
+    def test_no_changes(self):
+        from modules.updater import parse_releases
+        assert parse_releases({"version": "1.1.0"}) == []
+
+
+class TestNewVersions:
+    RELEASES = [{"version": v, "changes": ["x"]} for v in ("1.2.6", "1.2.5", "1.2.4")]
+
+    def test_versions_newer_than_installed(self):
+        from modules.updater import new_versions
+        assert new_versions(self.RELEASES, "1.2.4") == {"1.2.6", "1.2.5"}
+
+    def test_falls_back_to_latest_when_up_to_date(self):
+        from modules.updater import new_versions
+        assert new_versions(self.RELEASES, "1.2.6") == {"1.2.6"}
+
+    def test_empty(self):
+        from modules.updater import new_versions
+        assert new_versions([], "1.0.0") == set()
+
+
 # ── Snooze/disable file tests ──
 
 class TestSnoozeLogic:
@@ -140,13 +178,93 @@ class TestConnectivity:
 
 # ── UI tests ──
 
+def _changelog_text(window):
+    from PySide6.QtWidgets import QLabel
+    return "\n".join(l.text() for l in window.changelog_widget.findChildren(QLabel))
+
+
+def _headers(window):
+    from PySide6.QtWidgets import QLabel
+    return {l.text(): l.objectName() for l in window.changelog_widget.findChildren(QLabel)
+            if l.objectName().startswith("releaseHeader")}
+
+
+RELEASES = [
+    {"version": "1.2.6", "changes": ["<b>feat:</b> Newest"]},
+    {"version": "1.2.5", "changes": ["<b>fix:</b> Middle"]},
+    {"version": "1.2.4", "changes": ["<b>fix:</b> Installed"]},
+]
+
+
+class TestGroupedChangelog:
+    @pytest.fixture
+    def window(self, qapp):
+        from modules.updater import UpdaterWindow
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=False, current_version="1.2.4")
+        yield win
+        win.close()
+
+    def test_one_section_per_version_newest_first(self, window):
+        text = _changelog_text(window)
+        assert text.index("v1.2.6") < text.index("v1.2.5") < text.index("v1.2.4")
+
+    def test_versions_newer_than_installed_are_marked_new(self, window):
+        assert _headers(window) == {
+            "v1.2.6 (new)": "releaseHeaderNew",
+            "v1.2.5 (new)": "releaseHeaderNew",
+            "v1.2.4": "releaseHeader",
+        }
+
+    def test_latest_marked_new_when_up_to_date(self, qapp):
+        from modules.updater import UpdaterWindow
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=False, current_version="1.2.6")
+        assert _headers(win)["v1.2.6 (new)"] == "releaseHeaderNew"
+        assert "v1.2.5" in _headers(win)
+        win.close()
+
+
+class TestPreviewMode:
+    @pytest.fixture
+    def window(self, qapp):
+        from modules.updater import UpdaterWindow
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=True, current_version="1.2.6", preview=True)
+        yield win
+        win.close()
+
+    def test_update_shows_command_without_running_it(self, window):
+        with patch("modules.updater.QProcess") as process:
+            window._on_update()
+        process.assert_not_called()
+        assert "install.sh" in window.log_area.toPlainText()
+        assert window.update_btn.isEnabled()
+
+    def test_later_does_not_snooze(self, window):
+        with patch("modules.updater.write_snooze") as snooze:
+            window._on_later()
+        snooze.assert_not_called()
+
+    def test_toggle_does_not_touch_disable_flag(self, window):
+        with patch("modules.updater.toggle_updater_disabled") as toggle:
+            window._on_toggle_updater()
+        toggle.assert_not_called()
+        assert window.toggle_btn.text() == "Enable Updater"
+
+    def test_title_marks_preview(self, window):
+        from PySide6.QtWidgets import QLabel
+        title = window.findChild(QLabel, "updaterTitle")
+        assert "(preview)" in title.text()
+
+
 class TestUpdaterWindow:
     @pytest.fixture
     def window(self, qapp):
         from modules.updater import UpdaterWindow
         win = UpdaterWindow(
             latest_version="2.0.0",
-            changelog=["<b>feat:</b> New feature", "<b>fix:</b> Bug fix"],
+            releases=["<b>feat:</b> New feature", "<b>fix:</b> Bug fix"],  # legacy flat list
             pkg_update=False,
         )
         yield win
@@ -169,7 +287,7 @@ class TestUpdaterWindow:
         assert window.toggle_btn is not None
 
     def test_changelog_displayed(self, window):
-        text = window.changelog_label.text()
+        text = _changelog_text(window)
         assert "New feature" in text
         assert "Bug fix" in text
 
