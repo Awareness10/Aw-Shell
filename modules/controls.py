@@ -782,7 +782,7 @@ class MicIcon(BaseIconControl):
         if self.audio.microphone:
             self.audio.microphone.muted = not self.audio.microphone.muted
             if self.audio.microphone.muted:
-                self.control_button.get_child().set_markup("")
+                self.control_button.get_child().set_markup(icons.mic_mute)
                 self.control_label.add_style_class("muted")
                 self.control_button.add_style_class("muted")
             else:
@@ -826,7 +826,7 @@ class MicIcon(BaseIconControl):
         if not self.audio.microphone:
             return
         if self.audio.microphone.muted:
-            self.control_button.get_child().set_markup("")
+            self.control_button.get_child().set_markup(icons.mic_mute)
             self.add_style_class("muted")
             self.control_label.add_style_class("muted")
             self.set_tooltip_text("Muted")
@@ -835,7 +835,7 @@ class MicIcon(BaseIconControl):
         self.remove_style_class("muted")
         self.control_label.remove_style_class("muted")
         self.set_tooltip_text(f"{round(self.audio.microphone.volume)}%")
-        icon = "" if self.audio.microphone.volume >= 1 else ""
+        icon = icons.mic if self.audio.microphone.volume >= 1 else icons.mic_mute
         self.control_button.get_child().set_markup(icon)
 
 
