@@ -882,40 +882,21 @@ class Notch(Window):
         """Get the real focused monitor ID directly from Hyprland."""
         # Use thread to avoid blocking UI
         self._focused_monitor_result = None
+        self._focused_monitor_done = False
         GLib.Thread.new("get-focused-monitor", self._get_focused_monitor_thread, None)
         # Wait for result (not ideal, but for compatibility)
         import time
         start = time.time()
-        while self._focused_monitor_result is None and time.time() - start < 2.0:
+        while not self._focused_monitor_done and time.time() - start < 2.0:
             time.sleep(0.01)
         return self._focused_monitor_result
 
     def _get_focused_monitor_thread(self, user_data):
         try:
-            import json
-            import subprocess
+            self._focused_monitor_result = self.monitor_manager.query_focused_monitor_id()
+        finally:
+            self._focused_monitor_done = True
 
-            # Get focused monitor from Hyprland
-            result = subprocess.run(
-                ["hyprctl", "monitors", "-j"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=2.0
-            )
-
-            monitors = json.loads(result.stdout)
-            for i, monitor in enumerate(monitors):
-                if monitor.get('focused', False):
-                    self._focused_monitor_result = i
-                    return
-
-        except (subprocess.CalledProcessError, json.JSONDecodeError,
-                FileNotFoundError, subprocess.TimeoutExpired) as e:
-            print(f"Warning: Could not get focused monitor from Hyprland: {e}")
-
-        self._focused_monitor_result = None
-    
     def _open_notch_internal(self, widget_name: str):
         
         self.notch_revealer.set_reveal_child(True)
@@ -1232,8 +1213,7 @@ class Notch(Window):
     def _get_monitor_name(self):
         """Connector name of this notch's monitor, or None if unknown.
 
-        The window is placed by GDK monitor index, which doesn't follow the
-        monitor manager's origin-sorted ids, so resolve the name the same way.
+        monitor_id is the GDK monitor index the window is placed by.
         """
         screen = Gdk.Screen.get_default()
         if screen is None or not 0 <= self.monitor_id < screen.get_n_monitors():

@@ -7,6 +7,11 @@ import gi
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
 
+# The main monitor is the one holding this workspace. Monitor IDs follow
+# connection order, which changes with how fast each screen wakes up, while
+# workspace 1 is normally pinned to the main screen.
+PRIMARY_WORKSPACE = 1
+
 
 class Signal:
     """Simple signal implementation for monitor manager."""
@@ -25,6 +30,40 @@ class Signal:
                 callback(*args, **kwargs)
             except Exception as e:
                 print(f"Error in signal callback: {e}")
+
+
+def _hyprctl_json(command: str):
+    result = subprocess.run(
+        ["hyprctl", command, "-j"], capture_output=True, text=True, check=True, timeout=2.0
+    )
+    return json.loads(result.stdout)
+
+
+def _gdk_ids_by_connector() -> Dict[str, int]:
+    """GDK monitor index per connector name; empty if GDK can't tell."""
+    ids = {}
+    try:
+        screen = Gdk.Screen.get_default()
+        if screen is None:
+            return ids
+        for i in range(screen.get_n_monitors()):
+            name = screen.get_monitor_plug_name(i)
+            if isinstance(name, str) and name:
+                ids[name] = i
+    except Exception as e:
+        print(f"MonitorManager: could not read GDK monitors: {e}")
+    return ids
+
+
+def _match_monitor_rule(selector: str, monitors: List[Dict]) -> Optional[str]:
+    """Connector name for a workspace rule's monitor (a name or `desc:...`)."""
+    for monitor in monitors:
+        if selector.startswith("desc:"):
+            if monitor.get("description", "").startswith(selector[len("desc:"):].strip()):
+                return monitor.get("name")
+        elif monitor.get("name") == selector:
+            return monitor.get("name")
+    return None
 
 
 class MonitorManager:
@@ -51,19 +90,11 @@ class MonitorManager:
         self._notch_states: Dict[int, bool] = {}
         self._current_notch_module: Dict[int, Optional[str]] = {}
         self._monitor_instances: Dict[int, Dict] = {}
-        self._monitor_focus_service = None
         
         # Signals
         self.monitor_changed = Signal()
-        self.notch_focus_changed = Signal()
         
         self.refresh_monitors()
-    
-    def set_monitor_focus_service(self, service):
-        """Set the monitor focus service reference."""
-        self._monitor_focus_service = service
-        if service:
-            service.monitor_focused.connect(self._on_monitor_focused)
     
     def _get_gtk_monitor_info(self) -> List[Dict]:
         """Get monitor information using GTK/GDK including scale factors."""
@@ -95,9 +126,12 @@ class MonitorManager:
 
     def refresh_monitors(self) -> List[Dict]:
         """
-        Detect monitors using Hyprland API for accurate info, with GTK for scale detection.
-        Monitors are sorted by distance from origin (0,0), so the primary monitor
-        (typically at 0,0) gets ID 0 and workspaces 1-10.
+        Detect monitors using Hyprland API for accurate info.
+
+        A monitor's id is its GDK index, which is what layer surfaces are
+        placed by (`monitor=` on a window), so an id always names the screen
+        its surfaces are on. GDK numbers monitors in connection order, which
+        can put the main screen anywhere; see get_primary_monitor_id().
 
         Returns:
             List of monitor dictionaries with id, name, width, height, x, y, scale
@@ -105,47 +139,45 @@ class MonitorManager:
         self._monitors = []
 
         try:
-            # Try Hyprland first for primary info (more accurate)
-            result = subprocess.run(
-                ["hyprctl", "monitors", "-j"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            hypr_monitors = json.loads(result.stdout)
+            hypr_monitors = _hyprctl_json("monitors")
+            gdk_ids = _gdk_ids_by_connector()
 
-            # Sort monitors by distance from origin (0,0)
-            # This ensures the primary monitor (usually at 0,0) gets ID 0 and workspaces 1-10
-            def distance_from_origin(m):
-                x, y = m.get('x', 0), m.get('y', 0)
-                return x * x + y * y  # Squared distance (no need for sqrt)
+            for monitor in hypr_monitors:
+                monitor_name = monitor.get('name', '')
+                hypr_id = monitor.get('id', 0)
 
-            sorted_monitors = sorted(hypr_monitors, key=distance_from_origin)
-
-            for i, monitor in enumerate(sorted_monitors):
-                monitor_name = monitor.get('name', f'monitor-{i}')
-
-                # Get scale directly from Hyprland (more reliable)
-                hypr_scale = monitor.get('scale', 1.0)
+                if not gdk_ids:
+                    # No connector names from GDK; Hyprland ids follow
+                    # connection order too
+                    monitor_id = hypr_id
+                elif monitor_name in gdk_ids:
+                    monitor_id = gdk_ids[monitor_name]
+                else:
+                    print(f"MonitorManager: skipping {monitor_name}, unknown to GDK")
+                    continue
 
                 self._monitors.append({
-                    'id': i,  # Logical ID: 0 for primary (nearest origin), then outward
+                    'id': monitor_id,
                     'name': monitor_name,
-                    'hypr_id': monitor.get('id', i),  # Keep original Hyprland ID
+                    'hypr_id': hypr_id,
                     'width': monitor.get('width', 1920),
                     'height': monitor.get('height', 1080),
                     'x': monitor.get('x', 0),
                     'y': monitor.get('y', 0),
                     'focused': monitor.get('focused', False),
-                    'scale': hypr_scale
+                    # Get scale directly from Hyprland (more reliable)
+                    'scale': monitor.get('scale', 1.0)
                 })
 
                 # Initialize states for new monitors
-                if i not in self._notch_states:
-                    self._notch_states[i] = False
-                    self._current_notch_module[i] = None
-                    
-        except (subprocess.CalledProcessError, json.JSONDecodeError, FileNotFoundError):
+                if monitor_id not in self._notch_states:
+                    self._notch_states[monitor_id] = False
+                    self._current_notch_module[monitor_id] = None
+
+            self._monitors.sort(key=lambda m: m['id'])
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
+                json.JSONDecodeError, FileNotFoundError):
             # Fallback to GTK only if Hyprland fails
             self._fallback_to_gtk()
         
@@ -204,7 +236,55 @@ class MonitorManager:
     def get_monitors(self) -> List[Dict]:
         """Get list of all monitors."""
         return self._monitors.copy()
-    
+
+    def get_primary_monitor_name(self) -> Optional[str]:
+        """Connector name of the monitor holding PRIMARY_WORKSPACE, or None.
+
+        Hyprland drops empty workspaces, so when the workspace doesn't exist
+        right now its workspace rule decides.
+        """
+        try:
+            for workspace in _hyprctl_json("workspaces"):
+                if workspace.get("id") == PRIMARY_WORKSPACE:
+                    return workspace.get("monitor")
+
+            for rule in _hyprctl_json("workspacerules"):
+                if rule.get("workspaceString") == str(PRIMARY_WORKSPACE) and rule.get("monitor"):
+                    return _match_monitor_rule(rule["monitor"], _hyprctl_json("monitors"))
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
+                json.JSONDecodeError, FileNotFoundError) as e:
+            print(f"MonitorManager: could not resolve primary monitor: {e}")
+        return None
+
+    def get_primary_monitor_id(self) -> int:
+        """Id of the monitor holding PRIMARY_WORKSPACE, else the first monitor's."""
+        monitor_id = self.get_monitor_id_by_name(self.get_primary_monitor_name())
+        if monitor_id is not None:
+            return monitor_id
+        return self._monitors[0]['id'] if self._monitors else 0
+
+    def query_focused_monitor_id(self) -> Optional[int]:
+        """Id of the monitor Hyprland has focused right now, or None.
+
+        Asks Hyprland rather than trusting the tracked focus, which only
+        updates when a notch opens.
+        """
+        try:
+            for monitor in _hyprctl_json("monitors"):
+                if monitor.get("focused"):
+                    return self.get_monitor_id_by_name(monitor.get("name"))
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
+                json.JSONDecodeError, FileNotFoundError) as e:
+            print(f"MonitorManager: could not query focused monitor: {e}")
+        return None
+
+    def get_monitor_id_by_name(self, name: Optional[str]) -> Optional[int]:
+        """Id of the monitor with this connector name (e.g. "DP-3")."""
+        for monitor in self._monitors:
+            if monitor['name'] == name:
+                return monitor['id']
+        return None
+
     def get_monitor_by_id(self, monitor_id: int) -> Optional[Dict]:
         """Get monitor by ID."""
         for monitor in self._monitors:
@@ -322,30 +402,6 @@ class MonitorManager:
         """Get component instance from focused monitor."""
         return self.get_instance(self._focused_monitor_id, component)
     
-    def _on_monitor_focused(self, monitor_name: str, monitor_id: int, workspace_id: int):
-        """Handle monitor focus change."""
-        old_focused = self._focused_monitor_id
-        self._focused_monitor_id = monitor_id
-        
-        # Handle notch focus switching
-        if old_focused != monitor_id:
-            self._handle_notch_focus_switch(old_focused, monitor_id)
-    
-    def _handle_notch_focus_switch(self, old_monitor: int, new_monitor: int):
-        """Handle notch switching between monitors."""
-        # Close notch on old monitor if open
-        if self.is_notch_open(old_monitor):
-            old_module = self.get_current_notch_module(old_monitor)
-            self.close_all_notches_except(-1)  # Close all
-            
-            # Open notch on new monitor with same module
-            if old_module:
-                new_instances = self.get_monitor_instances(new_monitor)
-                notch = new_instances.get('notch')
-                if notch and hasattr(notch, 'open_module'):
-                    notch.open_module(old_module)
-        
-        self.notch_focus_changed.emit(old_monitor, new_monitor)
 
 
 # Singleton accessor
