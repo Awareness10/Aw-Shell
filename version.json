@@ -1,41 +1,100 @@
 {
   "version": "1.2.6",
   "pkg_update": true,
+  "releases": [
+    {
+      "version": "1.2.6",
+      "changes": [
+        "<b>feat:</b> Window border colors follow a new wallpaper instantly, no Hyprland reload needed",
+        "<b>fix:</b> Dashboard microphone icon shows again"
+      ]
+    },
+    {
+      "version": "1.2.5",
+      "changes": [
+        "<b>fix:</b> Shell no longer keeps a CPU core and upowerd busy (mouse battery update loop)",
+        "<b>perf:</b> Notch occlusion is event-driven over Hyprland IPC and checks each monitor separately",
+        "<b>perf:</b> Toolbox status checks run in-process instead of spawning pgrep and scripts every 2s",
+        "<b>feat:</b> Headset battery ring via headsetcontrol; mouse battery ring shows a mouse icon",
+        "<b>fix:</b> Hover tooltips show again (repeated tooltip updates kept cancelling them)",
+        "<b>fix:</b> Game mode works on Hyprland 0.56 and Lua configs",
+        "<b>update:</b> Default audio mixer shortcut is now SUPER+X (existing configs keep their key)",
+        "<b>fix:</b> Keybinds left unset no longer generate empty SUPER binds"
+      ]
+    },
+    {
+      "version": "1.2.4",
+      "changes": [
+        "<b>fix:</b> Connecting to a saved Wi-Fi network reuses its profile instead of creating a duplicate",
+        "<b>fix:</b> Wallpaper thumbnails refresh when a wallpaper's content changes"
+      ]
+    },
+    {
+      "version": "1.2.3",
+      "changes": [
+        "<b>fix:</b> Caffeine works again (pywayland 0.4.19) and shows its real state",
+        "<b>feat:</b> \"Suspend when idle\" option in Settings → Hyprland Integration",
+        "<b>fix:</b> Only one hypridle runs after Apply, so idle timers no longer fire twice",
+        "<b>fix:</b> Settings keep \"all monitors\" instead of saving every monitor by name",
+        "<b>fix:</b> Scrolling the settings page no longer changes spin boxes, dropdowns or sliders",
+        "<b>fix:</b> Overview uses Hyprland Lua dispatch syntax",
+        "<b>fix:</b> Metrics no longer crash without UPower",
+        "<b>fix:</b> Default wallpaper points to an existing file, broken ~/.current.wall is replaced",
+        "<b>test:</b> Real-GTK test suite in Docker (headless sway), coverage badge"
+      ]
+    },
+    {
+      "version": "1.2.2",
+      "changes": [
+        "<b>feat:</b> \"Lock After Idle\" setting, hypridle.conf is now generated from it",
+        "<b>update:</b> Hyprland Lua config: hyprland.lua dofile() line and hl.dsp dispatch",
+        "<b>fix:</b> Rounded corners on all monitors"
+      ]
+    },
+    {
+      "version": "1.2.1",
+      "changes": [
+        "<b>fix:</b> Rewrote Bluetooth on BlueZ D-Bus + bluetoothctl (pairing, trust, error feedback)"
+      ]
+    },
+    {
+      "version": "1.0.5",
+      "changes": [
+        "<b>update:</b> Added regression tests for the latest breaking changes, updated to use .venv-python"
+      ]
+    },
+    {
+      "version": "1.0.4",
+      "changes": [
+        "<b>hotfix:</b> Update Glaze version with matugen fix"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "changes": [
+        "<b>hotfix:</b> Matugen 4.0.0 breaking api change, json decode changes"
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "changes": [
+        "<b>test:</b> Comprehensive test suite - 362 tests, 94% coverage",
+        "<b>cleanup:</b> Removed dead GTK settings modules (about, appearance, keybindings, system, window)"
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "changes": [
+        "<b>refactor:</b> Major codebase refactoring for maintainability",
+        "<b>refactor:</b> Extracted Signal class to utils/signal.py",
+        "<b>refactor:</b> Created BaseSlider class hierarchy for controls",
+        "<b>refactor:</b> Added layout utilities module",
+        "<b>fork:</b> Rebranded from Ax-Shell to Aw-Shell"
+      ]
+    }
+  ],
   "changelog": [
     "<b>feat:</b> Window border colors follow a new wallpaper instantly, no Hyprland reload needed",
-    "<b>fix:</b> Dashboard microphone icon shows again",
-    "<b>fix:</b> Shell no longer keeps a CPU core and upowerd busy (mouse battery update loop)",
-    "<b>perf:</b> Notch occlusion is event-driven over Hyprland IPC and checks each monitor separately",
-    "<b>perf:</b> Toolbox status checks run in-process instead of spawning pgrep and scripts every 2s",
-    "<b>feat:</b> Headset battery ring via headsetcontrol; mouse battery ring shows a mouse icon",
-    "<b>fix:</b> Hover tooltips show again (repeated tooltip updates kept cancelling them)",
-    "<b>fix:</b> Game mode works on Hyprland 0.56 and Lua configs",
-    "<b>update:</b> Default audio mixer shortcut is now SUPER+X (existing configs keep their key)",
-    "<b>fix:</b> Keybinds left unset no longer generate empty SUPER binds",
-    "<b>fix:</b> Connecting to a saved Wi-Fi network reuses its profile instead of creating a duplicate",
-    "<b>fix:</b> Wallpaper thumbnails refresh when a wallpaper's content changes",
-    "<b>fix:</b> Caffeine works again (pywayland 0.4.19) and shows its real state",
-    "<b>feat:</b> \"Suspend when idle\" option in Settings → Hyprland Integration",
-    "<b>fix:</b> Only one hypridle runs after Apply, so idle timers no longer fire twice",
-    "<b>fix:</b> Settings keep \"all monitors\" instead of saving every monitor by name",
-    "<b>fix:</b> Scrolling the settings page no longer changes spin boxes, dropdowns or sliders",
-    "<b>fix:</b> Overview uses Hyprland Lua dispatch syntax",
-    "<b>fix:</b> Metrics no longer crash without UPower",
-    "<b>fix:</b> Default wallpaper points to an existing file, broken ~/.current.wall is replaced",
-    "<b>test:</b> Real-GTK test suite in Docker (headless sway), coverage badge",
-    "<b>feat:</b> \"Lock After Idle\" setting, hypridle.conf is now generated from it (1.2.2)",
-    "<b>update:</b> Hyprland Lua config: hyprland.lua dofile() line and hl.dsp dispatch (1.2.2)",
-    "<b>fix:</b> Rounded corners on all monitors (1.2.2)",
-    "<b>fix:</b> Rewrote Bluetooth on BlueZ D-Bus + bluetoothctl (pairing, trust, error feedback)",
-    "<b>update:</b> Added regression tests for the latest breaking changes, updated to use .venv-python",
-    "<b>hotfix:</b> Update Glaze version with matugen fix",
-    "<b>hotfix:</b> Matugen 4.0.0 breaking api change, json decode changes",
-    "<b>test:</b> Comprehensive test suite - 362 tests, 94% coverage",
-    "<b>cleanup:</b> Removed dead GTK settings modules (about, appearance, keybindings, system, window)",
-    "<b>refactor:</b> Major codebase refactoring for maintainability",
-    "<b>refactor:</b> Extracted Signal class to utils/signal.py",
-    "<b>refactor:</b> Created BaseSlider class hierarchy for controls",
-    "<b>refactor:</b> Added layout utilities module",
-    "<b>fork:</b> Rebranded from Ax-Shell to Aw-Shell"
+    "<b>fix:</b> Dashboard microphone icon shows again"
   ]
 }
