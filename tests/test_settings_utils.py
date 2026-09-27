@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
@@ -26,6 +27,7 @@ from config.settings_utils import (
     generate_hypridle,
     HYPRIDLE_HEADER,
     HYPRIDLE_START,
+    APPLY_COLORS_FN,
     bind_vars,
 )
 from config.settings_constants import APP_NAME_CAP
@@ -169,6 +171,17 @@ class TestGenerateHyprlua:
         # Other binds are unaffected
         assert any("-- Pins" in l for l in bind_lines)
         assert any("-- Dashboard" in l for l in bind_lines)
+
+    def test_border_colors_come_from_reapplicable_function(self):
+        """Wallpaper changes re-run APPLY_COLORS_FN over IPC instead of a full
+        `hyprctl reload`, so the border colors must live in that function."""
+        conf = generate_hyprlua()
+        assert f"function {APPLY_COLORS_FN}()" in conf
+        body = conf.split(f"function {APPLY_COLORS_FN}()", 1)[1].split("\nend\n", 1)[0]
+        assert "dofile(" in body  # re-reads the freshly written colors.lua
+        assert "active_border" in body and "inactive_border" in body
+        assert f"\n{APPLY_COLORS_FN}()\n" in conf  # applied at config load
+        assert len(re.findall(r"\bactive_border\b", conf)) == 1  # only set there
 
     def test_horizontal_animation_for_top(self):
         set_bind_var("bar_position", "Top")
@@ -651,6 +664,19 @@ class TestEnsureMatugenConfig:
                 with patch("config.settings_utils.exec_shell_command_async"):
                     ensure_matugen_config()
         assert matugen_config.exists()
+
+    def test_hyprland_colors_template_reapplies_borders(self, matugen_env):
+        import toml
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        matugen_config = config_dir / "matugen" / "config.toml"
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.os.path.expanduser",
+                       return_value=str(matugen_config)):
+                with patch("config.settings_utils.exec_shell_command_async"):
+                    ensure_matugen_config()
+        hook = toml.loads(matugen_config.read_text())["templates"]["hyprland-lua"]["post_hook"]
+        assert f"hyprctl eval '{APPLY_COLORS_FN}()'" in hook
+        assert "reload" not in hook
 
     def test_merges_with_existing_config(self, matugen_env):
         import toml
