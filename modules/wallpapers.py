@@ -22,6 +22,7 @@ import modules.icons as icons
 
 class WallpaperSelector(Box):
     CACHE_DIR = f"{data.CACHE_DIR}/thumbs"  # Changed from wallpapers to thumbs
+    SCHEME_APPLY_DELAY_MS = 400
 
     def __init__(self, **kwargs):
         # Delete the old cache directory if it exists
@@ -98,6 +99,8 @@ class WallpaperSelector(Box):
         for key, display_name in self.schemes.items():
             self.scheme_dropdown.append(key, display_name)
         self.scheme_dropdown.set_active_id("scheme-tonal-spot")
+        self._scheme_apply_id = None
+        self._custom_hex = None  # last color applied in custom color mode
         self.scheme_dropdown.connect("changed", self.on_scheme_changed)
 
         # Load matugen state from the dedicated file
@@ -382,8 +385,26 @@ class WallpaperSelector(Box):
             )
 
     def on_scheme_changed(self, combo):
-        selected_scheme = combo.get_active_id()
-        print(f"Color scheme selected: {selected_scheme}")
+        # Apply right away instead of on the next wallpaper pick; debounced so
+        # cycling schemes (Shift+Up/Down) runs matugen once
+        if self._scheme_apply_id is not None:
+            GLib.source_remove(self._scheme_apply_id)
+        self._scheme_apply_id = GLib.timeout_add(self.SCHEME_APPLY_DELAY_MS, self._apply_scheme)
+
+    def _apply_scheme(self) -> bool:
+        self._scheme_apply_id = None
+        selected_scheme = self.scheme_dropdown.get_active_id()
+        if self.matugen_switcher.get_active():
+            current_wall = os.path.realpath(os.path.expanduser("~/.current.wall"))
+            if os.path.isfile(current_wall):
+                exec_shell_command_async(
+                    f'matugen image "{current_wall}" -t {selected_scheme} --source-color-index 0'
+                )
+        elif self._custom_hex:
+            exec_shell_command_async(
+                f'matugen color hex "{self._custom_hex}" -t {selected_scheme}'
+            )
+        return False
 
     def on_search_entry_key_press(self, widget, event):
         if event.state & Gdk.ModifierType.SHIFT_MASK:
@@ -663,6 +684,7 @@ class WallpaperSelector(Box):
         hex_color = self.hsl_to_rgb_hex(hue_value)  # Convert HSL(hue, 1.0, 0.5) to HEX
         print(f"Applying color from slider: H={hue_value}, HEX={hex_color}")
         selected_scheme = self.scheme_dropdown.get_active_id()
+        self._custom_hex = hex_color
         # Run matugen with the chosen hex color and selected scheme
         exec_shell_command_async(
             f'matugen color hex "{hex_color}" -t {selected_scheme}'

@@ -369,3 +369,81 @@ class TestThumbnailCacheInvalidation:
 
         assert os.path.exists(keep)
         assert not os.path.exists(orphan)
+
+
+class TestSchemeChangeApplies:
+    """Regression: picking a color scheme only printed it; the theme changed
+    only after double-clicking a wallpaper again."""
+
+    @pytest.fixture
+    def env(self, tmp_path, monkeypatch):
+        wallpapers = TestThumbnailCacheInvalidation._import_wallpapers()
+        commands, timers = [], {}
+
+        class FakeGLib:
+            def timeout_add(self, _ms, callback):
+                timers[len(timers) + 1] = callback
+                return len(timers)
+
+            def source_remove(self, source_id):
+                timers.pop(source_id, None)
+
+        monkeypatch.setattr(wallpapers, "GLib", FakeGLib())
+        monkeypatch.setattr(wallpapers, "exec_shell_command_async", commands.append)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        wall = tmp_path / "walls" / "forest.png"
+        wall.parent.mkdir()
+        wall.write_bytes(b"png")
+        (tmp_path / ".current.wall").symlink_to(wall)
+
+        cls = wallpapers.WallpaperSelector
+
+        class Stub:
+            SCHEME_APPLY_DELAY_MS = cls.SCHEME_APPLY_DELAY_MS
+            on_scheme_changed = cls.on_scheme_changed
+            _apply_scheme = cls._apply_scheme
+
+            def __init__(self):
+                self._scheme_apply_id = None
+                self._custom_hex = None
+                self.scheme = "scheme-expressive"
+                self.matugen = True
+                self.scheme_dropdown = MagicMock(get_active_id=lambda: self.scheme)
+                self.matugen_switcher = MagicMock(get_active=lambda: self.matugen)
+
+        def fire():
+            for callback in list(timers.values()):
+                callback()
+            timers.clear()
+
+        return Stub(), commands, timers, fire, wall
+
+    def test_scheme_change_reapplies_current_wallpaper(self, env):
+        selector, commands, _, fire, wall = env
+        selector.on_scheme_changed(None)
+        fire()
+        assert commands == [f'matugen image "{wall}" -t scheme-expressive --source-color-index 0']
+
+    def test_cycling_schemes_applies_once(self, env):
+        selector, commands, timers, fire, _ = env
+        for scheme in ("scheme-content", "scheme-fidelity", "scheme-neutral"):
+            selector.scheme = scheme
+            selector.on_scheme_changed(None)
+        assert len(timers) == 1
+        fire()
+        assert len(commands) == 1 and "-t scheme-neutral" in commands[0]
+
+    def test_custom_color_mode_reapplies_last_color(self, env):
+        selector, commands, _, fire, _ = env
+        selector.matugen = False
+        selector._custom_hex = "#ff8800"
+        selector.on_scheme_changed(None)
+        fire()
+        assert commands == ['matugen color hex "#ff8800" -t scheme-expressive']
+
+    def test_custom_color_mode_without_applied_color_does_nothing(self, env):
+        selector, commands, _, fire, _ = env
+        selector.matugen = False
+        selector.on_scheme_changed(None)
+        fire()
+        assert commands == []
