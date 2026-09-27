@@ -39,6 +39,9 @@ REMOTE_URL = (
     "https://raw.githubusercontent.com/awareness10/Aw-Shell/"
     "refs/heads/main/version.json"
 )
+REMOTE_API_URL = (
+    "https://api.github.com/repos/awareness10/Aw-Shell/contents/version.json?ref=main"
+)
 REPO_DIR = str(_PROJECT_DIR)
 
 CACHE_DIR = os.path.expanduser(f"~/.cache/{APP_NAME}")
@@ -71,17 +74,26 @@ def get_disable_file_path() -> str:
     return os.path.join(get_cache_dir(), UPDATER_DISABLE_FILE_NAME)
 
 
+def _curl(url: str, *extra: str) -> int:
+    return subprocess.run(
+        ["curl", "-sL", "--fail", "--connect-timeout", "10", *extra,
+         url, "-o", REMOTE_VERSION_FILE],
+        check=False,
+        timeout=15,
+    ).returncode
+
+
 def fetch_remote_version() -> None:
-    """Download the remote version.json with curl."""
+    """Download the remote version.json with curl.
+
+    raw.githubusercontent caches which commit a branch points to for minutes,
+    so a release could go unnoticed for a while; the contents API is at most
+    a minute behind. Unauthenticated it allows 60 requests an hour per IP, so
+    fall back to the raw file (with a cache-busting query) if it refuses.
+    """
     try:
-        # raw.githubusercontent caches files for 5 minutes; a unique query
-        # string skips that, so a release shows up right after it's pushed
-        subprocess.run(
-            ["curl", "-sL", "--connect-timeout", "10",
-             f"{REMOTE_URL}?t={int(time.time())}", "-o", REMOTE_VERSION_FILE],
-            check=False,
-            timeout=15,
-        )
+        if _curl(REMOTE_API_URL, "-H", "Accept: application/vnd.github.raw+json") != 0:
+            _curl(f"{REMOTE_URL}?t={int(time.time())}")
     except subprocess.TimeoutExpired:
         print("Error: curl timed out while fetching the remote version.")
     except FileNotFoundError:
