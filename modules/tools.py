@@ -1,6 +1,8 @@
+import json
 import os
-import subprocess
 
+import psutil
+from fabric.hyprland.service import Hyprland
 from fabric.utils.helpers import exec_shell_command_async, get_relative_path
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -51,6 +53,78 @@ Ctrl+Enter: HSV"""
 tooltip_gamemode = "<b>Game Mode</b>\nDisables effects and window animations for better performance."
 tooltip_pomodoro = "<b>Pomodoro Timer</b>"
 tooltip_emoji = "<b>Emoji Picker</b>"
+
+
+
+class ToolsStatusMonitor:
+    """Single poller for the toolbox's status buttons, shared by every
+    monitor's Toolbox. Checks run in-process instead of spawning pgrep or
+    the gamemode script."""
+    POLL_INTERVAL_SECONDS = 2
+    _instance = None
+
+    @classmethod
+    def get(cls) -> "ToolsStatusMonitor":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        self._listeners = []
+        self._status = None
+        self._in_flight = False
+        GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self.refresh)
+        self.refresh()
+
+    def connect(self, callback) -> None:
+        """Call `callback(recording, pomodoro, gamemode)` on every change."""
+        self._listeners.append(callback)
+        if self._status is not None:
+            callback(*self._status)
+
+    def refresh(self) -> bool:
+        # Scanning every process takes a few ms; keep it off the main loop
+        if not self._in_flight:
+            self._in_flight = True
+            GLib.Thread.new("tools-status", self._check_thread, None)
+        return True
+
+    def _check_thread(self, _user_data) -> None:
+        try:
+            recording, pomodoro = self._scan_processes()
+            status = (recording, pomodoro, self._gamemode_enabled())
+        except Exception as e:
+            logger.warning(f"[Tools] status check failed: {e}")
+            status = None
+        GLib.idle_add(self._publish, status)
+
+    @staticmethod
+    def _scan_processes() -> tuple[bool, bool]:
+        # Same matching as `pgrep -f`: substring of the full command line
+        recording = pomodoro = False
+        own_pid = os.getpid()
+        for proc in psutil.process_iter(["pid", "cmdline"]):
+            if proc.info["pid"] == own_pid:
+                continue
+            cmdline = " ".join(proc.info["cmdline"] or ())
+            recording = recording or "gpu-screen-recorder" in cmdline
+            pomodoro = pomodoro or "pomodoro.sh" in cmdline
+        return recording, pomodoro
+
+    @staticmethod
+    def _gamemode_enabled() -> bool:
+        # Game mode disables animations. Newer Hyprland reports the option
+        # as "bool", older as "int"
+        option = json.loads(Hyprland.send_command("j/getoption animations:enabled").reply.decode())
+        return not option.get("bool", option.get("int", 1))
+
+    def _publish(self, status) -> bool:
+        self._in_flight = False
+        if status is not None and status != self._status:
+            self._status = status
+            for callback in list(self._listeners):
+                callback(*status)
+        return False
 
 
 class Toolbox(Box):
@@ -232,9 +306,12 @@ class Toolbox(Box):
 
         self.show_all()
 
-        self.recorder_timer_id = GLib.timeout_add_seconds(2, self.update_screenrecord_state)
-        self.gamemode_updater = GLib.timeout_add_seconds(2, self.gamemode_check)
-        self.pomodoro_updater = GLib.timeout_add_seconds(2, self.pomodoro_check)
+        ToolsStatusMonitor.get().connect(self._on_status)
+
+    def _on_status(self, recording, pomodoro, gamemode):
+        self._update_screenrecord_ui(recording)
+        self._update_pomodoro_ui(pomodoro)
+        self._update_gamemode_ui(gamemode)
 
     def close_menu(self):
         self.notch.close_notch()
@@ -324,21 +401,6 @@ class Toolbox(Box):
         exec_shell_command_async(f"bash -c 'nohup bash {POMODORO_SCRIPT} > /dev/null 2>&1 & disown'")
         self.close_menu()
 
-    def pomodoro_check(self):
-        """Check pomodoro status using proper background threading"""
-        GLib.Thread.new("pomodoro-check", self._pomodoro_check_thread, None)
-        return True
-    
-    def _pomodoro_check_thread(self, user_data):
-        """Background thread to check pomodoro status"""
-        try:
-            result = subprocess.run("pgrep -f pomodoro.sh", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            running = result.returncode == 0
-        except Exception:
-            running = False
-
-        GLib.idle_add(self._update_pomodoro_ui, running)
-    
     def _update_pomodoro_ui(self, running):
         """Update pomodoro UI from main thread"""
         if running:
@@ -355,24 +417,10 @@ class Toolbox(Box):
 
     def gamemode(self, *args):
         exec_shell_command_async(f"bash {GAMEMODE_SCRIPT}")
-        self.gamemode_check()
+        # The script runs async; give it a moment before re-reading the state
+        GLib.timeout_add(500, lambda: ToolsStatusMonitor.get().refresh() and False)
         self.close_menu()
 
-    def gamemode_check(self):
-        """Check gamemode status using proper background threading"""
-        GLib.Thread.new("gamemode-check", self._gamemode_check_thread, None)
-        return True
-    
-    def _gamemode_check_thread(self, user_data):
-        """Background thread to check gamemode status"""
-        try:
-            result = subprocess.run(f"bash {GAMEMODE_SCRIPT} check", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            enabled = result.stdout == b't\n'
-        except Exception:
-            enabled = False
-
-        GLib.idle_add(self._update_gamemode_ui, enabled)
-    
     def _update_gamemode_ui(self, enabled):
         """Update gamemode UI from main thread"""
         if enabled:
@@ -409,21 +457,6 @@ class Toolbox(Box):
             return True
         return False
 
-    def update_screenrecord_state(self):
-        """Check screen recording status using proper background threading"""
-        GLib.Thread.new("screenrecord-check", self._screenrecord_check_thread, None)
-        return True
-    
-    def _screenrecord_check_thread(self, user_data):
-        """Background thread to check screen recording status"""
-        try:
-            result = subprocess.run("pgrep -f gpu-screen-recorder", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            running = result.returncode == 0
-        except Exception:
-            running = False
-
-        GLib.idle_add(self._update_screenrecord_ui, running)
-    
     def _update_screenrecord_ui(self, running):
         """Update screen recording UI from main thread"""
         if running:
