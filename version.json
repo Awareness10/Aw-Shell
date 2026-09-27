@@ -1,7 +1,15 @@
 {
-  "version": "1.2.4",
+  "version": "1.2.5",
   "pkg_update": true,
   "changelog": [
+    "<b>fix:</b> Shell no longer keeps a CPU core and upowerd busy (mouse battery update loop)",
+    "<b>perf:</b> Notch occlusion is event-driven over Hyprland IPC and checks each monitor separately",
+    "<b>perf:</b> Toolbox status checks run in-process instead of spawning pgrep and scripts every 2s",
+    "<b>feat:</b> Headset battery ring via headsetcontrol; mouse battery ring shows a mouse icon",
+    "<b>fix:</b> Hover tooltips show again (repeated tooltip updates kept cancelling them)",
+    "<b>fix:</b> Game mode works on Hyprland 0.56 and Lua configs",
+    "<b>update:</b> Default audio mixer shortcut is now SUPER+X (existing configs keep their key)",
+    "<b>fix:</b> Keybinds left unset no longer generate empty SUPER binds",
     "<b>fix:</b> Connecting to a saved Wi-Fi network reuses its profile instead of creating a duplicate",
     "<b>fix:</b> Wallpaper thumbnails refresh when a wallpaper's content changes",
     "<b>fix:</b> Caffeine works again (pywayland 0.4.19) and shows its real state",
