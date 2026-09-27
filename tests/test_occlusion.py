@@ -1,6 +1,6 @@
 """Tests for utils/occlusion.py - per-monitor top-edge occlusion."""
 
-from utils.occlusion import is_top_edge_occluded
+from utils.occlusion import has_visible_floating, is_top_edge_occluded
 
 # Side-by-side layout: ultrawide at the origin, 1080p to its right
 LEFT = {"name": "DP-3", "x": 0, "y": 0, "width": 3440, "height": 1440, "scale": 1.0,
@@ -54,3 +54,16 @@ def test_scaled_monitor_uses_logical_width():
     monitor = {**LEFT, "width": 3840, "height": 2160, "scale": 2.0}
     assert not is_top_edge_occluded(monitor, [client(1, [2000, 0], [500, 500])])
     assert is_top_edge_occluded(monitor, [client(1, [1800, 0], [500, 500])])
+
+
+def test_floating_window_on_shown_workspace_is_detected():
+    clients = [client(2, [3500, 100], [400, 300], floating=True)]
+    assert has_visible_floating([LEFT, RIGHT], clients)
+
+
+def test_floating_window_on_hidden_workspace_is_ignored():
+    clients = [
+        client(1, [0, 50], [800, 600], floating=False),
+        client(7, [0, 0], [400, 300], floating=True),
+    ]
+    assert not has_visible_floating([LEFT, RIGHT], clients)

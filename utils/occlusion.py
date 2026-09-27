@@ -38,21 +38,38 @@ def _logical_size(monitor: dict) -> tuple[float, float]:
     return width, height
 
 
+def _visible_workspaces(monitor: dict) -> set:
+    workspaces = {monitor.get("activeWorkspace", {}).get("id")}
+    special = monitor.get("specialWorkspace", {}).get("id")
+    if special:
+        workspaces.add(special)
+    return workspaces
+
+
+def _is_shown(client: dict, workspaces: set) -> bool:
+    return (
+        client.get("mapped", False)
+        and not client.get("hidden", False)
+        and client.get("workspace", {}).get("id") in workspaces
+    )
+
+
+def has_visible_floating(monitors: list[dict], clients: list[dict]) -> bool:
+    """Whether any monitor shows a floating window. Tiled windows are also
+    floating while being dragged."""
+    workspaces = set().union(*(_visible_workspaces(m) for m in monitors))
+    return any(c.get("floating") and _is_shown(c, workspaces) for c in clients)
+
+
 def is_top_edge_occluded(monitor: dict, clients: list[dict], size: int = TOP_EDGE_SIZE) -> bool:
     """Whether any visible window on `monitor` overlaps its top `size` pixels."""
     width, _ = _logical_size(monitor)
     x1, y1 = monitor.get("x", 0), monitor.get("y", 0)
     x2, y2 = x1 + width, y1 + size
 
-    workspaces = {monitor.get("activeWorkspace", {}).get("id")}
-    special = monitor.get("specialWorkspace", {}).get("id")
-    if special:
-        workspaces.add(special)
-
+    workspaces = _visible_workspaces(monitor)
     for client in clients:
-        if not client.get("mapped", False) or client.get("hidden", False):
-            continue
-        if client.get("workspace", {}).get("id") not in workspaces:
+        if not _is_shown(client, workspaces):
             continue
         at, dims = client.get("at"), client.get("size")
         if not at or not dims:
@@ -68,8 +85,10 @@ class OcclusionWatcher:
     """Shared, event-driven occlusion state for every monitor."""
 
     DEBOUNCE_MS = 50
-    # Hyprland emits no event for resizing or dragging a window, so
-    # re-check occasionally to catch those
+    # Hyprland emits no events while a window is dragged or resized. Floating
+    # windows (tiled ones float while dragged) can move freely, so poll fast
+    # while any are shown; otherwise only re-check occasionally
+    FLOATING_REFRESH_MS = 250
     SAFETY_REFRESH_SECONDS = 5
     _instance = None
 
@@ -87,6 +106,8 @@ class OcclusionWatcher:
         self._focused: str | None = None
         self._listeners = []
         self._refresh_source_id = None
+        self._floating_source_id = None
+        self._has_floating = False
 
         for event in _REFRESH_EVENTS:
             self._conn.connect(f"event::{event}", self._schedule_refresh)
@@ -111,6 +132,11 @@ class OcclusionWatcher:
 
         occluded = {m.get("name"): is_top_edge_occluded(m, clients) for m in monitors}
         self._focused = next((m.get("name") for m in monitors if m.get("focused")), None)
+
+        self._has_floating = has_visible_floating(monitors, clients)
+        if self._has_floating and self._floating_source_id is None:
+            self._floating_source_id = GLib.timeout_add(self.FLOATING_REFRESH_MS, self._floating_refresh)
+
         if occluded != self._occluded:
             self._occluded = occluded
             for callback in list(self._listeners):
@@ -133,6 +159,13 @@ class OcclusionWatcher:
         self._refresh_source_id = None
         self.refresh()
         return False
+
+    def _floating_refresh(self) -> bool:
+        self.refresh()
+        if not self._has_floating:
+            self._floating_source_id = None
+            return False
+        return True
 
     def _safety_refresh(self) -> bool:
         self.refresh()
