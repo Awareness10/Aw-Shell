@@ -480,24 +480,45 @@ class MouseBattery(DeviceBattery):
         return True
 
 
-class HeadsetBattery(DeviceBattery):
-    """USB-dongle headsets UPower doesn't see, read via headsetcontrol."""
+class HeadsetBatteryMonitor:
+    """Single headsetcontrol poller shared by every bar's HeadsetBattery.
+    Concurrent queries to the dongle collide and both read back 0%, so
+    only one may run at a time."""
+    POLL_INTERVAL_SECONDS = 30
+    _instance = None
 
-    def __init__(self, **kwargs):
-        super().__init__("button-bar-headset-battery", "button-headset-battery", icons.headset, **kwargs)
-        self._reading_in_flight = False
-        self.set_no_show_all(True)
-        self.set_visible(False)
-        if shutil.which("headsetcontrol") is None:
-            return
-        self._start_polling()
+    @classmethod
+    def get(cls) -> "HeadsetBatteryMonitor":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
-    def _update(self) -> bool:
+    def __init__(self):
+        self._listeners = []
+        self._reading = None
+        self._in_flight = False
+        self._poll_source_id = None
+
+    def subscribe(self, callback) -> None:
+        self._listeners.append(callback)
+        callback(self._reading)
+        if self._poll_source_id is None:
+            self._poll_source_id = GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self._poll)
+            self._poll()
+
+    def unsubscribe(self, callback) -> None:
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+        if not self._listeners and self._poll_source_id is not None:
+            GLib.source_remove(self._poll_source_id)
+            self._poll_source_id = None
+
+    def _poll(self) -> bool:
         # headsetcontrol talks to the dongle over HID and can take a while;
         # run it async so it never stalls the main loop
-        if self._reading_in_flight:
+        if self._in_flight:
             return True
-        self._reading_in_flight = True
+        self._in_flight = True
         try:
             proc = Gio.Subprocess.new(
                 ["headsetcontrol", "-b", "-o", "json"],
@@ -505,17 +526,27 @@ class HeadsetBattery(DeviceBattery):
             )
             proc.communicate_utf8_async(None, None, self._on_output)
         except GLib.Error:
-            self._reading_in_flight = False
-            self._show_reading(None)
+            self._in_flight = False
+            self._publish(None)
         return True
 
     def _on_output(self, proc, result) -> None:
-        self._reading_in_flight = False
+        self._in_flight = False
         try:
             _, stdout, _ = proc.communicate_utf8_finish(result)
-            self._show_reading(self._parse(stdout))
+            reading = self._parse(stdout)
         except (GLib.Error, ValueError):
-            self._show_reading(None)
+            reading = None
+        # A 0% reading means the query collided with another headsetcontrol
+        # run (e.g. from a terminal); keep the last good value instead
+        if reading is not None and reading[0] <= 0 and self._reading is not None:
+            return
+        self._publish(reading)
+
+    def _publish(self, reading) -> None:
+        self._reading = reading
+        for callback in list(self._listeners):
+            callback(reading)
 
     @staticmethod
     def _parse(stdout):
@@ -531,6 +562,26 @@ class HeadsetBattery(DeviceBattery):
             model = device.get("device") or device.get("product") or "Headset"
             return float(level), status == "BATTERY_CHARGING", model
         return None
+
+
+class HeadsetBattery(DeviceBattery):
+    """USB-dongle headsets UPower doesn't see, read via headsetcontrol."""
+
+    def __init__(self, **kwargs):
+        super().__init__("button-bar-headset-battery", "button-headset-battery", icons.headset, **kwargs)
+        self._monitor = None
+        self.set_no_show_all(True)
+        self.set_visible(False)
+        if shutil.which("headsetcontrol") is None:
+            return
+        self._monitor = HeadsetBatteryMonitor.get()
+        self._monitor.subscribe(self._show_reading)
+
+    def destroy(self) -> None:
+        if self._monitor is not None:
+            self._monitor.unsubscribe(self._show_reading)
+            self._monitor = None
+        super().destroy()
 
 
 class BaseIconControl(Box, DebouncedValueMixin):
