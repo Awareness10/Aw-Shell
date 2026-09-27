@@ -11,6 +11,21 @@ import config.data as data
 
 logger = logging.getLogger(__name__)
 
+_watcher = None
+
+
+def _get_watcher() -> Gray.Watcher:
+    """Process-wide watcher shared by every bar's tray.
+
+    Only one watcher per process can serve org.kde.StatusNotifierWatcher;
+    a second one never receives items, so its tray would stay empty.
+    """
+    global _watcher
+    if _watcher is None:
+        _watcher = Gray.Watcher()
+    return _watcher
+
+
 class SystemTray(Box):
     def __init__(self, pixel_size: int = 20, **kwargs) -> None:
         orientation = Gtk.Orientation.HORIZONTAL if not data.VERTICAL else Gtk.Orientation.VERTICAL
@@ -25,9 +40,27 @@ class SystemTray(Box):
         self.pixel_size = pixel_size
         self.buttons_by_id = {}
         self.items_by_id = {}
+        self.item_handlers_by_id = {}
 
-        self.watcher = Gray.Watcher()
-        self.watcher.connect("item-added", self.on_watcher_item_added)
+        self.watcher = _get_watcher()
+        self._watcher_handler = self.watcher.connect("item-added", self.on_watcher_item_added)
+        self.connect("destroy", self._on_destroy)
+
+        # Items registered before this tray was built (e.g. by another bar)
+        for identifier in list(self.watcher.get_items()):
+            self.on_watcher_item_added(self.watcher, identifier)
+
+    def _disconnect_item(self, identifier: str):
+        item = self.items_by_id.get(identifier)
+        for handler in self.item_handlers_by_id.pop(identifier, []):
+            if item is not None and item.handler_is_connected(handler):
+                item.disconnect(handler)
+
+    def _on_destroy(self, *_):
+        if self.watcher.handler_is_connected(self._watcher_handler):
+            self.watcher.disconnect(self._watcher_handler)
+        for identifier in list(self.items_by_id):
+            self._disconnect_item(identifier)
 
     def set_visible(self, visible: bool):
         self.enabled = visible
@@ -92,6 +125,7 @@ class SystemTray(Box):
             return
 
         if identifier in self.buttons_by_id:
+            self._disconnect_item(identifier)
             self.buttons_by_id[identifier].destroy()
             del self.buttons_by_id[identifier]
             del self.items_by_id[identifier]
@@ -100,17 +134,24 @@ class SystemTray(Box):
         self.buttons_by_id[identifier] = btn
         self.items_by_id[identifier] = item
 
-        item.connect("notify::icon-pixmaps",
-                     lambda itm, pspec: self._refresh_item_ui(itm, btn))
-        item.connect("notify::icon-name",
-                     lambda itm, pspec: self._refresh_item_ui(itm, btn))
+        handlers = [
+            item.connect("notify::icon-pixmaps",
+                         lambda itm, pspec: self._refresh_item_ui(itm, btn)),
+            item.connect("notify::icon-name",
+                         lambda itm, pspec: self._refresh_item_ui(itm, btn)),
+        ]
 
         try:
-            item.connect("icon-changed", lambda itm: self._refresh_item_ui(itm, btn))
+            handlers.append(
+                item.connect("icon-changed", lambda itm: self._refresh_item_ui(itm, btn))
+            )
         except TypeError:
             pass
 
-        item.connect("removed", lambda itm: self.on_item_instance_removed(identifier, itm))
+        handlers.append(
+            item.connect("removed", lambda itm: self.on_item_instance_removed(identifier, itm))
+        )
+        self.item_handlers_by_id[identifier] = handlers
 
         self.add(btn)
         btn.show_all()
@@ -128,6 +169,7 @@ class SystemTray(Box):
 
     def on_item_instance_removed(self, identifier: str, removed_item: Gray.Item):
         if self.items_by_id.get(identifier) is removed_item:
+            self._disconnect_item(identifier)
             btn = self.buttons_by_id.pop(identifier, None)
             self.items_by_id.pop(identifier, None)
             if btn:
