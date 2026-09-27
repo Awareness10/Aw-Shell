@@ -236,6 +236,26 @@ class TestGroupedChangelog:
         win.close()
 
 
+class TestChangeRows:
+    def test_split_change(self):
+        from modules.updater import split_change
+        assert split_change("<b>fix:</b> Mic icon shows again") == ("fix", "Mic icon shows again")
+        assert split_change("Plain entry") == (None, "Plain entry")
+
+    def test_each_change_is_its_own_row_with_type_tag(self, qapp):
+        from PySide6.QtWidgets import QLabel
+        from modules.updater import UpdaterWindow
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=False, current_version="1.2.4")
+        tags = {l.text(): l.objectName() for l in win.changelog_widget.findChildren(QLabel)
+                if l.objectName().startswith("changeTag")}
+        assert tags == {"feat": "changeTag_feat", "fix": "changeTag_fix"}
+        texts = [l.text() for l in win.changelog_widget.findChildren(QLabel)
+                 if l.objectName() == "changeText"]
+        assert texts == ["Newest", "Middle", "Installed"]
+        win.close()
+
+
 class TestPreviewMode:
     @pytest.fixture
     def window(self, qapp):
