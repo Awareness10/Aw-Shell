@@ -28,6 +28,7 @@ from config.settings_utils import (
     HYPRIDLE_START,
     bind_vars,
 )
+from config.settings_constants import APP_NAME_CAP
 from config.settings_constants import DEFAULTS
 
 
@@ -153,6 +154,21 @@ class TestGenerateHyprlua:
         assert "hl.bind(" in conf
         assert get_bind_var("suffix_restart") in conf
         assert get_bind_var("suffix_launcher") in conf
+
+    @pytest.mark.parametrize("unset", ["", "   "])
+    def test_skips_binds_with_unset_key(self, unset):
+        """Regression: an unset key generated a keyless `hl.bind("SUPER + ", ...)`
+        that Hyprland registers as a bogus keycode-0 bind."""
+        set_bind_var("suffix_bluetooth", unset)
+        set_bind_var("suffix_restart", unset)
+        conf = generate_hyprlua()
+        bind_lines = [l for l in conf.splitlines() if l.startswith("hl.bind(")]
+        assert not any("-- Bluetooth" in l for l in bind_lines)
+        assert not any(l.endswith(f"-- Reload {APP_NAME_CAP}") for l in bind_lines)
+        assert not any(l.split(",")[0].rstrip('" ').endswith("+") for l in bind_lines)
+        # Other binds are unaffected
+        assert any("-- Pins" in l for l in bind_lines)
+        assert any("-- Dashboard" in l for l in bind_lines)
 
     def test_horizontal_animation_for_top(self):
         set_bind_var("bar_position", "Top")
