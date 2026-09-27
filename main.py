@@ -48,13 +48,10 @@ if __name__ == "__main__":
 
     # Initialize multi-monitor services
     try:
-        from services.monitor_focus import get_monitor_focus_service
         from utils.global_keybinds import init_global_keybind_objects
         from utils.monitor_manager import get_monitor_manager
         
         monitor_manager = get_monitor_manager()
-        monitor_focus_service = get_monitor_focus_service()
-        monitor_manager.set_monitor_focus_service(monitor_focus_service)
         init_global_keybind_objects()
         
         # Get all available monitors

@@ -139,10 +139,6 @@ class TestFocusedMonitor:
         focused = mgr.get_focused_monitor()
         assert focused["name"] == "HDMI-A-1"
 
-    def test_focus_change_via_callback(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        mgr._on_monitor_focused("DP-1", 1, 3)
-        assert mgr.get_focused_monitor_id() == 1
 
 
 # =========================================================================
@@ -281,53 +277,6 @@ class TestMonitorSignals:
             mgr.refresh_monitors()
 
         assert results == [3]
-
-    def test_notch_focus_changed_emitted(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        results = []
-        mgr.notch_focus_changed.connect(lambda old, new: results.append((old, new)))
-        mgr._on_monitor_focused("DP-1", 1, 3)
-        assert results == [(0, 1)]
-
-    def test_no_signal_when_focus_unchanged(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        results = []
-        mgr.notch_focus_changed.connect(lambda old, new: results.append((old, new)))
-        mgr._on_monitor_focused("HDMI-A-1", 0, 1)
-        assert results == []  # same monitor, no switch
-
-
-# =========================================================================
-# Notch focus switching
-# =========================================================================
-
-class TestNotchFocusSwitch:
-
-    def test_notch_transfers_to_new_monitor(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        mock_notch_0 = MagicMock()
-        mock_notch_0.close_notch = MagicMock()
-        mock_notch_1 = MagicMock()
-        mock_notch_1.open_module = MagicMock()
-        mgr.register_monitor_instances(0, {"notch": mock_notch_0})
-        mgr.register_monitor_instances(1, {"notch": mock_notch_1})
-
-        mgr.set_notch_state(0, True, "dashboard")
-        mgr._on_monitor_focused("DP-1", 1, 3)
-
-        # Old notch should have been closed
-        mock_notch_0.close_notch.assert_called()
-        # New notch should open with same module
-        mock_notch_1.open_module.assert_called_with("dashboard")
-
-    def test_no_transfer_when_notch_closed(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        mock_notch_1 = MagicMock()
-        mgr.register_monitor_instances(1, {"notch": mock_notch_1})
-
-        mgr._on_monitor_focused("DP-1", 1, 3)
-        mock_notch_1.open_module.assert_not_called()
-
 
 # =========================================================================
 # Internal Signal class (from monitor_manager, not utils.signal)
@@ -528,35 +477,6 @@ class TestGtkFallback:
         with patch("utils.monitor_manager.Gdk.Display.get_default", return_value=None):
             info = mgr._get_gtk_monitor_info()
         assert info == []
-
-
-# =========================================================================
-# Monitor focus service integration
-# =========================================================================
-
-class TestMonitorFocusService:
-
-    def test_set_monitor_focus_service(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        mock_service = MagicMock()
-        mock_service.monitor_focused = Signal()
-        mgr.set_monitor_focus_service(mock_service)
-        assert mgr._monitor_focus_service is mock_service
-
-    def test_focus_service_signal_triggers_update(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        mock_service = MagicMock()
-        mock_service.monitor_focused = Signal()
-        mgr.set_monitor_focus_service(mock_service)
-
-        # Emit from the service signal
-        mock_service.monitor_focused.emit("DP-1", 1, 3)
-        assert mgr.get_focused_monitor_id() == 1
-
-    def test_set_none_service(self):
-        mgr = _make_manager(TRIPLE_MONITOR)
-        mgr.set_monitor_focus_service(None)
-        assert mgr._monitor_focus_service is None
 
 
 # =========================================================================

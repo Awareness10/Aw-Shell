@@ -90,19 +90,11 @@ class MonitorManager:
         self._notch_states: Dict[int, bool] = {}
         self._current_notch_module: Dict[int, Optional[str]] = {}
         self._monitor_instances: Dict[int, Dict] = {}
-        self._monitor_focus_service = None
         
         # Signals
         self.monitor_changed = Signal()
-        self.notch_focus_changed = Signal()
         
         self.refresh_monitors()
-    
-    def set_monitor_focus_service(self, service):
-        """Set the monitor focus service reference."""
-        self._monitor_focus_service = service
-        if service:
-            service.monitor_focused.connect(self._on_monitor_focused)
     
     def _get_gtk_monitor_info(self) -> List[Dict]:
         """Get monitor information using GTK/GDK including scale factors."""
@@ -410,30 +402,6 @@ class MonitorManager:
         """Get component instance from focused monitor."""
         return self.get_instance(self._focused_monitor_id, component)
     
-    def _on_monitor_focused(self, monitor_name: str, monitor_id: int, workspace_id: int):
-        """Handle monitor focus change."""
-        old_focused = self._focused_monitor_id
-        self._focused_monitor_id = monitor_id
-        
-        # Handle notch focus switching
-        if old_focused != monitor_id:
-            self._handle_notch_focus_switch(old_focused, monitor_id)
-    
-    def _handle_notch_focus_switch(self, old_monitor: int, new_monitor: int):
-        """Handle notch switching between monitors."""
-        # Close notch on old monitor if open
-        if self.is_notch_open(old_monitor):
-            old_module = self.get_current_notch_module(old_monitor)
-            self.close_all_notches_except(-1)  # Close all
-            
-            # Open notch on new monitor with same module
-            if old_module:
-                new_instances = self.get_monitor_instances(new_monitor)
-                notch = new_instances.get('notch')
-                if notch and hasattr(notch, 'open_module'):
-                    notch.open_module(old_module)
-        
-        self.notch_focus_changed.emit(old_monitor, new_monitor)
 
 
 # Singleton accessor
