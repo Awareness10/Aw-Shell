@@ -1,7 +1,17 @@
 {
-  "version": "1.2.8",
+  "version": "1.2.9",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.9",
+      "changes": [
+        "<b>fix:</b> Tray icons (Discord, Sunshine, ...) show on every monitor's bar, not only the first one",
+        "<b>fix:</b> Bar, notch, dock and overview use the right monitor's size and focus when screens connect in a different order than they're arranged",
+        "<b>feat:</b> Notifications appear on the monitor you're using; at startup, the main monitor (the one holding workspace 1)",
+        "<b>fix:</b> Opening the notch no longer stalls for 2 seconds when Hyprland doesn't answer",
+        "<b>update:</b> Removed the non-working <code>toggle_launcher.py</code> and <code>toggle_overview.py</code> scripts"
+      ]
+    },
     {
       "version": "1.2.8",
       "changes": [
@@ -131,8 +141,10 @@
     }
   ],
   "changelog": [
-    "<b>feat:</b> Updater shows each change on its own row with a theme-colored type tag",
-    "<b>fix:</b> Updater reads version info through the GitHub API, so new releases show up within a minute",
-    "<b>update:</b> Changelog now includes the 1.1.0 and 1.2.0 releases"
+    "<b>fix:</b> Tray icons (Discord, Sunshine, ...) show on every monitor's bar, not only the first one",
+    "<b>fix:</b> Bar, notch, dock and overview use the right monitor's size and focus when screens connect in a different order than they're arranged",
+    "<b>feat:</b> Notifications appear on the monitor you're using; at startup, the main monitor (the one holding workspace 1)",
+    "<b>fix:</b> Opening the notch no longer stalls for 2 seconds when Hyprland doesn't answer",
+    "<b>update:</b> Removed the non-working <code>toggle_launcher.py</code> and <code>toggle_overview.py</code> scripts"
   ]
 }
