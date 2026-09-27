@@ -23,6 +23,7 @@ import modules.icons as icons
 class WallpaperSelector(Box):
     CACHE_DIR = f"{data.CACHE_DIR}/thumbs"  # Changed from wallpapers to thumbs
     SCHEME_APPLY_DELAY_MS = 400
+    DEFAULT_SCHEME = "scheme-tonal-spot"
 
     def __init__(self, **kwargs):
         # Delete the old cache directory if it exists
@@ -98,7 +99,8 @@ class WallpaperSelector(Box):
         self.scheme_dropdown.set_tooltip_text("Select color scheme")
         for key, display_name in self.schemes.items():
             self.scheme_dropdown.append(key, display_name)
-        self.scheme_dropdown.set_active_id("scheme-tonal-spot")
+        # Restored before connecting "changed", so startup doesn't re-theme
+        self.scheme_dropdown.set_active_id(self._load_scheme())
         self._scheme_apply_id = None
         self._custom_hex = None  # last color applied in custom color mode
         self.scheme_dropdown.connect("changed", self.on_scheme_changed)
@@ -391,9 +393,23 @@ class WallpaperSelector(Box):
             GLib.source_remove(self._scheme_apply_id)
         self._scheme_apply_id = GLib.timeout_add(self.SCHEME_APPLY_DELAY_MS, self._apply_scheme)
 
+    def _load_scheme(self) -> str:
+        try:
+            scheme = data.MATUGEN_SCHEME_FILE.read_text().strip()
+        except OSError:
+            return self.DEFAULT_SCHEME
+        return scheme if scheme in self.schemes else self.DEFAULT_SCHEME
+
+    def _save_scheme(self, scheme: str) -> None:
+        try:
+            data.MATUGEN_SCHEME_FILE.write_text(scheme)
+        except OSError as e:
+            print(f"Error writing matugen scheme file: {e}")
+
     def _apply_scheme(self) -> bool:
         self._scheme_apply_id = None
         selected_scheme = self.scheme_dropdown.get_active_id()
+        self._save_scheme(selected_scheme)
         if self.matugen_switcher.get_active():
             current_wall = os.path.realpath(os.path.expanduser("~/.current.wall"))
             if os.path.isfile(current_wall):

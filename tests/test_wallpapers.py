@@ -396,12 +396,19 @@ class TestSchemeChangeApplies:
         wall.write_bytes(b"png")
         (tmp_path / ".current.wall").symlink_to(wall)
 
+        monkeypatch.setattr(wallpapers.data, "MATUGEN_SCHEME_FILE", tmp_path / "matugen-scheme")
         cls = wallpapers.WallpaperSelector
 
         class Stub:
             SCHEME_APPLY_DELAY_MS = cls.SCHEME_APPLY_DELAY_MS
+            DEFAULT_SCHEME = cls.DEFAULT_SCHEME
             on_scheme_changed = cls.on_scheme_changed
             _apply_scheme = cls._apply_scheme
+            _load_scheme = cls._load_scheme
+            _save_scheme = cls._save_scheme
+            schemes = {"scheme-tonal-spot": "Tonal Spot", "scheme-expressive": "Expressive",
+                       "scheme-content": "Content", "scheme-fidelity": "Fidelity",
+                       "scheme-neutral": "Neutral"}
 
             def __init__(self):
                 self._scheme_apply_id = None
@@ -417,6 +424,24 @@ class TestSchemeChangeApplies:
             timers.clear()
 
         return Stub(), commands, timers, fire, wall
+
+    def test_applied_scheme_is_saved(self, env, tmp_path):
+        selector, _, _, fire, _ = env
+        selector.on_scheme_changed(None)
+        fire()
+        assert (tmp_path / "matugen-scheme").read_text() == "scheme-expressive"
+
+    def test_saved_scheme_is_loaded(self, env, tmp_path):
+        selector, *_ = env
+        (tmp_path / "matugen-scheme").write_text("scheme-expressive\n")
+        assert selector._load_scheme() == "scheme-expressive"
+
+    @pytest.mark.parametrize("content", [None, "", "scheme-bogus"])
+    def test_missing_or_unknown_scheme_falls_back_to_tonal_spot(self, env, tmp_path, content):
+        selector, *_ = env
+        if content is not None:
+            (tmp_path / "matugen-scheme").write_text(content)
+        assert selector._load_scheme() == "scheme-tonal-spot"
 
     def test_scheme_change_reapplies_current_wallpaper(self, env):
         selector, commands, _, fire, wall = env

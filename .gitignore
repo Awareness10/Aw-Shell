@@ -14,6 +14,7 @@ config/hypr/colors.lua
 config/colors.json
 config/hypr/hypridle.conf
 config/matugen/matugen-state
+config/matugen/matugen-scheme
 
 Aw-Shell.code-workspace
 

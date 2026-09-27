@@ -27,6 +27,7 @@ DEFAULT_FACE_ICON = CONFIG_DIR / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.
 DEFAULT_WALLPAPER = CONFIG_DIR / f"{APP_NAME}" / "assets" / "wallpapers_example" / "ax-red.jpg"
 
 MATUGEN_STATE_FILE = AW_CONFIG_DIR / "matugen" / "matugen-state"
+MATUGEN_SCHEME_FILE = AW_CONFIG_DIR / "matugen" / "matugen-scheme"
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()
