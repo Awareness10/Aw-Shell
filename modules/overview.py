@@ -19,7 +19,7 @@ import modules.icons as icons
 from utils.icon_resolver import IconResolver
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, Gtk
+from gi.repository import Gdk, GLib, Gtk
 
 screen = Gdk.Screen.get_default()
 CURRENT_WIDTH = screen.get_width()
@@ -55,6 +55,32 @@ def focus_window(address: str) -> None:
 
 def close_window(address: str) -> None:
     connection.send_command(f'/dispatch hl.dsp.window.close({{ window = "address:{address}" }})')
+
+
+# How long an app gets to close before we assume it's asking for confirmation
+CLOSE_CONFIRM_DELAY_MS = 400
+
+
+def window_exists(address: str) -> bool:
+    clients = json.loads(connection.send_command("j/clients").reply.decode())
+    return any(client.get("address") == address for client in clients)
+
+
+def request_close(address: str, notch) -> None:
+    """Ask a window to close. Apps may ask for confirmation first (e.g. kitty
+    with a program running); that prompt can't get keyboard focus while the
+    overview is open, so if the window is still there, close the overview and
+    focus it."""
+    close_window(address)
+
+    def focus_if_still_open() -> bool:
+        if window_exists(address):
+            if hasattr(notch, "close_notch"):
+                notch.close_notch()
+            focus_window(address)
+        return False
+
+    GLib.timeout_add(CLOSE_CONFIRM_DELAY_MS, focus_if_still_open)
 
 
 def move_window_to_workspace(address: str, workspace_id: int) -> None:
@@ -118,7 +144,7 @@ class HyprlandWindowButton(Button):
             tooltip_text=title,
             size=size,
             on_clicked=self.on_button_click,
-            on_button_press_event=lambda _, event: close_window(address)
+            on_button_press_event=lambda _, event: request_close(address, self.get_toplevel())
             if event.button == 3
             else None,
             on_drag_data_get=lambda _s, _c, data, *_: data.set_text(
@@ -143,7 +169,7 @@ class HyprlandWindowButton(Button):
     def on_key_press_event(self, widget, event):
         if event.get_state() & Gdk.ModifierType.SHIFT_MASK:
             if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
-                close_window(self.address)
+                request_close(self.address, self.get_toplevel())
                 return True
         return False
 
