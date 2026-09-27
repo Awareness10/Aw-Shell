@@ -6,6 +6,7 @@ the update process via QProcess. No GTK dependencies.
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -37,6 +38,9 @@ REMOTE_VERSION_FILE = "/tmp/remote_version.json"
 REMOTE_URL = (
     "https://raw.githubusercontent.com/awareness10/Aw-Shell/"
     "refs/heads/main/version.json"
+)
+REMOTE_API_URL = (
+    "https://api.github.com/repos/awareness10/Aw-Shell/contents/version.json?ref=main"
 )
 REPO_DIR = str(_PROJECT_DIR)
 
@@ -70,15 +74,26 @@ def get_disable_file_path() -> str:
     return os.path.join(get_cache_dir(), UPDATER_DISABLE_FILE_NAME)
 
 
+def _curl(url: str, *extra: str) -> int:
+    return subprocess.run(
+        ["curl", "-sL", "--fail", "--connect-timeout", "10", *extra,
+         url, "-o", REMOTE_VERSION_FILE],
+        check=False,
+        timeout=15,
+    ).returncode
+
+
 def fetch_remote_version() -> None:
-    """Download the remote version.json with curl."""
+    """Download the remote version.json with curl.
+
+    raw.githubusercontent caches which commit a branch points to for minutes,
+    so a release could go unnoticed for a while; the contents API is at most
+    a minute behind. Unauthenticated it allows 60 requests an hour per IP, so
+    fall back to the raw file (with a cache-busting query) if it refuses.
+    """
     try:
-        subprocess.run(
-            ["curl", "-sL", "--connect-timeout", "10",
-             REMOTE_URL, "-o", REMOTE_VERSION_FILE],
-            check=False,
-            timeout=15,
-        )
+        if _curl(REMOTE_API_URL, "-H", "Accept: application/vnd.github.raw+json") != 0:
+            _curl(f"{REMOTE_URL}?t={int(time.time())}")
     except subprocess.TimeoutExpired:
         print("Error: curl timed out while fetching the remote version.")
     except FileNotFoundError:
@@ -120,6 +135,26 @@ def parse_releases(data: dict) -> list[dict]:
     if not changelog:
         return []
     return [{"version": data.get("version", "0.0.0"), "changes": list(changelog)}]
+
+
+_CHANGE_TYPE_RE = re.compile(r"\s*<b>([^<:]+):</b>\s*(.*)", re.DOTALL)
+
+# (text, background) theme colors for each change type's tag, taken from the
+# matugen palette so tags follow the wallpaper; other types stay neutral
+CHANGE_TYPE_COLORS = {
+    "feat": ("tertiary", "tertiary_container"),
+    "fix": ("secondary", "secondary_container"),
+    "hotfix": ("secondary", "secondary_container"),
+    "perf": ("accent_text", "surface_variant"),
+}
+
+
+def split_change(change: str) -> tuple[str | None, str]:
+    """Split ``"<b>fix:</b> text"`` into ``("fix", "text")``."""
+    match = _CHANGE_TYPE_RE.match(change)
+    if not match:
+        return None, change
+    return match.group(1).strip(), match.group(2)
 
 
 def new_versions(releases: list[dict], current_version: str) -> set[str]:
@@ -416,6 +451,10 @@ class UpdaterWindow(FramelessMainWindow):
 
     def get_extra_stylesheet(self) -> str:
         t = get_current_theme()
+        tag_colors = "\n".join(
+            f"#changeTag_{kind} {{ color: {getattr(t, fg)}; background-color: {getattr(t, bg)}; }}"
+            for kind, (fg, bg) in CHANGE_TYPE_COLORS.items()
+        )
         return get_dialog_stylesheet() + f"""
             #updaterTitle {{
                 font-size: 20px;
@@ -456,6 +495,15 @@ class UpdaterWindow(FramelessMainWindow):
                 font-weight: bold;
                 color: {t.accent_text};
             }}
+            QLabel[objectName^="changeTag_"] {{
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+                padding: 1px 4px;
+                color: {t.text_secondary};
+                background-color: {t.surface_variant};
+            }}
+            {tag_colors}
             #updaterLog {{
                 font-family: monospace;
                 background-color: {t.bg_tertiary};
@@ -499,16 +547,36 @@ class UpdaterWindow(FramelessMainWindow):
             header.setObjectName("releaseHeaderNew" if is_new else "releaseHeader")
             block_layout.addWidget(header)
 
-            changes = QLabel("<br>".join(f"&bull; {c}" for c in release["changes"]))
-            changes.setTextFormat(Qt.TextFormat.RichText)
-            changes.setWordWrap(True)
-            changes.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            block_layout.addWidget(changes)
+            for change in release["changes"]:
+                block_layout.addLayout(self._build_change_row(change))
 
             layout.addWidget(block)
 
         layout.addStretch(1)
         return self.changelog_widget
+
+    @staticmethod
+    def _build_change_row(change: str) -> QHBoxLayout:
+        """A change as its own row: a colored type tag, then the text in its
+        own column so wrapped lines stay aligned."""
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 2, 0, 2)
+        row.setSpacing(8)
+
+        change_type, text = split_change(change)
+        tag = QLabel(change_type or "\u2022")
+        tag.setObjectName(f"changeTag_{change_type}" if change_type else "changeBullet")
+        tag.setFixedWidth(52)
+        tag.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        row.addWidget(tag, 0, Qt.AlignmentFlag.AlignTop)
+
+        label = QLabel(text)
+        label.setObjectName("changeText")
+        label.setTextFormat(Qt.TextFormat.RichText)
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        row.addWidget(label, 1)
+        return row
 
     # -- Button handlers --
 

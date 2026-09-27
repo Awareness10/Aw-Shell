@@ -95,6 +95,30 @@ class TestGetRemoteVersion:
             assert pkg_update is True
 
 
+class TestFetchRemoteVersion:
+    """Regression: raw.githubusercontent caches which commit a branch points
+    to for minutes (a cache-busting query string doesn't help), so right after
+    a release the updater still saw the previous version.json."""
+
+    def test_reads_through_github_api(self):
+        from modules.updater import REMOTE_API_URL, fetch_remote_version
+        with patch("modules.updater.subprocess.run", return_value=MagicMock(returncode=0)) as run:
+            fetch_remote_version()
+        assert run.call_count == 1
+        cmd = run.call_args.args[0]
+        assert REMOTE_API_URL in cmd and "--fail" in cmd
+        assert "Accept: application/vnd.github.raw+json" in cmd
+
+    def test_falls_back_to_raw_url_when_api_fails(self):
+        from modules.updater import REMOTE_URL, fetch_remote_version
+        with patch("modules.updater.subprocess.run",
+                   side_effect=[MagicMock(returncode=22), MagicMock(returncode=0)]) as run, \
+                patch("modules.updater.time.time", return_value=1790000000.5):
+            fetch_remote_version()
+        assert run.call_count == 2
+        assert f"{REMOTE_URL}?t=1790000000" in run.call_args.args[0]
+
+
 class TestParseReleases:
     def test_grouped_releases(self):
         from modules.updater import parse_releases
@@ -222,6 +246,26 @@ class TestGroupedChangelog:
                             pkg_update=False, current_version="1.2.6")
         assert _headers(win)["v1.2.6 (new)"] == "releaseHeaderNew"
         assert "v1.2.5" in _headers(win)
+        win.close()
+
+
+class TestChangeRows:
+    def test_split_change(self):
+        from modules.updater import split_change
+        assert split_change("<b>fix:</b> Mic icon shows again") == ("fix", "Mic icon shows again")
+        assert split_change("Plain entry") == (None, "Plain entry")
+
+    def test_each_change_is_its_own_row_with_type_tag(self, qapp):
+        from PySide6.QtWidgets import QLabel
+        from modules.updater import UpdaterWindow
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=False, current_version="1.2.4")
+        tags = {l.text(): l.objectName() for l in win.changelog_widget.findChildren(QLabel)
+                if l.objectName().startswith("changeTag")}
+        assert tags == {"feat": "changeTag_feat", "fix": "changeTag_fix"}
+        texts = [l.text() for l in win.changelog_widget.findChildren(QLabel)
+                 if l.objectName() == "changeText"]
+        assert texts == ["Newest", "Middle", "Installed"]
         win.close()
 
 
