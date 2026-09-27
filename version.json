@@ -68,6 +68,25 @@
       ]
     },
     {
+      "version": "1.2.0",
+      "changes": [
+        "<b>update:</b> Hyprland config migrated to Lua (hyprland.lua + generated aw-shell.lua), requires Hyprland 0.56.2+",
+        "<b>update:</b> Matugen also writes Lua colors (colors.lua) for the Hyprland config",
+        "<b>fix:</b> Wallpaper daemon (awww) no longer crashes at login"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "changes": [
+        "<b>feat:</b> Logitech mouse battery ring in the bar",
+        "<b>feat:</b> Lua config for Hyprland 0.55+ (first step of the Lua migration)",
+        "<b>fix:</b> Weather widget stays hidden until weather data is available",
+        "<b>fix:</b> Valid rgba syntax for the window shadow color",
+        "<b>test:</b> Weather tests and higher coverage; CI runs tests with Glaze and headless GL",
+        "<b>update:</b> Dependencies updated"
+      ]
+    },
+    {
       "version": "1.0.5",
       "changes": [
         "<b>update:</b> Added regression tests for the latest breaking changes, updated to use .venv-python"
