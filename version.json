@@ -1,7 +1,17 @@
 {
-  "version": "1.2.6",
+  "version": "1.2.7",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.7",
+      "changes": [
+        "<b>feat:</b> Color scheme changes apply immediately, and the chosen scheme is remembered",
+        "<b>feat:</b> Full theme palette is written to config/colors.json so other tools (e.g. matuwrap terminal colors) follow aw-shell's theme",
+        "<b>feat:</b> Updater changelog is grouped by version with new versions marked; <code>--preview</code> opens it safely for inspection",
+        "<b>fix:</b> Closing a window from the overview focuses it when the app asks for confirmation",
+        "<b>update:</b> Fabric and other dependencies updated"
+      ]
+    },
     {
       "version": "1.2.6",
       "changes": [
@@ -94,7 +104,10 @@
     }
   ],
   "changelog": [
-    "<b>feat:</b> Window border colors follow a new wallpaper instantly, no Hyprland reload needed",
-    "<b>fix:</b> Dashboard microphone icon shows again"
+    "<b>feat:</b> Color scheme changes apply immediately, and the chosen scheme is remembered",
+    "<b>feat:</b> Full theme palette is written to config/colors.json so other tools (e.g. matuwrap terminal colors) follow aw-shell's theme",
+    "<b>feat:</b> Updater changelog is grouped by version with new versions marked; <code>--preview</code> opens it safely for inspection",
+    "<b>fix:</b> Closing a window from the overview focuses it when the app asks for confirmation",
+    "<b>update:</b> Fabric and other dependencies updated"
   ]
 }
