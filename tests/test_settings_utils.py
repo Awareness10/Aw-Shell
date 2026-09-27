@@ -678,6 +678,21 @@ class TestEnsureMatugenConfig:
         assert f"hyprctl eval '{APPLY_COLORS_FN}()'" in hook
         assert "reload" not in hook
 
+    def test_writes_full_palette_json_for_other_tools(self, matugen_env):
+        """matuwrap (wrp) reads this file so the terminal follows aw-shell's
+        scheme/custom color instead of recomputing tonal-spot colors."""
+        import toml
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        matugen_config = config_dir / "matugen" / "config.toml"
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.os.path.expanduser",
+                       return_value=str(matugen_config)):
+                with patch("config.settings_utils.exec_shell_command_async"):
+                    ensure_matugen_config()
+        template = toml.loads(matugen_config.read_text())["templates"]["aw-shell-colors-json"]
+        assert template["input_path"].endswith("/matugen/templates/colors.json")
+        assert template["output_path"] == f"{aw_dir}/colors.json"
+
     def test_merges_with_existing_config(self, matugen_env):
         import toml
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env

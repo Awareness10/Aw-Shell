@@ -220,6 +220,12 @@ def ensure_matugen_config():
                 # Update window border colors over IPC instead of a full reload
                 "post_hook": f"hyprctl eval '{APPLY_COLORS_FN}()' &",
             },
+            # Full palette for other tools (matuwrap/wrp terminal colors), so
+            # they follow the scheme or custom color picked in aw-shell
+            f"{APP_NAME}-colors-json": {
+                "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/colors.json",
+                "output_path": f"{str(AW_CONFIG_DIR)}/colors.json",
+            },
             f"{APP_NAME}": {
                 "input_path": f"{str(AW_CONFIG_DIR)}/matugen/templates/{APP_NAME}.css",
                 "output_path": f"~/.config/{APP_NAME}/styles/colors.css",
