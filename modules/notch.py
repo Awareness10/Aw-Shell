@@ -1230,11 +1230,15 @@ class Notch(Window):
         return True
 
     def _get_monitor_name(self):
-        """Connector name of this notch's monitor, or None if unknown."""
-        if self.monitor_manager is None:
+        """Connector name of this notch's monitor, or None if unknown.
+
+        The window is placed by GDK monitor index, which doesn't follow the
+        monitor manager's origin-sorted ids, so resolve the name the same way.
+        """
+        screen = Gdk.Screen.get_default()
+        if screen is None or not 0 <= self.monitor_id < screen.get_n_monitors():
             return None
-        monitor = self.monitor_manager.get_monitor_by_id(self.monitor_id)
-        return monitor.get("name") if monitor else None
+        return screen.get_monitor_plug_name(self.monitor_id)
     
     def force_occlusion(self):
         """Force notch to occlusion mode (hidden)."""
