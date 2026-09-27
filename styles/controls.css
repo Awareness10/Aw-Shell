@@ -60,7 +60,8 @@
 #button-volume,
 #button-mic,
 #button-brightness,
-#button-mouse-battery {
+#button-mouse-battery,
+#button-headset-battery {
   color: var(--surface-bright);
   border: 3px solid var(--primary);
 }
@@ -71,7 +72,8 @@
   border: 3px solid var(--outline);
 }
 
-#button-mouse-battery.alert {
+#button-mouse-battery.alert,
+#button-headset-battery.alert {
   border: 3px solid var(--red-dim);
 }
 

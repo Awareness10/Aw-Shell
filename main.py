@@ -16,12 +16,14 @@ from modules.corners import Corners
 from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
+from utils.tooltips import install_tooltip_dedup
 import subprocess as _sp
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
 
 if __name__ == "__main__":
     setproctitle.setproctitle(APP_NAME)
+    install_tooltip_dedup()
 
     if not os.path.isfile(CONFIG_FILE):
         config_script_path = get_relative_path("config/config.py")

@@ -21,7 +21,7 @@ from modules.power import PowerMenu
 from modules.tmux import TmuxManager
 from modules.tools import Toolbox
 from utils.icon_resolver import IconResolver
-from utils.occlusion import check_occlusion
+from utils.occlusion import OcclusionWatcher
 from widgets.wayland import WaylandWindow as Window
 
 
@@ -509,7 +509,12 @@ class Notch(Window):
 
         self._current_window_class = self._get_current_window_class()
 
-        # Always enable occlusion detection for fullscreen windows
+        # Always enable occlusion detection for fullscreen windows. The watcher
+        # reacts to Hyprland events; the timer only re-applies its cached state
+        # after hover/open state changes
+        self._monitor_name = self._get_monitor_name()
+        self._occlusion_watcher = OcclusionWatcher.get()
+        self._occlusion_watcher.connect(self._check_occlusion)
         GLib.timeout_add(500, self._check_occlusion)
 
         if data.PANEL_THEME == "Notch":
@@ -1215,17 +1220,25 @@ class Notch(Window):
         and update the notch_revealer accordingly.
         """
 
-        occlusion_edge = "top"
-        occlusion_size = 40
-
         if self._forced_occlusion:
             # When forced occlusion is active, show only on hover
             self.notch_revealer.set_reveal_child(self.is_hovered)
         elif not (self.is_hovered or self._is_notch_open or self._prevent_occlusion):
-            is_occluded = check_occlusion((occlusion_edge, occlusion_size))
+            is_occluded = self._occlusion_watcher.is_occluded(self._monitor_name)
             self.notch_revealer.set_reveal_child(not is_occluded)
 
         return True
+
+    def _get_monitor_name(self):
+        """Connector name of this notch's monitor, or None if unknown.
+
+        The window is placed by GDK monitor index, which doesn't follow the
+        monitor manager's origin-sorted ids, so resolve the name the same way.
+        """
+        screen = Gdk.Screen.get_default()
+        if screen is None or not 0 <= self.monitor_id < screen.get_n_monitors():
+            return None
+        return screen.get_monitor_plug_name(self.monitor_id)
     
     def force_occlusion(self):
         """Force notch to occlusion mode (hidden)."""

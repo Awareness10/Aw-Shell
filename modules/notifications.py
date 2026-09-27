@@ -1362,7 +1362,6 @@ class NotificationContainer(Box):
             logger.error(f"Error cleaning up the container: {e}")
         finally:
             self._is_destroying = False
-            return False
 
     def pause_and_reset_all_timeouts(self):
         if self._is_destroying:

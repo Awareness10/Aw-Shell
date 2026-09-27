@@ -1,3 +1,5 @@
+import json
+import shutil
 from abc import abstractmethod
 from typing import Optional, Callable
 
@@ -9,7 +11,7 @@ from fabric.widgets.eventbox import EventBox
 from fabric.widgets.label import Label
 from fabric.widgets.overlay import Overlay
 from fabric.widgets.scale import Scale
-from gi.repository import Gdk, GLib
+from gi.repository import Gdk, Gio, GLib
 
 import config.data as data
 import modules.icons as icons
@@ -371,15 +373,67 @@ class MicSmall(BaseSmallControl):
         self.control_button.get_child().set_markup(icon)
 
 
-class MouseBattery(BaseSmallControl):
-    DEVICE_TYPE_MOUSE = 5
-    STATE_CHARGING = 1
+class DeviceBattery(BaseSmallControl):
+    """Battery ring for a peripheral. Subclasses fetch a reading and pass
+    (percentage, charging, model) or None to _show_reading."""
     LOW_THRESHOLD = 15
     POLL_INTERVAL_SECONDS = 30
 
-    def __init__(self, **kwargs):
-        super().__init__("button-bar-mouse-battery", "button-mouse-battery", icons.battery, **kwargs)
+    def __init__(self, name: str, progress_name: str, icon: str, **kwargs):
+        super().__init__(name, progress_name, icon, **kwargs)
+        self._icon = icon
         self._poll_source_id = None
+
+    def _start_polling(self) -> None:
+        self._poll_source_id = GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self._update)
+        # One-shot: _update returns True to keep the timeout alive, which
+        # would make a bare idle_add re-run it on every main-loop iteration
+        GLib.idle_add(lambda: self._update() and False)
+
+    def _update(self) -> bool:
+        raise NotImplementedError
+
+    def _on_scroll(self, widget, event) -> None:
+        return None
+
+    def _show_reading(self, reading) -> None:
+        if reading is None:
+            self.set_visible(False)
+            return
+
+        percentage, is_charging, model = reading
+        self.set_visible(True)
+        self.progress_bar.value = percentage / 100
+
+        is_low = percentage <= self.LOW_THRESHOLD and not is_charging
+
+        if is_charging:
+            self.control_label.set_markup(icons.charging)
+        elif is_low:
+            self.control_label.set_markup(icons.alert)
+        else:
+            self.control_label.set_markup(self._icon)
+
+        style_op_bar = self.progress_bar.add_style_class if is_low else self.progress_bar.remove_style_class
+        style_op_lbl = self.control_label.add_style_class if is_low else self.control_label.remove_style_class
+        style_op_bar("alert")
+        style_op_lbl("alert")
+
+        self.set_tooltip_text(f"{model}: {round(percentage)}%")
+
+    def destroy(self) -> None:
+        if self._poll_source_id:
+            GLib.source_remove(self._poll_source_id)
+            self._poll_source_id = None
+        super().destroy()
+
+
+class MouseBattery(DeviceBattery):
+    DEVICE_TYPE_MOUSE = 5
+    STATE_CHARGING = 1
+
+    def __init__(self, **kwargs):
+        super().__init__("button-bar-mouse-battery", "button-mouse-battery", icons.mouse, **kwargs)
         try:
             self.upower = UPowerManager()
             self.device_path = self._find_mouse_device()
@@ -391,8 +445,7 @@ class MouseBattery(BaseSmallControl):
             self.set_visible(False)
             return
 
-        self._poll_source_id = GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self._update)
-        GLib.idle_add(self._update)
+        self._start_polling()
 
     def _find_mouse_device(self):
         for path in self.upower.detect_devices():
@@ -401,49 +454,133 @@ class MouseBattery(BaseSmallControl):
                 return path
         return None
 
-    def _on_scroll(self, widget, event) -> None:
-        return None
-
-    def _update(self) -> bool:
+    def _read_info(self):
         try:
             info = self.upower.get_full_device_information(self.device_path)
+            if info.get("IsPresent", False):
+                return info
+            # The receiver re-enumerates the mouse under a new path on reconnect
+            self.device_path = self._find_mouse_device() or self.device_path
+            info = self.upower.get_full_device_information(self.device_path)
         except Exception:
-            self.set_visible(False)
+            return None
+        return info if info.get("IsPresent", False) else None
+
+    def _update(self) -> bool:
+        info = self._read_info()
+        if info is None:
+            self._show_reading(None)
             return True
 
-        if not info.get("IsPresent", False):
-            self.set_visible(False)
-            return True
-
-        percentage = float(info.get("Percentage", 0))
-        state = int(info.get("State", 0))
-        model = (info.get("Model") or "").strip() or "Mouse"
-
-        self.set_visible(True)
-        self.progress_bar.value = percentage / 100
-
-        is_charging = state == self.STATE_CHARGING
-        is_low = percentage <= self.LOW_THRESHOLD and not is_charging
-
-        if is_charging:
-            self.control_label.set_markup(icons.charging)
-        elif is_low:
-            self.control_label.set_markup(icons.alert)
-        else:
-            self.control_label.set_markup(icons.battery)
-
-        style_op_bar = self.progress_bar.add_style_class if is_low else self.progress_bar.remove_style_class
-        style_op_lbl = self.control_label.add_style_class if is_low else self.control_label.remove_style_class
-        style_op_bar("alert")
-        style_op_lbl("alert")
-
-        self.set_tooltip_text(f"{model}: {round(percentage)}%")
+        self._show_reading((
+            float(info.get("Percentage", 0)),
+            int(info.get("State", 0)) == self.STATE_CHARGING,
+            (info.get("Model") or "").strip() or "Mouse",
+        ))
         return True
 
-    def destroy(self) -> None:
-        if self._poll_source_id:
+
+class HeadsetBatteryMonitor:
+    """Single headsetcontrol poller shared by every bar's HeadsetBattery.
+    Concurrent queries to the dongle collide and both read back 0%, so
+    only one may run at a time."""
+    POLL_INTERVAL_SECONDS = 30
+    _instance = None
+
+    @classmethod
+    def get(cls) -> "HeadsetBatteryMonitor":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        self._listeners = []
+        self._reading = None
+        self._in_flight = False
+        self._poll_source_id = None
+
+    def subscribe(self, callback) -> None:
+        self._listeners.append(callback)
+        callback(self._reading)
+        if self._poll_source_id is None:
+            self._poll_source_id = GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self._poll)
+            self._poll()
+
+    def unsubscribe(self, callback) -> None:
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+        if not self._listeners and self._poll_source_id is not None:
             GLib.source_remove(self._poll_source_id)
             self._poll_source_id = None
+
+    def _poll(self) -> bool:
+        # headsetcontrol talks to the dongle over HID and can take a while;
+        # run it async so it never stalls the main loop
+        if self._in_flight:
+            return True
+        self._in_flight = True
+        try:
+            proc = Gio.Subprocess.new(
+                ["headsetcontrol", "-b", "-o", "json"],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE,
+            )
+            proc.communicate_utf8_async(None, None, self._on_output)
+        except GLib.Error:
+            self._in_flight = False
+            self._publish(None)
+        return True
+
+    def _on_output(self, proc, result) -> None:
+        self._in_flight = False
+        try:
+            _, stdout, _ = proc.communicate_utf8_finish(result)
+            reading = self._parse(stdout)
+        except (GLib.Error, ValueError):
+            reading = None
+        # A 0% reading means the query collided with another headsetcontrol
+        # run (e.g. from a terminal); keep the last good value instead
+        if reading is not None and reading[0] <= 0 and self._reading is not None:
+            return
+        self._publish(reading)
+
+    def _publish(self, reading) -> None:
+        self._reading = reading
+        for callback in list(self._listeners):
+            callback(reading)
+
+    @staticmethod
+    def _parse(stdout):
+        # Headset powered off (dongle still plugged in) reports BATTERY_UNAVAILABLE
+        for device in json.loads(stdout or "{}").get("devices", []):
+            battery = device.get("battery") or {}
+            status = battery.get("status")
+            if status not in ("BATTERY_AVAILABLE", "BATTERY_CHARGING"):
+                continue
+            level = battery.get("level", -1)
+            if level < 0:
+                continue
+            model = device.get("device") or device.get("product") or "Headset"
+            return float(level), status == "BATTERY_CHARGING", model
+        return None
+
+
+class HeadsetBattery(DeviceBattery):
+    """USB-dongle headsets UPower doesn't see, read via headsetcontrol."""
+
+    def __init__(self, **kwargs):
+        super().__init__("button-bar-headset-battery", "button-headset-battery", icons.headset, **kwargs)
+        self._monitor = None
+        self.set_no_show_all(True)
+        self.set_visible(False)
+        if shutil.which("headsetcontrol") is None:
+            return
+        self._monitor = HeadsetBatteryMonitor.get()
+        self._monitor.subscribe(self._show_reading)
+
+    def destroy(self) -> None:
+        if self._monitor is not None:
+            self._monitor.unsubscribe(self._show_reading)
+            self._monitor = None
         super().destroy()
 
 
@@ -737,7 +874,7 @@ class ControlSmall(Box):
         children = []
         if brightness.screen_brightness != -1:
             children.append(BrightnessSmall())
-        children.extend([VolumeSmall(), MicSmall(), MouseBattery()])
+        children.extend([VolumeSmall(), MicSmall(), MouseBattery(), HeadsetBattery()])
         super().__init__(
             name="control-small",
             orientation="h" if not data.VERTICAL else "v",

@@ -122,6 +122,8 @@ mic_mute: str = "&#xed16;"
 
 speaker: str = "&#x10045;"
 headphones: str = "&#xfa3c;"
+headset: str = "&#xeb90;"
+mouse: str = "&#xeaf9;"
 mic_filled: str = "&#xfe0f;"
 
 # Overview
