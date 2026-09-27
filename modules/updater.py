@@ -73,9 +73,11 @@ def get_disable_file_path() -> str:
 def fetch_remote_version() -> None:
     """Download the remote version.json with curl."""
     try:
+        # raw.githubusercontent caches files for 5 minutes; a unique query
+        # string skips that, so a release shows up right after it's pushed
         subprocess.run(
             ["curl", "-sL", "--connect-timeout", "10",
-             REMOTE_URL, "-o", REMOTE_VERSION_FILE],
+             f"{REMOTE_URL}?t={int(time.time())}", "-o", REMOTE_VERSION_FILE],
             check=False,
             timeout=15,
         )

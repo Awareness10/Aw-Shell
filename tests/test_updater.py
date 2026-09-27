@@ -95,6 +95,17 @@ class TestGetRemoteVersion:
             assert pkg_update is True
 
 
+class TestFetchRemoteVersion:
+    def test_bypasses_cdn_cache(self):
+        """Regression: raw.githubusercontent caches for 5 minutes, so right
+        after a release the updater still saw the previous version.json."""
+        from modules.updater import REMOTE_URL, fetch_remote_version
+        with patch("modules.updater.subprocess.run") as run, \
+                patch("modules.updater.time.time", return_value=1790000000.5):
+            fetch_remote_version()
+        assert f"{REMOTE_URL}?t=1790000000" in run.call_args.args[0]
+
+
 class TestParseReleases:
     def test_grouped_releases(self):
         from modules.updater import parse_releases
