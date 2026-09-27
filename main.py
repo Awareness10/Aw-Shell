@@ -93,7 +93,10 @@ if __name__ == "__main__":
     
     # Create application components list
     app_components = []
-    notification = None
+    notches = {}
+
+    # The main monitor holds workspace 1; notifications start there
+    primary_monitor_id = monitor_manager.get_primary_monitor_id() if monitor_manager else 0
     
     # Create components for each monitor
     for monitor in monitors:
@@ -120,11 +123,8 @@ if __name__ == "__main__":
         bar.notch = notch
         notch.bar = bar
         
-        # Create notification popup for the first monitor only
-        if monitor_id == 0:
-            notification = NotificationPopup(widgets=notch.dashboard.widgets)
-            app_components.append(notification)
-        
+        notches[monitor_id] = notch
+
         # Register instances in monitor manager if available
         if multi_monitor_enabled and monitor_manager:
             monitor_manager.register_monitor_instances(monitor_id, {
@@ -136,6 +136,16 @@ if __name__ == "__main__":
         
         # Add components to app list
         app_components.extend([bar, notch, dock])
+
+    # One notification popup, sharing the main monitor's notch widgets; the
+    # first shown monitor stands in if the main one isn't selected. It starts
+    # there and follows focus to any shown monitor as notifications arrive
+    popup_monitor_id = primary_monitor_id if primary_monitor_id in notches else next(iter(notches))
+    app_components.append(NotificationPopup(
+        widgets=notches[popup_monitor_id].dashboard.widgets,
+        monitor=popup_monitor_id if multi_monitor_enabled else None,
+        follow_focus_monitors=list(notches) if multi_monitor_enabled else None,
+    ))
 
     # Create the application with all components
     app = Application(f"{APP_NAME}", *app_components)

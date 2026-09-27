@@ -1115,9 +1115,12 @@ class NotificationContainer(Box):
         self,
         notification_history_instance: NotificationHistory,
         revealer_transition_type: str = "slide-down",
+        before_show=None,
     ):
         super().__init__(name="notification-container-main", orientation="v", spacing=4)
         self.notification_history = notification_history_instance
+        # Called when a notification arrives while none are on screen
+        self._before_show = before_show
 
         self._server = Notifications()
         self._server.connect("notification-added", self.on_new_notification)
@@ -1205,6 +1208,9 @@ class NotificationContainer(Box):
                 cache_notification_pixbuf(new_box)
             notification_history_instance.add_notification(new_box)
             return
+
+        if not self.notifications and self._before_show:
+            self._before_show()
 
         notification = fabric_notif.get_notification_from_id(id)
         new_box = NotificationBox(notification)
@@ -1407,6 +1413,7 @@ class NotificationPopup(Window):
             layer="top",
             keyboard_mode="none",
             exclusivity="none",
+            monitor=kwargs.get("monitor"),
             visible=True,
             all_visible=True,
         )
@@ -1416,9 +1423,12 @@ class NotificationPopup(Window):
         self.notification_history = (
             self.widgets.notification_history if self.widgets else NotificationHistory()
         )
+        # Monitors the popup may follow focus to; None keeps it where it is
+        self._follow_focus_monitors = kwargs.get("follow_focus_monitors")
         self.notification_container = NotificationContainer(
             notification_history_instance=self.notification_history,
             revealer_transition_type="slide-down" if y_pos == "top" else "slide-up",
+            before_show=self._move_to_focused_monitor,
         )
 
         self.show_box = Box()
@@ -1431,3 +1441,17 @@ class NotificationPopup(Window):
                 children=[self.notification_container, self.show_box],
             )
         )
+
+    def _move_to_focused_monitor(self):
+        """Show new notifications on the monitor in use.
+
+        Only runs while none are on screen, so a visible stack never jumps
+        between monitors.
+        """
+        if not self._follow_focus_monitors:
+            return
+        from utils.monitor_manager import get_monitor_manager
+
+        monitor_id = get_monitor_manager().query_focused_monitor_id()
+        if monitor_id in self._follow_focus_monitors and monitor_id != self.monitor:
+            self.monitor = monitor_id

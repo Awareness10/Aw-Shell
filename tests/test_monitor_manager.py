@@ -36,12 +36,26 @@ def _hyprctl_result(stdout: str):
     return result
 
 
-def _make_manager(hyprctl_stdout: str) -> MonitorManager:
-    """Create a fresh MonitorManager with mocked hyprctl output."""
+def _gdk_screen(plug_names):
+    """Gdk.Screen stand-in whose monitors have these connector names, in order."""
+    screen = MagicMock()
+    screen.get_n_monitors.return_value = len(plug_names)
+    screen.get_monitor_plug_name.side_effect = lambda i: plug_names[i]
+    return screen
+
+
+def _make_manager(hyprctl_stdout: str, gdk_plug_names=None) -> MonitorManager:
+    """Create a fresh MonitorManager with mocked hyprctl output.
+
+    Without gdk_plug_names, GDK exposes no connector names (the mocked gi).
+    """
     # Reset singleton
     MonitorManager._instance = None
 
-    with patch("utils.monitor_manager.subprocess.run", return_value=_hyprctl_result(hyprctl_stdout)):
+    screen = _gdk_screen(gdk_plug_names) if gdk_plug_names is not None else None
+    result = _hyprctl_result(hyprctl_stdout)
+    with patch("utils.monitor_manager.subprocess.run", return_value=result), \
+         patch("utils.monitor_manager.Gdk.Screen.get_default", return_value=screen):
         mgr = MonitorManager()
     return mgr
 
@@ -71,19 +85,13 @@ def reset_singleton():
 
 class TestMonitorDetection:
 
-    def test_triple_monitor_sorted_by_distance(self):
+    def test_ids_follow_hyprland_ids_without_gdk_names(self):
+        # Hyprland ids follow connection order too, like GDK's
         mgr = _make_manager(TRIPLE_MONITOR)
         monitors = mgr.get_monitors()
-        assert len(monitors) == 3
-        # Primary (origin) should be id 0
-        assert monitors[0]["name"] == "HDMI-A-1"
-        assert monitors[0]["id"] == 0
-        # DP-1 at x=2560 should be id 1
-        assert monitors[1]["name"] == "DP-1"
-        assert monitors[1]["id"] == 1
-        # DP-2 at x=5120 should be id 2
-        assert monitors[2]["name"] == "DP-2"
-        assert monitors[2]["id"] == 2
+        assert [(m["id"], m["name"]) for m in monitors] == [
+            (0, "HDMI-A-1"), (1, "DP-1"), (2, "DP-2"),
+        ]
 
     def test_single_monitor(self):
         mgr = _make_manager(SINGLE_MONITOR)
@@ -92,13 +100,11 @@ class TestMonitorDetection:
         assert monitors[0]["name"] == "eDP-1"
         assert monitors[0]["scale"] == 1.25
 
-    def test_stacked_monitors_sorted_by_distance(self):
+    def test_stacked_monitors(self):
         mgr = _make_manager(STACKED_MONITORS)
         monitors = mgr.get_monitors()
-        # Origin monitor first
         assert monitors[0]["name"] == "DP-1"
         assert monitors[0]["y"] == 0
-        # Below monitor second
         assert monitors[1]["name"] == "DP-2"
         assert monitors[1]["y"] == 2160
 
@@ -595,3 +601,148 @@ class TestEdgeCases:
         with patch("utils.monitor_manager.subprocess.run", return_value=_hyprctl_result(TRIPLE_MONITOR)):
             mgr.refresh_monitors()
         assert len(mgr.get_monitors()) == 3
+
+
+# =========================================================================
+# Primary monitor (the one holding workspace 1)
+# =========================================================================
+
+# Mirrors a slow-to-wake main screen: it connects second, so Hyprland (and
+# GDK) number it 1, but workspace 1 is pinned to it
+LATE_MAIN_MONITORS = json.dumps([
+    {"name": "HDMI-A-1", "id": 0, "description": "AOC 24G1WG4 0x00010F5B",
+     "width": 1920, "height": 1080, "x": 3440, "y": 0, "scale": 1.0, "focused": False},
+    {"name": "DP-3", "id": 1, "description": "Microstep MAG 341C OLED",
+     "width": 3440, "height": 1440, "x": 0, "y": 0, "scale": 1.0, "focused": True},
+])
+GDK_PLUG_NAMES = ["HDMI-A-1", "DP-3"]  # GDK follows connection order
+
+
+def _hyprctl_by_command(workspaces=None, rules=None, monitors=LATE_MAIN_MONITORS):
+    """subprocess.run stand-in answering `hyprctl <cmd> -j` per command."""
+    outputs = {
+        "monitors": monitors,
+        "workspaces": json.dumps(workspaces or []),
+        "workspacerules": json.dumps(rules or []),
+    }
+
+    def run(cmd, *args, **kwargs):
+        return _hyprctl_result(outputs[cmd[1]])
+
+    return run
+
+
+def _primary(mgr, **hyprctl):
+    run = _hyprctl_by_command(**hyprctl)
+    with patch("utils.monitor_manager.subprocess.run", side_effect=run):
+        return mgr.get_primary_monitor_name(), mgr.get_primary_monitor_id()
+
+
+class TestPrimaryMonitor:
+    def test_monitor_holding_workspace_1(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        workspaces = [{"id": 2, "monitor": "HDMI-A-1"}, {"id": 1, "monitor": "DP-3"}]
+        assert _primary(mgr, workspaces=workspaces) == ("DP-3", 1)
+
+    def test_workspace_1_on_first_monitor(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        assert _primary(mgr, workspaces=[{"id": 1, "monitor": "HDMI-A-1"}]) == ("HDMI-A-1", 0)
+
+    def test_empty_workspace_1_uses_its_rule_by_description(self):
+        # Hyprland drops empty workspaces, so workspace 1 may not exist
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        rules = [{"workspaceString": "2", "monitor": "desc:AOC 24G1WG4"},
+                 {"workspaceString": "1", "monitor": "desc:Microstep MAG 341C OLED"}]
+        workspaces = [{"id": 4, "monitor": "DP-3"}]
+        assert _primary(mgr, workspaces=workspaces, rules=rules) == ("DP-3", 1)
+
+    def test_empty_workspace_1_uses_its_rule_by_name(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        rules = [{"workspaceString": "1", "monitor": "DP-3"}]
+        assert _primary(mgr, rules=rules) == ("DP-3", 1)
+
+    def test_rule_for_unknown_monitor_falls_back_to_0(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        rules = [{"workspaceString": "1", "monitor": "desc:Unplugged Screen"}]
+        assert _primary(mgr, rules=rules) == (None, 0)
+
+    def test_no_workspace_1_and_no_rule_falls_back_to_0(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        assert _primary(mgr, workspaces=[{"id": 3, "monitor": "DP-3"}]) == (None, 0)
+
+    def test_hyprctl_failure_falls_back_to_0(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        with patch("utils.monitor_manager.subprocess.run",
+                   side_effect=subprocess.CalledProcessError(1, "hyprctl")):
+            assert mgr.get_primary_monitor_name() is None
+            assert mgr.get_primary_monitor_id() == 0
+
+
+
+# =========================================================================
+# Ids are GDK monitor indices (what layer surfaces are placed by)
+# =========================================================================
+
+class TestGdkIds:
+    def test_late_main_monitor_keeps_its_gdk_index(self):
+        # DP-3 sits at the origin but connected second: GDK index 1
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        assert [(m["id"], m["name"]) for m in mgr.get_monitors()] == [
+            (0, "HDMI-A-1"), (1, "DP-3"),
+        ]
+        assert mgr.get_monitor_by_id(1)["width"] == 3440
+
+    def test_focused_id_is_gdk_index(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        assert mgr.get_focused_monitor_id() == 1
+        assert mgr.get_focused_monitor()["name"] == "DP-3"
+
+    def test_gdk_order_wins_over_hyprland_ids(self):
+        # Hyprland ids can drift from GDK order after a reconnect
+        hypr = json.dumps([
+            {"name": "DP-1", "id": 3, "width": 2560, "height": 1440, "x": 0, "y": 0},
+            {"name": "DP-2", "id": 1, "width": 1920, "height": 1080, "x": 2560, "y": 0},
+        ])
+        mgr = _make_manager(hypr, ["DP-1", "DP-2"])
+        assert [(m["id"], m["name"], m["hypr_id"]) for m in mgr.get_monitors()] == [
+            (0, "DP-1", 3), (1, "DP-2", 1),
+        ]
+
+    def test_monitor_unknown_to_gdk_is_skipped(self):
+        # Its surfaces couldn't be placed on it; they'd land on another screen
+        mgr = _make_manager(LATE_MAIN_MONITORS, ["DP-3"])
+        assert [(m["id"], m["name"]) for m in mgr.get_monitors()] == [(0, "DP-3")]
+
+    def test_monitor_id_by_name(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        assert mgr.get_monitor_id_by_name("DP-3") == 1
+        assert mgr.get_monitor_id_by_name("HDMI-A-1") == 0
+        assert mgr.get_monitor_id_by_name("DP-9") is None
+
+
+class TestQueryFocusedMonitor:
+    def _query(self, mgr, hyprctl_stdout=None, error=None):
+        if error:
+            kwargs = {"side_effect": error}
+        else:
+            kwargs = {"return_value": _hyprctl_result(hyprctl_stdout)}
+        with patch("utils.monitor_manager.subprocess.run", **kwargs):
+            return mgr.query_focused_monitor_id()
+
+    def test_focused_monitor_by_name(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        # DP-3 is second in hyprctl's list and GDK's; focus it, then HDMI
+        assert self._query(mgr, LATE_MAIN_MONITORS) == 1
+        focused_hdmi = json.loads(LATE_MAIN_MONITORS)
+        focused_hdmi[0]["focused"], focused_hdmi[1]["focused"] = True, False
+        assert self._query(mgr, json.dumps(focused_hdmi)) == 0
+
+    def test_unknown_focused_monitor(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, ["DP-3"])  # HDMI-A-1 skipped
+        focused_hdmi = json.loads(LATE_MAIN_MONITORS)
+        focused_hdmi[0]["focused"], focused_hdmi[1]["focused"] = True, False
+        assert self._query(mgr, json.dumps(focused_hdmi)) is None
+
+    def test_hyprctl_failure(self):
+        mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
+        assert self._query(mgr, error=FileNotFoundError) is None
