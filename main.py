@@ -1,9 +1,7 @@
 import os
+import subprocess as _sp
 import sys
 
-import gi
-
-gi.require_version("GLib", "2.0")
 import setproctitle
 from fabric import Application
 from fabric.utils import exec_shell_command_async, get_relative_path
@@ -17,7 +15,6 @@ from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
 from utils.tooltips import install_tooltip_dedup
-import subprocess as _sp
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
 
@@ -51,9 +48,9 @@ if __name__ == "__main__":
 
     # Initialize multi-monitor services
     try:
-        from utils.monitor_manager import get_monitor_manager
         from services.monitor_focus import get_monitor_focus_service
         from utils.global_keybinds import init_global_keybind_objects
+        from utils.monitor_manager import get_monitor_manager
         
         monitor_manager = get_monitor_manager()
         monitor_focus_service = get_monitor_focus_service()
