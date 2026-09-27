@@ -392,7 +392,9 @@ class MouseBattery(BaseSmallControl):
             return
 
         self._poll_source_id = GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self._update)
-        GLib.idle_add(self._update)
+        # One-shot: _update returns True to keep the timeout alive, which
+        # would make a bare idle_add re-run it on every main-loop iteration
+        GLib.idle_add(lambda: self._update() and False)
 
     def _find_mouse_device(self):
         for path in self.upower.detect_devices():
