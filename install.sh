@@ -16,6 +16,7 @@ PACKAGES=(
   bluez-utils
   gobject-introspection
   gpu-screen-recorder
+  headsetcontrol
   hypridle
   hyprlock
   hyprpicker
