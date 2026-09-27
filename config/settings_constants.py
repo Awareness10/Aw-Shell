@@ -37,7 +37,7 @@ DEFAULTS = {
     "prefix_randwall": "SUPER SHIFT",
     "suffix_randwall": "COMMA",
     "prefix_mixer": "SUPER",
-    "suffix_mixer": "M",
+    "suffix_mixer": "X",
     "prefix_emoji": "SUPER",
     "suffix_emoji": "PERIOD",
     "prefix_power": "SUPER",
