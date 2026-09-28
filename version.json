@@ -1,7 +1,13 @@
 {
-  "version": "1.2.9",
+  "version": "1.2.10",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.10",
+      "changes": [
+        "<b>fix:</b> Automated tests pass again after 1.2.9 (no changes to the shell itself)"
+      ]
+    },
     {
       "version": "1.2.9",
       "changes": [
@@ -141,10 +147,6 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> Tray icons (Discord, Sunshine, ...) show on every monitor's bar, not only the first one",
-    "<b>fix:</b> Bar, notch, dock and overview use the right monitor's size and focus when screens connect in a different order than they're arranged",
-    "<b>feat:</b> Notifications appear on the monitor you're using; at startup, the main monitor (the one holding workspace 1)",
-    "<b>fix:</b> Opening the notch no longer stalls for 2 seconds when Hyprland doesn't answer",
-    "<b>update:</b> Removed the non-working <code>toggle_launcher.py</code> and <code>toggle_overview.py</code> scripts"
+    "<b>fix:</b> Automated tests pass again after 1.2.9 (no changes to the shell itself)"
   ]
 }
