@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from gi.repository import Gdk, Gio
+from gi.repository import Gdk, Gio, GLib
 
 
 def test_home_is_temporary(sandbox):
@@ -59,7 +59,15 @@ def test_dbus_buses_are_private():
         "ListNames", None, None, Gio.DBusCallFlags.NONE, -1, None,
     ).unpack()[0]
     # A real session bus would have the notification daemon, portals, etc.
-    assert "org.freedesktop.Notifications" not in names
+    # Earlier tests run the shell's own notification server in this process,
+    # and Fabric never releases the name, so only a foreign owner counts.
+    if "org.freedesktop.Notifications" in names:
+        owner = session.call_sync(
+            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+            "GetNameOwner", GLib.Variant("(s)", ("org.freedesktop.Notifications",)),
+            None, Gio.DBusCallFlags.NONE, -1, None,
+        ).unpack()[0]
+        assert owner == session.get_unique_name()
     assert os.environ["DBUS_SYSTEM_BUS_ADDRESS"] == os.environ["DBUS_SESSION_BUS_ADDRESS"]
     assert system is not None
 
