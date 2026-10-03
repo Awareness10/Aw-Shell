@@ -19,6 +19,7 @@ import modules.icons as icons
 from modules.controls import ControlSmall
 from modules.dock import Dock
 from modules.metrics import Battery, MetricsSmall, NetworkApplet
+from modules.recording_indicator import RecordingIndicator
 from modules.systemprofiles import Systemprofiles
 from modules.systemtray import SystemTray
 from modules.weather import Weather
@@ -181,6 +182,8 @@ class Bar(Window):
 
         self.systray = SystemTray()
 
+        self.recording = RecordingIndicator()
+
         self.weather = Weather()
         self.sysprofiles = Systemprofiles()
 
@@ -308,6 +311,7 @@ class Bar(Window):
             self.boxed_revealer_right,
             self.battery,
             self.systray,
+            self.recording,
             self.button_tools,
             self.language,
             self.date_time,
@@ -320,6 +324,7 @@ class Bar(Window):
             self.control,
             self.sysprofiles,
             self.network,
+            self.recording,
             self.button_tools,
         ]
 
@@ -434,6 +439,7 @@ class Bar(Window):
             self.metrics,
             self.systray,
             self.control,
+            self.recording,
         ]
         if self.integrated_dock_widget:
             self.themed_children.append(self.integrated_dock_widget)

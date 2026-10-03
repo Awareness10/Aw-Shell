@@ -85,6 +85,21 @@ def get_available_monitors() -> list:
     return [{"id": 0, "name": "default"}]
 
 
+def get_focused_monitor_name():
+    """Name of the monitor Hyprland has focused, or None if unavailable."""
+    try:
+        result = subprocess.run(
+            ["hyprctl", "monitors", "-j"], capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            for m in json.loads(result.stdout):
+                if m.get("focused"):
+                    return m.get("name")
+    except Exception as e:
+        print(f"Error getting focused monitor: {e}")
+    return None
+
+
 def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) -> None:
     """Save settings, generate hyprconf, and restart Aw-Shell."""
     save_bind_vars()

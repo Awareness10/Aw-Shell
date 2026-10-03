@@ -207,6 +207,38 @@ tooltip > * {
   background-color: var(--primary);
 }
 
+#recording-indicator {
+  min-height: 36px;
+  padding: 0 10px;
+  background-color: var(--shadow);
+}
+
+#recording-indicator.invert {
+  background-color: var(--surface);
+  border-radius: 12px;
+}
+
+#recording-indicator:hover {
+  background-color: var(--surface-bright);
+}
+
+#recording-dot {
+  color: var(--red);
+  font-size: 14px;
+  animation: recording-pulse 1.6s ease-in-out infinite;
+}
+
+#recording-time {
+  color: var(--red);
+  font-weight: bold;
+}
+
+@keyframes recording-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.25; }
+  100% { opacity: 1; }
+}
+
 #corner {
   background-color: var(--shadow);
   border-radius: 0;

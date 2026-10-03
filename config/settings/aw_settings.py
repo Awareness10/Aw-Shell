@@ -13,21 +13,21 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtWidgets import (
     QAbstractSlider, QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
     QGraphicsDropShadowEffect, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QScrollBar,
     QSizePolicy, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 )
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtGui import QColor, QPixmap, QScreen
 
 from glaze.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
 from glaze.widgets import ThemedComboBox, FramelessMainWindow, DonateButton
 
 from config.settings_utils import (
     get_bind_var, set_all_bind_vars, reset_to_defaults,
-    apply_and_restart, get_available_monitors, load_bind_vars,
+    apply_and_restart, get_available_monitors, get_focused_monitor_name, load_bind_vars,
     APP_NAME, APP_NAME_CAP, HOME_DIR
 )
 
@@ -38,6 +38,12 @@ PANEL_THEMES = ["Notch", "Panel"]
 PANEL_POSITIONS = ["Start", "Center", "End"]
 NOTIFICATION_POSITIONS = ["Top", "Bottom"]
 METRIC_NAMES = {"cpu": "CPU", "ram": "RAM", "disk": "Disk", "gpu": "GPU"}
+
+# Initial window size, relative to the screen it opens on: tall and slim.
+HEIGHT_FRACTION = 0.93
+WIDTH_PER_HEIGHT = 0.645
+MIN_WIDTH, MIN_HEIGHT = 400, 380
+QWIDGETSIZE_MAX = (1 << 24) - 1
 
 COMPONENT_DISPLAY_NAMES = {
     "button_apps": "App Launcher Button",
@@ -130,7 +136,38 @@ class AwShellSettings(FramelessMainWindow):
         self.selected_face_icon: Optional[str] = None
 
         super().__init__(width=560, height=1080, title=f"{APP_NAME_CAP} Settings")
-        self.setMinimumSize(400, 380)
+        self._fit_to_screen()
+
+    def _target_screen(self) -> QScreen:
+        """The screen the compositor will open us on: the focused monitor."""
+        name = get_focused_monitor_name()
+        for screen in QApplication.screens():
+            if screen.name() == name:
+                return screen
+        return QApplication.primaryScreen()
+
+    def _fit_to_screen(self) -> None:
+        """Size the window from the target screen instead of fixed pixels.
+
+        The size is locked (min == max) until the window is mapped so tiling
+        compositors like Hyprland float it at that size rather than tiling it,
+        then the lock is released so the user can resize freely.
+        """
+        avail = self._target_screen().availableGeometry()
+        height = max(MIN_HEIGHT, min(round(avail.height() * HEIGHT_FRACTION), avail.height()))
+        width = max(MIN_WIDTH, min(round(height * WIDTH_PER_HEIGHT), avail.width()))
+        self.setFixedSize(width, height)
+        self._size_locked = True
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if self._size_locked:
+            self._size_locked = False
+            QTimer.singleShot(500, self._release_size_lock)
+
+    def _release_size_lock(self) -> None:
+        self.setMinimumSize(MIN_WIDTH, MIN_HEIGHT)
+        self.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
 
     def _create_scrollable_tab(self, content: QWidget) -> QScrollArea:
         """Wrap tab content in a scroll area."""

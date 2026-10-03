@@ -72,6 +72,8 @@ class ToolsStatusMonitor:
     def __init__(self):
         self._listeners = []
         self._status = None
+        # Epoch start time of the running recorder, None when not recording
+        self.recording_since = None
         self._in_flight = False
         GLib.timeout_add_seconds(self.POLL_INTERVAL_SECONDS, self.refresh)
         self.refresh()
@@ -91,25 +93,31 @@ class ToolsStatusMonitor:
 
     def _check_thread(self, _user_data) -> None:
         try:
-            recording, pomodoro = self._scan_processes()
-            status = (recording, pomodoro, self._gamemode_enabled())
+            recording_since, pomodoro = self._scan_processes()
+            status = (recording_since is not None, pomodoro, self._gamemode_enabled())
         except Exception as e:
             logger.warning(f"[Tools] status check failed: {e}")
-            status = None
-        GLib.idle_add(self._publish, status)
+            recording_since, status = None, None
+        GLib.idle_add(self._publish, status, recording_since)
 
     @staticmethod
-    def _scan_processes() -> tuple[bool, bool]:
-        # Same matching as `pgrep -f`: substring of the full command line
-        recording = pomodoro = False
+    def _scan_processes() -> tuple[float | None, bool]:
+        """Return the recorder's start time (None when not recording) and
+        whether the pomodoro script runs."""
+        recording_since = None
+        pomodoro = False
         own_pid = os.getpid()
-        for proc in psutil.process_iter(["pid", "cmdline"]):
+        for proc in psutil.process_iter(["pid", "cmdline", "create_time"]):
             if proc.info["pid"] == own_pid:
                 continue
-            cmdline = " ".join(proc.info["cmdline"] or ())
-            recording = recording or "gpu-screen-recorder" in cmdline
+            argv = proc.info["cmdline"] or ()
+            # The recorder as the command itself, like the script's match;
+            # command lines that merely mention it don't count
+            if argv and os.path.basename(argv[0]) == "gpu-screen-recorder":
+                recording_since = proc.info["create_time"]
+            cmdline = " ".join(argv)
             pomodoro = pomodoro or "pomodoro.sh" in cmdline
-        return recording, pomodoro
+        return recording_since, pomodoro
 
     @staticmethod
     def _gamemode_enabled() -> bool:
@@ -118,13 +126,25 @@ class ToolsStatusMonitor:
         option = json.loads(Hyprland.send_command("j/getoption animations:enabled").reply.decode())
         return not option.get("bool", option.get("int", 1))
 
-    def _publish(self, status) -> bool:
+    def _publish(self, status, recording_since=None) -> bool:
         self._in_flight = False
+        if status is not None:
+            self.recording_since = recording_since
         if status is not None and status != self._status:
             self._status = status
             for callback in list(self._listeners):
                 callback(*status)
         return False
+
+
+def toggle_screenrecord() -> None:
+    """Start or stop a recording, then pick up the new state promptly."""
+    exec_shell_command_async(
+        f"bash -c 'nohup bash {SCREENRECORD_SCRIPT} > /dev/null 2>&1 & disown'"
+    )
+    monitor = ToolsStatusMonitor.get()
+    for delay in (300, 1500):
+        GLib.timeout_add(delay, lambda: monitor.refresh() and False)
 
 
 class Toolbox(Box):
@@ -393,8 +413,7 @@ class Toolbox(Box):
         return False
 
     def screenrecord(self, *args):
-
-        exec_shell_command_async(f"bash -c 'nohup bash {SCREENRECORD_SCRIPT} > /dev/null 2>&1 & disown'")
+        toggle_screenrecord()
         self.close_menu()
 
     def pomodoro(self, *args):
