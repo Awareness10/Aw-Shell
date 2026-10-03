@@ -1,7 +1,16 @@
 {
-  "version": "1.2.10",
+  "version": "1.2.11",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.11",
+      "changes": [
+        "<b>feat:</b> A recording indicator appears in the bar while the screen recorder runs, showing the elapsed time; click it to stop",
+        "<b>fix:</b> Screen recording works on multi-GPU setups by falling back to the desktop portal, and stopping waits for the file to finish saving",
+        "<b>fix:</b> Settings window opens at a size that fits the screen it's on and floats instead of filling the screen",
+        "<b>update:</b> README lists what has changed since Ax-Shell"
+      ]
+    },
     {
       "version": "1.2.10",
       "changes": [
@@ -147,6 +156,9 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> Automated tests pass again after 1.2.9 (no changes to the shell itself)"
+    "<b>feat:</b> A recording indicator appears in the bar while the screen recorder runs, showing the elapsed time; click it to stop",
+    "<b>fix:</b> Screen recording works on multi-GPU setups by falling back to the desktop portal, and stopping waits for the file to finish saving",
+    "<b>fix:</b> Settings window opens at a size that fits the screen it's on and floats instead of filling the screen",
+    "<b>update:</b> README lists what has changed since Ax-Shell"
   ]
 }
