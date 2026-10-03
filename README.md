@@ -35,21 +35,44 @@
 
 <h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Wrench.png" alt="Wrench" width="25" height="25" /></sub> Changes from Ax-Shell</h2>
 
-Aw-Shell builds on the original Ax-Shell with the following improvements:
+Aw-Shell started from Ax-Shell, which is now deprecated upstream, and has since grown into its own project:
 
-- **New PySide6 settings gui** - the first step of the migration to pyside6 (Qt6) gui.
-- **Refactored controls** — simplified and reorganized control panel
-- **Improved launcher** — better search relevance and multi-monitor awareness
-- **Multi-monitor fixes** — dashboard and workspaces open on the correct monitor
-- **`uv` package manager** — replaced manual pip/venv setup with `uv sync` for reproducible installs
-- **Glaze theming** — integrated [Glaze](https://github.com/Awareness10/Glaze) for consistent Qt6 styling
-- **Test suite** — added unit tests for core utilities (layout, signals, settings conversion)
-- **Code quality** — `pathlib` over `os.path`, cleaned up imports, removed deprecated typings
+**Hyprland compatibility**
+- **Lua config** — keybinds and settings generate a native Hyprland Lua config, compatible with Hyprland 0.56.2+ (including the 0.57 module changes)
+- **Live theme updates** — border colors apply over Hyprland IPC after a wallpaper change, no reload needed
+
+**Performance**
+- **No process polling** — toolbox status (screen recorder, pomodoro, gamemode) is checked in-process by one shared poller instead of spawning `pgrep` and scripts every 2 seconds on every monitor
+- **Event-driven notch hiding** — the notch reacts to Hyprland events per monitor instead of polling the active window twice a second
+- **Shared pollers** — tray watcher and headset battery run once and serve every bar
+
+**Multi-monitor**
+- Monitor ids match screens, and the main monitor is whichever holds workspace 1 — no hard-coded connector names
+- Tray icons on every bar; dashboard, launcher, workspaces and notifications open on the focused monitor
+- Rounded corners and notch hiding work per monitor
+
+**Settings & theming**
+- **PySide6 (Qt6) settings window** — the first step of the migration to Qt, styled with [Glaze](https://github.com/Awareness10/Glaze); sizes itself to the screen it opens on
+- **Color schemes** — the selected Matugen scheme is remembered and applied immediately; the full palette is written to `config/colors.json` for other tools
+- **Matugen 4** support
+- **Idle** — "Suspend when idle" option, a working Caffeine toggle, and a single hypridle instance after Apply
+
+**New & rewritten**
+- **Bluetooth** — rewritten on BlueZ D-Bus and `bluetoothctl`
+- **Updater** — fresh version checks via the GitHub API, changelog grouped by version with one row per change
+- **Peripherals** — headset battery (via `headsetcontrol`) and Logitech mouse battery in the control panel
+- **Screen recorder indicator**, weather widget, and tooltips throughout
+- **Fixes** — Wi-Fi no longer creates duplicate profiles, wallpaper thumbnails refresh when files change, metrics work without UPower, overview handles close confirmations
+
+**Development**
+- **`uv`** — reproducible installs with `uv sync` instead of a manual pip/venv setup
+- **Tests & CI** — unit tests with coverage on every push
+- **Code quality** — dead code removed, `pathlib` over `os.path`, cleaned imports and typings
 
 <h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
 
 > [!NOTE]
-> You need a functioning Hyprland installation.
+> You need a functioning Hyprland installation (0.56.2 or newer).
 > This will also enable NetworkManager if it is not already enabled.
 
 ### Arch Linux
@@ -74,7 +97,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
     - [Gray](https://github.com/Fabric-Development/gray)
     - [Matugen](https://github.com/InioX/matugen)
     - `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
-    - `bluez-utils` `gobject-introspection` `gpu-screen-recorder`
+    - `bluez-utils` `gobject-introspection` `gpu-screen-recorder` `headsetcontrol`
     - `hypridle` `hyprlock` `hyprpicker` `hyprshot` `hyprsunset`
     - `imagemagick` `libnotify` `networkmanager` `network-manager-applet`
     - `nm-connection-editor` `noto-fonts-emoji` `nvtop` `playerctl`
@@ -94,6 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 
 - App Launcher
 - Bluetooth Manager
+- Caffeine / Idle Control
 - Calculator
 - Calendar
 - Clipboard Manager
@@ -101,6 +125,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 - Customizable UI
 - Dashboard
 - Dock
+- Headset & Mouse Battery
 - Emoji Picker
 - Kanban Board
 - Network Manager
@@ -109,7 +134,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 - Pins
 - Power Manager
 - Power Menu
-- Screen Recorder
+- Screen Recorder (with recording indicator)
 - Screenshot
 - Settings
 - System Tray
@@ -118,6 +143,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 - Update checker
 - Vertical Layout
 - Wallpaper Selector
+- Weather
 - Workspaces Overview
 - Multi-monitor support
 
