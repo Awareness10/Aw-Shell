@@ -61,6 +61,9 @@ filterwarnings = [
     "ignore:Gio.DBusConnection.register_object is deprecated:DeprecationWarning:gi\\.overrides\\.Gio",
     # Gone in newer PyGObject (checked 3.58), but fabric pins 3.50.0 (3.51+ breaks its enum properties)
     "ignore:'asyncio.get_event_loop_policy' is deprecated:DeprecationWarning:gi\\._ossighelper",
+    # Compile-time warnings (e.g. 'return' in 'finally' in fabric) carry a file path,
+    # not a module name; only show up where .pyc files aren't cached, like Docker
+    "ignore::SyntaxWarning:.*/site-packages/",
 ]
 
 [tool.coverage.run]
