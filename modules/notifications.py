@@ -1141,8 +1141,11 @@ class NotificationContainer(Box):
         self._before_show = before_show
 
         self._server = get_notification_server()
-        handler = self._server.connect("notification-added", self.on_new_notification)
-        self.connect("destroy", lambda *_: self._server.disconnect(handler))
+        handlers = [
+            self._server.connect("notification-added", self.on_new_notification),
+            self._server.connect("notification-removed", self.on_notification_removed),
+        ]
+        self.connect("destroy", lambda *_: [self._server.disconnect(h) for h in handlers])
         self._pending_removal = False
         self._is_destroying = False
 
@@ -1306,6 +1309,20 @@ class NotificationContainer(Box):
         should_reveal = len(self.notifications) > 1
         self.navigation_revealer.set_reveal_child(should_reveal)
 
+    def on_notification_removed(self, _server, notification_id):
+        # fabric emits this for every close, before the notification's own
+        # "closed" handlers run; only the app withdrawing it (CloseNotification)
+        # leaves it unhandled, so check once those have had their turn
+        GLib.idle_add(self._close_withdrawn, notification_id)
+
+    def _close_withdrawn(self, notification_id):
+        if notification_id not in self._destroyed_notifications:
+            for notif_box in self.notifications:
+                if notif_box.notification.id == notification_id:
+                    notif_box.notification.close("closed-by-application")
+                    break
+        return False
+
     def on_notification_closed(self, notification, reason):
         if self._is_destroying:
             return
@@ -1333,8 +1350,8 @@ class NotificationContainer(Box):
                 notif_box.destroy()
             elif (
                 reason_str == "NotificationCloseReason.EXPIRED"
-                or reason_str == "NotificationCloseReason.CLOSED"
-                or reason_str == "NotificationCloseReason.UNDEFINED"
+                or reason_str == "NotificationCloseReason.CLOSED_BY_APPLICATION"
+                or reason_str == "NotificationCloseReason.UNKNOWN"
             ):
                 logger.info(
                     f"Adding notification {notification.id} to history (reason: {reason_str})"

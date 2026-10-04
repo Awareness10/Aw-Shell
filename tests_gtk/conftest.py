@@ -254,6 +254,43 @@ def pump_until(condition, timeout: float = 5.0) -> bool:
     return True
 
 
+def _call_notifications(method: str, args: GLib.Variant):
+    """Call the shell's notification server; async, since it answers from this
+    same main loop. Returns the reply's values."""
+    from gi.repository import Gio
+
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+
+    def server_owned() -> bool:  # the server claims its bus name asynchronously
+        reply = bus.call_sync(
+            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+            "NameHasOwner", GLib.Variant("(s)", ("org.freedesktop.Notifications",)),
+            GLib.VariantType("(b)"), Gio.DBusCallFlags.NONE, -1, None,
+        )
+        return reply.unpack()[0]
+
+    assert pump_until(server_owned), "no notification server on the bus"
+    replies = []
+    bus.call(
+        "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+        "org.freedesktop.Notifications", method, args, None, Gio.DBusCallFlags.NONE,
+        2000, None, lambda conn, result: replies.append(conn.call_finish(result).unpack()),
+    )
+    assert pump_until(lambda: replies), f"no reply to {method}"
+    return replies[0]
+
+
+def notify(summary: str, body: str = "", app_name: str = "test") -> int:
+    """Send a notification like an app would; returns its id."""
+    args = GLib.Variant("(susssasa{sv}i)", (app_name, 0, "", summary, body, [], {}, -1))
+    return _call_notifications("Notify", args)[0]
+
+
+def close_notification(notification_id: int) -> None:
+    """The sending app withdraws the notification (reason CLOSED)."""
+    _call_notifications("CloseNotification", GLib.Variant("(u)", (notification_id,)))
+
+
 @pytest.fixture
 def run_pending():
     return pump
