@@ -1,7 +1,20 @@
 {
-  "version": "1.2.11",
+  "version": "1.2.12",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.12",
+      "changes": [
+        "<b>fix:</b> Notifications that an app withdraws now disappear right away instead of staying until they time out",
+        "<b>fix:</b> Wallpapers with capitals or spaces in their name no longer stop the wallpaper list from loading, and no longer show up twice",
+        "<b>fix:</b> The launcher calculator handles exp(), factorials (5!) and scientific notation (1e3)",
+        "<b>fix:</b> Settings opens from the launcher and on first start even when the system Python lacks the shell's dependencies",
+        "<b>fix:</b> The network applet keeps updating while you're offline",
+        "<b>fix:</b> The update window opens at a size that fits the screen it's on",
+        "<b>perf:</b> The shell no longer loads the Qt settings libraries at startup, using less memory",
+        "<b>update:</b> Much larger test suite, including real-GTK tests that catch errors GTK only logs; the README explains how to run it"
+      ]
+    },
     {
       "version": "1.2.11",
       "changes": [
@@ -156,9 +169,13 @@
     }
   ],
   "changelog": [
-    "<b>feat:</b> A recording indicator appears in the bar while the screen recorder runs, showing the elapsed time; click it to stop",
-    "<b>fix:</b> Screen recording works on multi-GPU setups by falling back to the desktop portal, and stopping waits for the file to finish saving",
-    "<b>fix:</b> Settings window opens at a size that fits the screen it's on and floats instead of filling the screen",
-    "<b>update:</b> README lists what has changed since Ax-Shell"
+    "<b>fix:</b> Notifications that an app withdraws now disappear right away instead of staying until they time out",
+    "<b>fix:</b> Wallpapers with capitals or spaces in their name no longer stop the wallpaper list from loading, and no longer show up twice",
+    "<b>fix:</b> The launcher calculator handles exp(), factorials (5!) and scientific notation (1e3)",
+    "<b>fix:</b> Settings opens from the launcher and on first start even when the system Python lacks the shell's dependencies",
+    "<b>fix:</b> The network applet keeps updating while you're offline",
+    "<b>fix:</b> The update window opens at a size that fits the screen it's on",
+    "<b>perf:</b> The shell no longer loads the Qt settings libraries at startup, using less memory",
+    "<b>update:</b> Much larger test suite, including real-GTK tests that catch errors GTK only logs; the README explains how to run it"
   ]
 }
