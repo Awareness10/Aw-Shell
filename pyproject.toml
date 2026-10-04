@@ -68,3 +68,10 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["config", "modules", "services", "utils", "widgets"]
+
+[tool.uv.audit]
+ignore = [
+    # CVE-2011-2185 is for the SSH library `fabric` (github.com/fabric/fabric);
+    # ours is Fabric-Development/fabric from git, which shares the name only
+    "GHSA-xwg2-qc6c-7c3q",
+]
