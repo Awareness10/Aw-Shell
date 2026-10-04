@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 import pytest
@@ -244,3 +245,36 @@ def pump(iterations: int = 50) -> None:
 @pytest.fixture
 def run_pending():
     return pump
+
+
+_gtk_criticals: list[str] = []
+
+
+def _record_gtk_critical(domain, level, message, *_):
+    # Criticals are GTK API misuse (e.g. packing a widget that has a parent);
+    # GTK prints them and carries on. Keep the Python line that caused it.
+    ours = [f for f in traceback.extract_stack()
+            if f.filename.startswith(str(REPO)) and "/tests_gtk/" not in f.filename
+            and "/.venv/" not in f.filename]
+    where = f" at {Path(ours[-1].filename).relative_to(REPO)}:{ours[-1].lineno}" if ours else ""
+    _gtk_criticals.append(f"{domain}-CRITICAL: {message}{where}")
+
+
+GLib.log_set_handler("Gtk", GLib.LogLevelFlags.LEVEL_CRITICAL, _record_gtk_critical)
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_callback_errors():
+    """Errors GTK and PyGObject only print must fail the test: exceptions in
+    GLib callbacks (idle handlers, timeouts, signal handlers), which go to
+    sys.excepthook, and Gtk criticals."""
+    errors = []
+    original = sys.excepthook
+    sys.excepthook = lambda *exc_info: errors.append(exc_info)
+    _gtk_criticals.clear()
+    yield
+    sys.excepthook = original
+    report = ["".join(traceback.format_exception(*e)) for e in errors] + _gtk_criticals
+    if report:
+        pytest.fail(f"{len(report)} error(s) GTK only printed:\n" + "\n".join(report),
+                    pytrace=False)
