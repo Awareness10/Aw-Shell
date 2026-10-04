@@ -10,6 +10,7 @@ from fabric.widgets.stack import Stack
 from gi.repository import Gdk, GLib, Gtk, Pango
 
 import config.data as data
+import utils.apps as apps
 from modules.cliphist import ClipHistory
 from modules.corners import MyCorner
 from modules.dashboard import Dashboard
@@ -1098,32 +1099,11 @@ class Notch(Window):
             self.update_window_icon()
 
     def _build_app_identifiers_map(self):
-        """Build a mapping of app identifiers (class names, executables, names) to DesktopApp objects"""
-        identifiers = {}
-        for app in self._all_apps:
-            if app.name:
-                identifiers[app.name.lower()] = app
-
-            if app.display_name:
-                identifiers[app.display_name.lower()] = app
-
-            if app.window_class:
-                identifiers[app.window_class.lower()] = app
-
-            if app.executable:
-                exe_basename = app.executable.split("/")[-1].lower()
-                identifiers[exe_basename] = app
-
-            if app.command_line:
-                cmd_base = app.command_line.split()[0].split("/")[-1].lower()
-                identifiers[cmd_base] = app
-
-        return identifiers
+        return apps.build_identifier_map(self._all_apps)
 
     def find_app(self, app_id: str):
-        """Find a DesktopApp object by various identifiers using the pre-built map."""
-        normalized_id = app_id.lower()
-        return self.app_identifiers.get(normalized_id)
+        """Exact match on the identifier map (no substring fallback, unlike the dock)."""
+        return self.app_identifiers.get(app_id.lower())
 
     def update_window_icon(self, *args):
         """Update the window icon based on the current active window title"""
