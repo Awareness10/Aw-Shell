@@ -1,16 +1,21 @@
 import json
 import math
-import operator
 import os
 import re
 import subprocess
+import subprocess as _sp
 import sys
-from pathlib import Path
 from collections.abc import Iterator
+from pathlib import Path
 
 import numpy as np
-from fabric.utils import (DesktopApp, exec_shell_command_async,
-                          get_desktop_applications, idle_add, remove_handler)
+from fabric.utils import (
+    DesktopApp,
+    exec_shell_command_async,
+    get_desktop_applications,
+    idle_add,
+    remove_handler,
+)
 from fabric.utils.helpers import get_relative_path
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -23,7 +28,6 @@ from gi.repository import Gdk, GLib
 import config.data as data
 import modules.icons as icons
 from modules.dock import Dock
-import subprocess as _sp
 from utils.conversion import Conversion
 
 tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"

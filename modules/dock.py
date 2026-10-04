@@ -3,8 +3,13 @@ import logging
 
 import cairo
 from fabric.hyprland.widgets import get_hyprland_connection
-from fabric.utils import (exec_shell_command, exec_shell_command_async,
-                          get_relative_path, idle_add, remove_handler)
+from fabric.utils import (
+    exec_shell_command,
+    exec_shell_command_async,
+    get_relative_path,
+    idle_add,
+    remove_handler,
+)
 from fabric.utils.helpers import get_desktop_applications
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button

@@ -1,3 +1,4 @@
+from fabric.audio.service import Audio
 from fabric.hyprland.widgets import HyprlandActiveWindow as ActiveWindow
 from fabric.utils.helpers import FormattedString, get_desktop_applications
 from fabric.widgets.box import Box
@@ -6,7 +7,6 @@ from fabric.widgets.image import Image
 from fabric.widgets.label import Label
 from fabric.widgets.revealer import Revealer
 from fabric.widgets.stack import Stack
-from fabric.audio.service import Audio
 from gi.repository import Gdk, GLib, Gtk, Pango
 
 import config.data as data
@@ -264,7 +264,7 @@ class Notch(Window):
             h_expand=True,
             h_align="fill",
             formatter=FormattedString(
-                f"{{'Desktop' if not win_title or win_title == 'unknown' else win_title}}",
+                "{'Desktop' if not win_title or win_title == 'unknown' else win_title}",
             ),
         )
 

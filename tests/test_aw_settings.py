@@ -4,28 +4,26 @@ Tests widget construction, UI callbacks, settings collection, and roundtrip
 to catch breaking changes. Runs headless via QT_QPA_PLATFORM=offscreen (set in conftest.py).
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
-from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
 
-from config.settings_utils import bind_vars, get_bind_var, set_bind_var, reset_to_defaults
-from config.settings_constants import DEFAULTS
 from config.settings.aw_settings import (
-    AwShellSettings,
-    POSITIONS,
-    THEMES,
-    PANEL_THEMES,
-    PANEL_POSITIONS,
-    NOTIFICATION_POSITIONS,
-    METRIC_NAMES,
     COMPONENT_DISPLAY_NAMES,
     KEYBIND_SECTIONS,
+    METRIC_NAMES,
+    NOTIFICATION_POSITIONS,
+    PANEL_POSITIONS,
+    PANEL_THEMES,
+    POSITIONS,
+    THEMES,
+    AwShellSettings,
     SettingsSection,
 )
-
+from config.settings_constants import DEFAULTS
+from config.settings_utils import bind_vars, get_bind_var, reset_to_defaults, set_bind_var
 
 # ── Fixtures ──
 

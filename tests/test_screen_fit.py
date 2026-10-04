@@ -1,9 +1,8 @@
 """Tests for config/screen_fit.py and the windows sized with it."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 from PySide6.QtCore import QRect
 from PySide6.QtWidgets import QApplication, QWidget
 

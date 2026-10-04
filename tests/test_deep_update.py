@@ -6,10 +6,10 @@ chain (config.__init__ -> data -> settings_constants -> data).
 The actual function is verified to match via test_deep_update_matches_source.
 """
 
-import pytest
 import ast
-import inspect
 from pathlib import Path
+
+import pytest
 
 
 def deep_update(target: dict, update: dict) -> dict:

@@ -4,7 +4,7 @@ from typing import Literal, cast, overload
 
 import gi
 import OpenGL.GL as GL
-from fabric import Application, Property, Signal
+from fabric import Property, Signal
 from fabric.widgets.widget import Widget
 from OpenGL.GL.shaders import compileProgram, compileShader
 

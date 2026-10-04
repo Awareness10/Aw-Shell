@@ -14,15 +14,23 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QProcess, QThread, Qt, QTimer, Signal, Slot
-from PySide6.QtWidgets import (
-    QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QSizePolicy, QTextEdit, QVBoxLayout, QWidget,
-)
-from PySide6.QtGui import QColor
-
-from glaze.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
+from glaze.theme import get_current_theme, get_dialog_stylesheet, get_table_container_style
 from glaze.widgets import FramelessMainWindow
+from PySide6.QtCore import QObject, QProcess, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from config.screen_fit import ScreenFit
 from config.settings_constants import APP_NAME, APP_NAME_CAP

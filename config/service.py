@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional, TypeVar, Generic
 from dataclasses import dataclass, field
+from typing import Dict, List, Optional, TypeVar
 
 T = TypeVar('T')
 

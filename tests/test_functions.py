@@ -1,27 +1,26 @@
 """Tests for pure functions in utils/functions.py."""
 
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 from utils.functions import (
     ExecutableNotFoundError,
-    format_time,
     convert_bytes,
-    get_relative_time,
-    convert_to_percent,
-    merge_defaults,
-    exclude_keys,
-    unique_list,
     convert_seconds_to_milliseconds,
-    parse_markup,
-    validate_widgets,
-    executable_exists,
+    convert_to_percent,
     ensure_dir_exists,
+    exclude_keys,
+    executable_exists,
+    format_time,
+    get_relative_time,
+    merge_defaults,
+    parse_markup,
     send_notification,
+    unique_list,
     uptime,
+    validate_widgets,
 )
-
 
 # =========================================================================
 # format_time

@@ -4,8 +4,7 @@ import subprocess
 import sys
 import tempfile
 
-from fabric.utils import idle_add, remove_handler
-from fabric.utils.helpers import get_relative_path
+from fabric.utils import remove_handler
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.entry import Entry

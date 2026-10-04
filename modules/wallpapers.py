@@ -12,10 +12,9 @@ from fabric.widgets.button import Button
 from fabric.widgets.entry import Entry
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
-from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
 from PIL import Image
 
-import config.config
 import config.data as data
 import modules.icons as icons
 
@@ -286,7 +285,7 @@ class WallpaperSelector(Box):
         file_name = random.choice(self.files)
         full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
         selected_scheme = self.scheme_dropdown.get_active_id()
-        current_wall = os.path.expanduser(f"~/.current.wall")
+        current_wall = os.path.expanduser("~/.current.wall")
 
         if os.path.isfile(current_wall) or os.path.islink(
             current_wall
@@ -371,7 +370,7 @@ class WallpaperSelector(Box):
         file_name = model[path][1]
         full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
         selected_scheme = self.scheme_dropdown.get_active_id()
-        current_wall = os.path.expanduser(f"~/.current.wall")
+        current_wall = os.path.expanduser("~/.current.wall")
         if os.path.isfile(current_wall) or os.path.islink(current_wall):
             os.remove(current_wall)
         os.symlink(full_path, current_wall)

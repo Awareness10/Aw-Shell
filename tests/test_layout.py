@@ -7,8 +7,8 @@ config package to avoid circular import issues
 
 import sys
 import types
-import pytest
 
+import pytest
 
 # Create mock config.data module before importing layout
 _mock_data = types.ModuleType("config.data")

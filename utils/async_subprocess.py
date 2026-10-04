@@ -5,6 +5,7 @@ This module provides helper functions to prevent UI freezes when executing exter
 
 import subprocess
 from typing import Callable, List, Optional, Union
+
 from gi.repository import GLib
 
 
@@ -37,7 +38,7 @@ def run_async_subprocess(
             if on_success:
                 GLib.idle_add(lambda: (on_success(), False))
                 
-        except Exception as e:
+        except Exception:
             # Schedule error callback on main thread
             if on_error:
                 GLib.idle_add(lambda: (on_error(e), False))
@@ -77,7 +78,7 @@ def check_process_async(
             # Process is not running
             if on_not_running:
                 GLib.idle_add(lambda: (on_not_running(), False))
-        except Exception as e:
+        except Exception:
             # Other error occurred
             if on_error:
                 GLib.idle_add(lambda: (on_error(e), False))
@@ -112,7 +113,7 @@ def run_command_with_output_async(
             if on_success:
                 GLib.idle_add(lambda: (on_success(result.stdout), False))
                 
-        except Exception as e:
+        except Exception:
             # Schedule error callback on main thread
             if on_error:
                 GLib.idle_add(lambda: (on_error(e), False))

@@ -1,37 +1,35 @@
 """Tests for config/settings_utils.py — bind_vars management, config generation, file ops."""
 
 import json
-import os
 import re
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from config.settings_constants import APP_NAME_CAP, DEFAULTS
 from config.settings_utils import (
-    get_bind_var,
-    set_bind_var,
-    set_all_bind_vars,
-    reset_to_defaults,
-    load_bind_vars,
-    save_bind_vars,
-    get_available_monitors,
-    apply_and_restart,
-    ensure_matugen_config,
-    ensure_face_icon,
-    ensure_current_wallpaper,
-    start_config,
-    generate_hyprlua,
-    deep_update,
-    backup_and_replace,
-    generate_hypridle,
+    APPLY_COLORS_FN,
     HYPRIDLE_HEADER,
     HYPRIDLE_START,
-    APPLY_COLORS_FN,
+    apply_and_restart,
+    backup_and_replace,
     bind_vars,
+    deep_update,
+    ensure_current_wallpaper,
+    ensure_face_icon,
+    ensure_matugen_config,
+    generate_hypridle,
+    generate_hyprlua,
+    get_available_monitors,
+    get_bind_var,
+    load_bind_vars,
+    reset_to_defaults,
+    save_bind_vars,
+    set_all_bind_vars,
+    set_bind_var,
+    start_config,
 )
-from config.settings_constants import APP_NAME_CAP
-from config.settings_constants import DEFAULTS
 
 
 @pytest.fixture(autouse=True)

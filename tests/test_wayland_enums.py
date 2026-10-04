@@ -4,12 +4,13 @@ Regression tests for the PyGObject 3.50+ crash where custom GObject.GEnum
 subclasses fail to register GTypes, causing TypeError on @Property declarations.
 """
 
-import pytest
+import sys
 
 # GtkLayerShell requires a Wayland display, so we mock gi.repository at import time
 # to test the module's enum aliasing logic without a running compositor.
-from unittest.mock import MagicMock, patch
-import sys
+from unittest.mock import MagicMock
+
+import pytest
 
 
 @pytest.fixture
@@ -131,8 +132,9 @@ class TestWaylandEnumAliases:
 
     def test_no_custom_genum_subclass(self, mock_gi_modules):
         """Ensure Layer/KeyboardMode/Edge are NOT defined as class statements."""
-        import widgets.wayland as wmod
         import inspect
+
+        import widgets.wayland as wmod
         source = inspect.getsource(wmod)
         # These patterns would indicate custom GEnum subclasses (the broken pattern)
         assert "class Layer(" not in source, \
@@ -144,7 +146,7 @@ class TestWaylandEnumAliases:
 
     def test_enums_have_expected_members(self, mock_gi_modules):
         """Sanity check that the aliases expose the members we use."""
-        from widgets.wayland import Layer, KeyboardMode, Edge
+        from widgets.wayland import Edge, KeyboardMode, Layer
         # Layer
         assert hasattr(Layer, "TOP")
         assert hasattr(Layer, "BOTTOM")
@@ -166,7 +168,8 @@ class TestWaylandSourceCode:
 
     def test_no_gobject_import(self):
         """Ensure wayland.py doesn't import GObject (used for broken custom GEnum)."""
-        import os, re
+        import os
+        import re
         wayland_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "widgets", "wayland.py"
         )

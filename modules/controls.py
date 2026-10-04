@@ -1,7 +1,7 @@
 import json
 import shutil
 from abc import abstractmethod
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 from fabric.audio.service import Audio
 from fabric.widgets.box import Box

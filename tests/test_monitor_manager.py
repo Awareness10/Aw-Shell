@@ -1,13 +1,12 @@
 """Tests for utils/monitor_manager.py - Monitor detection, workspace mapping, and notch state."""
 
 import json
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from utils.monitor_manager import MonitorManager, Signal, get_monitor_manager
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 

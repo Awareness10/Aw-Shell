@@ -5,10 +5,9 @@ source color selection requires --source-color-index 0 when not on a TTY.
 """
 
 import os
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # =========================================================================
 # Matugen command flag tests (--source-color-index 0)
@@ -27,8 +26,6 @@ class TestMatugenSourceColorIndex:
         """Create a minimal WallpaperSelector mock for testing matugen commands."""
         # We can't instantiate the real WallpaperSelector (needs GTK), so we
         # test by reading the source and verifying all matugen image calls.
-        import inspect
-        import importlib
 
         # Mock all GTK dependencies
         mock_modules = {}
@@ -54,7 +51,6 @@ class TestMatugenSourceColorIndex:
 
     def test_source_code_matugen_image_calls_have_flag(self):
         """Scan wallpapers.py source to verify all 'matugen image' calls include the flag."""
-        import re
         wallpapers_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "modules", "wallpapers.py"
         )
@@ -172,7 +168,6 @@ class TestVenvPythonInHyprconf:
 
     def test_no_bare_python_in_hyprconf(self):
         """Scan generate_hyprlua source for bare 'python' without .venv path."""
-        import re
         settings_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "config", "settings_utils.py"
         )

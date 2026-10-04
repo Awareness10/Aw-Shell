@@ -11,26 +11,50 @@ Desktop shell configuration panel with:
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
+from glaze.theme import get_current_theme, get_dialog_stylesheet, get_table_container_style
+from glaze.widgets import DonateButton, FramelessMainWindow, ThemedComboBox
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtWidgets import (
-    QAbstractSlider, QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
-    QGraphicsDropShadowEffect, QGridLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QScrollBar,
-    QSizePolicy, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
-)
 from PySide6.QtGui import QColor, QPixmap
-
-from glaze.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
-from glaze.widgets import ThemedComboBox, FramelessMainWindow, DonateButton
-
-from config.settings_utils import (
-    get_bind_var, set_all_bind_vars, reset_to_defaults,
-    apply_and_restart, get_available_monitors, load_bind_vars,
-    APP_NAME, APP_NAME_CAP, HOME_DIR
+from PySide6.QtWidgets import (
+    QAbstractSlider,
+    QAbstractSpinBox,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QScrollBar,
+    QSizePolicy,
+    QSlider,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
+
 from config.screen_fit import ScreenFit
+from config.settings_utils import (
+    APP_NAME_CAP,
+    HOME_DIR,
+    apply_and_restart,
+    get_available_monitors,
+    get_bind_var,
+    load_bind_vars,
+    reset_to_defaults,
+    set_all_bind_vars,
+)
 
 # Constants matching the original GTK implementation
 POSITIONS = ["Top", "Bottom", "Left", "Right"]

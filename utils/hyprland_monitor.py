@@ -1,15 +1,12 @@
 import json
+import warnings
 from typing import Dict
 
 import gi
-
-import warnings
-
 from fabric.hyprland import Hyprland
 
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
-
 
 # IDC,  Gdk.Screen.get_monitor_plug_name is deprecated
 warnings.filterwarnings("ignore", category=DeprecationWarning)

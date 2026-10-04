@@ -1,6 +1,5 @@
 """Tests for utils/signal.py - Observer pattern implementation."""
 
-import pytest
 from utils.signal import Signal
 
 

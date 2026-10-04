@@ -5,14 +5,11 @@ and widget construction. Runs headless via QT_QPA_PLATFORM=offscreen.
 """
 
 import json
-import os
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 from PySide6.QtWidgets import QApplication
-
 
 # ── Fixtures ──
 
@@ -257,6 +254,7 @@ class TestChangeRows:
 
     def test_each_change_is_its_own_row_with_type_tag(self, qapp):
         from PySide6.QtWidgets import QLabel
+
         from modules.updater import UpdaterWindow
         win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
                             pkg_update=False, current_version="1.2.4")
