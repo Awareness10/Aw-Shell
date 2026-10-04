@@ -63,23 +63,21 @@ def settings(qapp):
 
 class TestConstants:
 
-    def test_positions(self):
-        assert POSITIONS == ["Top", "Bottom", "Left", "Right"]
+    @pytest.mark.parametrize("key, options", [
+        ("bar_position", POSITIONS),
+        ("bar_theme", THEMES),
+        ("dock_theme", THEMES),
+        ("panel_theme", PANEL_THEMES),
+        ("panel_position", PANEL_POSITIONS),
+        ("notif_pos", NOTIFICATION_POSITIONS),
+    ])
+    def test_default_is_an_offered_option(self, key, options):
+        """A default the combo box can't show would be lost on the first save."""
+        assert DEFAULTS[key] in options
 
-    def test_themes(self):
-        assert THEMES == ["Pills", "Dense", "Edge"]
-
-    def test_panel_themes(self):
-        assert PANEL_THEMES == ["Notch", "Panel"]
-
-    def test_panel_positions(self):
-        assert PANEL_POSITIONS == ["Start", "Center", "End"]
-
-    def test_notification_positions(self):
-        assert NOTIFICATION_POSITIONS == ["Top", "Bottom"]
-
-    def test_metric_names_keys(self):
-        assert set(METRIC_NAMES.keys()) == {"cpu", "ram", "disk", "gpu"}
+    @pytest.mark.parametrize("key", ["metrics_visible", "metrics_small_visible"])
+    def test_metric_switches_match_metric_defaults(self, key):
+        assert set(METRIC_NAMES) == set(DEFAULTS[key])
 
     def test_component_display_names_not_empty(self):
         assert len(COMPONENT_DISPLAY_NAMES) > 0

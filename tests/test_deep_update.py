@@ -1,40 +1,6 @@
-"""Tests for deep_update - Recursive dict merge.
+"""Tests for deep_update - Recursive dict merge."""
 
-We reimplement deep_update here to test the algorithm in isolation,
-since importing from config.settings_utils triggers a circular import
-chain (config.__init__ -> data -> settings_constants -> data).
-The actual function is verified to match via test_deep_update_matches_source.
-"""
-
-import ast
-from pathlib import Path
-
-import pytest
-
-
-def deep_update(target: dict, update: dict) -> dict:
-    """Local copy of config.settings_utils.deep_update for isolated testing."""
-    for key, value in update.items():
-        if isinstance(value, dict) and key in target and isinstance(target[key], dict):
-            deep_update(target[key], value)
-        else:
-            target[key] = value
-    return target
-
-
-class TestSourceParity:
-    """Verify our local copy matches the source."""
-
-    def test_deep_update_matches_source(self):
-        source_file = Path(__file__).parent.parent / "config" / "settings_utils.py"
-        source = source_file.read_text()
-        tree = ast.parse(source)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "deep_update":
-                # Found it - just verify the function exists in source
-                assert True
-                return
-        pytest.fail("deep_update not found in config/settings_utils.py")
+from config.settings_utils import deep_update
 
 
 class TestDeepUpdateFlat:

@@ -15,7 +15,6 @@ from config.settings_utils import (
     apply_and_restart,
     backup_and_replace,
     bind_vars,
-    deep_update,
     ensure_current_wallpaper,
     ensure_face_icon,
     ensure_matugen_config,
@@ -292,29 +291,6 @@ class TestBackupAndReplace:
         backup_and_replace(src, dest, "TestConfig")
 
         assert not (tmp_path / "dest.conf.bak").exists()
-
-
-# =========================================================================
-# deep_update (imported from settings_utils, already tested separately
-# but verifying it's the same function)
-# =========================================================================
-
-class TestDeepUpdateImport:
-
-    def test_basic_merge(self):
-        target = {"a": 1, "b": {"x": 1}}
-        deep_update(target, {"b": {"y": 2}})
-        assert target == {"a": 1, "b": {"x": 1, "y": 2}}
-
-    def test_overwrite_non_dict(self):
-        target = {"a": "old"}
-        deep_update(target, {"a": "new"})
-        assert target == {"a": "new"}
-
-    def test_add_new_key(self):
-        target = {"a": 1}
-        deep_update(target, {"b": 2})
-        assert target == {"a": 1, "b": 2}
 
 
 # =========================================================================
