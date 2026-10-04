@@ -153,7 +153,7 @@ There are two test suites. They must run in separate processes: `tests/` replace
 
 | Suite | What it covers | How |
 |---|---|---|
-| `tests/` | Logic: settings, config generation, monitor mapping, layout, conversions, updater, weather | `gi`, GTK and parts of fabric are mocked in `tests/conftest.py`; PySide6 runs offscreen |
+| `tests/` | Logic: settings, config generation, monitor mapping, layout, conversions, updater, weather | `gi`, GTK and parts of fabric are mocked in `tests/conftest.py`; PySide6 runs offscreen; runs in a temporary `HOME`, so your own config doesn't affect results |
 | `tests_gtk/` | Widgets built against real GTK/fabric: build smoke tests for the bar, notch, dock and most panels, plus notifications, overview, metrics, system tray | Runs inside a sandbox (see below) |
 
 ### Running
@@ -161,11 +161,13 @@ There are two test suites. They must run in separate processes: `tests/` replace
 ```bash
 uv sync                          # includes the dev group (pytest, pytest-cov, ruff)
 uv run pytest                    # unit tests (tests/)
-uv run pytest tests_gtk          # GTK tests, needs sway installed (pacman -S sway)
+uv run pytest tests_gtk          # GTK tests, needs sway plus the shell's system deps (see below)
 scripts/test-gtk.sh --all        # both suites in Docker, exactly like CI, merged coverage
 scripts/test-gtk.sh              # GTK tests only, in Docker
 uv run ruff check .              # lint
 ```
+
+Running `tests_gtk` locally needs `sway` (`pacman -S sway`) and the libraries the shell itself uses (e.g. gtk-layer-shell, Gray, NetworkManager and playerctl typelibs); with a working Aw-Shell install, only sway is missing. Without them, use the Docker script.
 
 Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs while working, and the Docker run before pushing: it uses Ubuntu 24.04 like CI, so results can differ from Arch, which ships newer libraries.
 
@@ -188,7 +190,7 @@ Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs whil
 ### Limitations
 
 - **Coverage is split by design.** Plain `uv run pytest` reports only what the unit tests reach, so it looks low; the real number is the merged one from `scripts/test-gtk.sh --all`, which is what the badge shows.
-- **Smoke tests check that widgets build, not how they look or behave in depth.** Only a few modules have behaviour tests (`test_notification_popup`, `test_overview`, `test_metrics`, `test_systemtray`).
+- **Smoke tests check that widgets build, not how they look or behave in depth.** Only a few modules have behaviour tests (`test_notification_popup`, `test_overview`, `test_metrics`, `test_systemtray`, `test_wallpapers`, `test_wayland`).
 - **Some code is only reached by the smoke tests or not at all,** e.g. the UPower client and Bluetooth service are partly covered, global keybinds and the tooltip helper not at all.
 - **Real hardware isn't exercised.** Monitors, audio, Bluetooth, NetworkManager and brightness are faked, stubbed or absent in the sandbox.
 - **PyGObject is pinned to 3.50.0** by fabric; newer versions break its enum properties. A few deprecation warnings from fabric and PyGObject are filtered in `pyproject.toml` because they can't be fixed here.
