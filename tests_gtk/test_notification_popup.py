@@ -64,6 +64,24 @@ def test_before_show_runs_only_when_nothing_on_screen():
         pump()
 
 
+
+def test_new_container_takes_over_the_server():
+    """The D-Bus server is process-wide (fabric can't register a second one);
+    a destroyed container must stop receiving and the next one must receive."""
+    from modules.notifications import NotificationContainer, NotificationHistory
+
+    first = NotificationContainer(NotificationHistory())
+    first.destroy()
+    pump()
+    second = NotificationContainer(NotificationHistory())
+    try:
+        _notify("after rebuild")
+        assert _pump_until(lambda: len(second.notifications) == 1)
+        assert first.notifications == []
+    finally:
+        second.destroy()
+        pump()
+
 def test_popup_follows_focus_to_shown_monitors(monkeypatch):
     from modules.notifications import NotificationPopup
 

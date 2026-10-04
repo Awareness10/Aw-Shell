@@ -529,7 +529,10 @@ class NotificationHistory(Box):
         self.persistent_notifications = []
         self.add(self.history_header)
         self.add(self.scrolled_window)
-        GLib.idle_add(self._load_persistent_history().__next__)
+        # One notification per idle call; False once the generator is done
+        # (a bare __next__ would leak StopIteration into GLib)
+        loader = self._load_persistent_history()
+        GLib.idle_add(lambda: next(loader, False))
 
     def get_ordinal(self, n):
         if 11 <= (n % 100) <= 13:
@@ -1110,6 +1113,21 @@ class NotificationHistory(Box):
         self.update_no_notifications_label_visibility()
 
 
+_notification_server = None
+
+
+def get_notification_server() -> Notifications:
+    """The process-wide org.freedesktop.Notifications server.
+
+    fabric's service never releases its bus name or exported object, so a
+    second instance in the same process fails to register.
+    """
+    global _notification_server
+    if _notification_server is None:
+        _notification_server = Notifications()
+    return _notification_server
+
+
 class NotificationContainer(Box):
     def __init__(
         self,
@@ -1122,8 +1140,9 @@ class NotificationContainer(Box):
         # Called when a notification arrives while none are on screen
         self._before_show = before_show
 
-        self._server = Notifications()
-        self._server.connect("notification-added", self.on_new_notification)
+        self._server = get_notification_server()
+        handler = self._server.connect("notification-added", self.on_new_notification)
+        self.connect("destroy", lambda *_: self._server.disconnect(handler))
         self._pending_removal = False
         self._is_destroying = False
 
