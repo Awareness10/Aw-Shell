@@ -525,7 +525,7 @@ class NotificationHistory(Box):
             orientation="v",
             children=[self.notifications_list, self.no_notifications_box],
         )
-        self.scrolled_window.add_with_viewport(self.scrolled_window_viewport_box)
+        self.scrolled_window.add(self.scrolled_window_viewport_box)
         self.persistent_notifications = []
         self.add(self.history_header)
         self.add(self.scrolled_window)

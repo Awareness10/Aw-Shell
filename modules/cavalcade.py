@@ -91,7 +91,9 @@ class Cava:
         self.fifo_fd = os.open(self.path, os.O_RDONLY | os.O_NONBLOCK)
         # Open dummy write end to prevent getting an EOF on our FIFO
         self.fifo_dummy_fd = os.open(self.path, os.O_WRONLY | os.O_NONBLOCK)
-        self.io_watch_id = GLib.io_add_watch(self.fifo_fd, GLib.IO_IN, self._io_callback)
+        self.io_watch_id = GLib.io_add_watch(
+            self.fifo_fd, GLib.PRIORITY_DEFAULT, GLib.IO_IN, self._io_callback
+        )
 
     def _io_callback(self, source, condition):
         chunk = self.byte_size * self.bars  # number of bytes for given format

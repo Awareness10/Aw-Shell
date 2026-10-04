@@ -38,7 +38,7 @@ def _hyprctl_result(stdout: str):
 def _gdk_screen(plug_names):
     """Gdk.Screen stand-in whose monitors have these connector names, in order."""
     screen = MagicMock()
-    screen.get_n_monitors.return_value = len(plug_names)
+    screen.get_display.return_value.get_n_monitors.return_value = len(plug_names)
     screen.get_monitor_plug_name.side_effect = lambda i: plug_names[i]
     return screen
 

@@ -46,7 +46,7 @@ def _gdk_ids_by_connector() -> Dict[str, int]:
         screen = Gdk.Screen.get_default()
         if screen is None:
             return ids
-        for i in range(screen.get_n_monitors()):
+        for i in range(screen.get_display().get_n_monitors()):
             name = screen.get_monitor_plug_name(i)
             if isinstance(name, str) and name:
                 ids[name] = i

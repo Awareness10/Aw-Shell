@@ -1216,7 +1216,7 @@ class Notch(Window):
         monitor_id is the GDK monitor index the window is placed by.
         """
         screen = Gdk.Screen.get_default()
-        if screen is None or not 0 <= self.monitor_id < screen.get_n_monitors():
+        if screen is None or not 0 <= self.monitor_id < screen.get_display().get_n_monitors():
             return None
         return screen.get_monitor_plug_name(self.monitor_id)
     

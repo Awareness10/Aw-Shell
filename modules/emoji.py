@@ -92,7 +92,7 @@ class EmojiPicker(Box):
             print(f"Emoji JSON file not found at: {emoji_file_path}")
             return {}
 
-        with open(emoji_file_path, 'r') as f:
+        with open(emoji_file_path, 'rb') as f:
             for emoji_char, emoji_info in ijson.kvitems(f, ''):
                 emoji_data[emoji_char] = emoji_info
         return emoji_data

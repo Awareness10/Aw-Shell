@@ -52,6 +52,10 @@ select = ["E", "F", "I"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "--cov --cov-report=term-missing"
+filterwarnings = [
+    # No GTK3 replacement for the connector name (Gdk.Monitor.get_connector is GTK4)
+    "ignore:Gdk.Screen.get_monitor_plug_name is deprecated:DeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["config", "modules", "services", "utils", "widgets"]
