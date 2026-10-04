@@ -4,28 +4,26 @@ Tests widget construction, UI callbacks, settings collection, and roundtrip
 to catch breaking changes. Runs headless via QT_QPA_PLATFORM=offscreen (set in conftest.py).
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
-from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
 
-from config.settings_utils import bind_vars, get_bind_var, set_bind_var, reset_to_defaults
-from config.settings_constants import DEFAULTS
 from config.settings.aw_settings import (
-    AwShellSettings,
-    POSITIONS,
-    THEMES,
-    PANEL_THEMES,
-    PANEL_POSITIONS,
-    NOTIFICATION_POSITIONS,
-    METRIC_NAMES,
     COMPONENT_DISPLAY_NAMES,
     KEYBIND_SECTIONS,
+    METRIC_NAMES,
+    NOTIFICATION_POSITIONS,
+    PANEL_POSITIONS,
+    PANEL_THEMES,
+    POSITIONS,
+    THEMES,
+    AwShellSettings,
     SettingsSection,
 )
-
+from config.settings_constants import DEFAULTS
+from config.settings_utils import bind_vars, get_bind_var, reset_to_defaults, set_bind_var
 
 # ── Fixtures ──
 
@@ -65,23 +63,21 @@ def settings(qapp):
 
 class TestConstants:
 
-    def test_positions(self):
-        assert POSITIONS == ["Top", "Bottom", "Left", "Right"]
+    @pytest.mark.parametrize("key, options", [
+        ("bar_position", POSITIONS),
+        ("bar_theme", THEMES),
+        ("dock_theme", THEMES),
+        ("panel_theme", PANEL_THEMES),
+        ("panel_position", PANEL_POSITIONS),
+        ("notif_pos", NOTIFICATION_POSITIONS),
+    ])
+    def test_default_is_an_offered_option(self, key, options):
+        """A default the combo box can't show would be lost on the first save."""
+        assert DEFAULTS[key] in options
 
-    def test_themes(self):
-        assert THEMES == ["Pills", "Dense", "Edge"]
-
-    def test_panel_themes(self):
-        assert PANEL_THEMES == ["Notch", "Panel"]
-
-    def test_panel_positions(self):
-        assert PANEL_POSITIONS == ["Start", "Center", "End"]
-
-    def test_notification_positions(self):
-        assert NOTIFICATION_POSITIONS == ["Top", "Bottom"]
-
-    def test_metric_names_keys(self):
-        assert set(METRIC_NAMES.keys()) == {"cpu", "ram", "disk", "gpu"}
+    @pytest.mark.parametrize("key", ["metrics_visible", "metrics_small_visible"])
+    def test_metric_switches_match_metric_defaults(self, key):
+        assert set(METRIC_NAMES) == set(DEFAULTS[key])
 
     def test_component_display_names_not_empty(self):
         assert len(COMPONENT_DISPLAY_NAMES) > 0
@@ -691,44 +687,3 @@ class TestWheelGuard:
         for widget in widgets:
             assert widget.focusPolicy() == Qt.FocusPolicy.StrongFocus
 
-
-# ── Initial window size ──
-
-class TestInitialSize:
-    def _fake_screen(self, w, h):
-        from PySide6.QtCore import QRect
-        screen = MagicMock()
-        screen.availableGeometry.return_value = QRect(0, 0, w, h)
-        return screen
-
-    @pytest.mark.parametrize("screen_w,screen_h,expected", [
-        (1920, 1080, (648, 1004)),
-        (3440, 1440, (864, 1339)),
-        (1366, 768, (461, 714)),
-    ])
-    def test_scales_with_screen(self, qapp, screen_w, screen_h, expected):
-        screen = self._fake_screen(screen_w, screen_h)
-        with patch.object(AwShellSettings, "_target_screen", return_value=screen):
-            win = AwShellSettings()
-        assert (win.width(), win.height()) == expected
-        win.close()
-
-    def test_tiny_screen_respects_minimum(self, qapp):
-        with patch.object(AwShellSettings, "_target_screen", return_value=self._fake_screen(320, 240)):
-            win = AwShellSettings()
-        assert (win.width(), win.height()) == (400, 380)
-        win.close()
-
-    def test_size_lock_released_after_show(self, settings):
-        assert settings.minimumSize() == settings.maximumSize()
-        settings.show()
-        settings._release_size_lock()
-        assert settings.minimumSize().width() == 400
-        assert settings.maximumSize().width() > 10000
-
-    def test_target_screen_matches_focused_monitor(self, settings):
-        screens = QApplication.screens()
-        with patch("config.settings.aw_settings.get_focused_monitor_name", return_value=screens[-1].name()):
-            assert settings._target_screen() is screens[-1]
-        with patch("config.settings.aw_settings.get_focused_monitor_name", return_value=None):
-            assert settings._target_screen() is QApplication.primaryScreen()

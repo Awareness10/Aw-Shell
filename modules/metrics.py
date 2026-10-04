@@ -10,16 +10,14 @@ from fabric.utils.helpers import invoke_repeater
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.circularprogressbar import CircularProgressBar
-from fabric.widgets.eventbox import EventBox
 from fabric.widgets.label import Label
-from fabric.widgets.overlay import Overlay
 from fabric.widgets.revealer import Revealer
 from fabric.widgets.scale import Scale
 from gi.repository import GLib
 
 import config.data as data
-from modules.upower.upower import UPowerManager
 import modules.icons as icons
+from modules.upower.upower import UPowerManager
 from services.network import NetworkClient
 
 logger = logging.getLogger(__name__)
@@ -218,7 +216,7 @@ class Metrics(Box):
                  for path in data.BAR_METRICS_DISKS] if visible.get('disk', True) else []
 
         gpu_info = shared_provider.get_gpu_info()
-        gpus = [SingularMetric(f"gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
+        gpus = [SingularMetric("gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
                 for v in gpu_info] if visible.get('gpu', True) else []
 
         self.cpu = SingularMetric("cpu", "CPU", icons.cpu) if visible.get('cpu', True) else None
@@ -314,7 +312,7 @@ class MetricsSmall(Button):
                  for path in data.BAR_METRICS_DISKS] if visible.get('disk', True) else []
 
         gpu_info = shared_provider.get_gpu_info()
-        gpus = [SingularMetricSmall(f"gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
+        gpus = [SingularMetricSmall("gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
                 for v in gpu_info] if visible.get('gpu', True) else []
 
         self.cpu = SingularMetricSmall("cpu", "CPU", icons.cpu) if visible.get('cpu', True) else None

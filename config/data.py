@@ -2,12 +2,12 @@ import json
 import os
 from pathlib import Path
 
-from .settings_constants import DEFAULTS, APP_NAME, APP_NAME_CAP # noqa: F401
-
 import gi
+
+from .settings_constants import APP_NAME, APP_NAME_CAP, DEFAULTS  # noqa: F401
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib  # type: ignore # noqa: E402
-
 
 CACHE_DIR = str(GLib.get_user_cache_dir()) + f"/{APP_NAME}"
 

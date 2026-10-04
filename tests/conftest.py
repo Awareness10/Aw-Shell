@@ -4,10 +4,24 @@ Sets up mocks for GTK/Fabric imports before any test module imports them,
 and configures headless Qt for PySide6 tests.
 """
 
+import atexit
 import os
+import shutil
 import sys
+import tempfile
 import types
 from unittest.mock import MagicMock
+
+# ── Temporary HOME ──
+# config.data resolves paths and reads config.json from HOME at import time;
+# without this the tests read the developer's own shell config and create
+# directories in their real HOME
+_TEST_HOME = tempfile.mkdtemp(prefix="aw-unit-tests-")
+atexit.register(shutil.rmtree, _TEST_HOME, ignore_errors=True)
+os.environ["HOME"] = _TEST_HOME
+for _var, _sub in (("XDG_CONFIG_HOME", ".config"), ("XDG_CACHE_HOME", ".cache"),
+                   ("XDG_DATA_HOME", ".local/share"), ("XDG_STATE_HOME", ".local/state")):
+    os.environ[_var] = os.path.join(_TEST_HOME, _sub)
 
 # ── Headless Qt for PySide6 tests ──
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -37,7 +51,7 @@ if "gi" not in sys.modules:
     _mock_gdk = MagicMock()
     _mock_gtk = MagicMock()
     _mock_glib = MagicMock()
-    _mock_glib.get_user_cache_dir.return_value = "/tmp/test-cache"
+    _mock_glib.get_user_cache_dir.return_value = os.environ["XDG_CACHE_HOME"]
     _mock_glib.get_os_info.return_value = "arch"
     _mock_gi_repo = types.ModuleType("gi.repository")
     _mock_vte = MagicMock()

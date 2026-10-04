@@ -1,11 +1,11 @@
 import os
-import sys
 import shutil
+import sys
 from pathlib import Path
-from PySide6.QtWidgets import QApplication
 
 import glaze
 from glaze import generate_theme
+from PySide6.QtWidgets import QApplication
 
 
 def _init_theme_from_wallpaper():
@@ -44,7 +44,7 @@ _configure_sys_path_for_direct_execution()
 
 if __name__ == "__main__" and not __package__:
     from config.settings_constants import APP_NAME
-    from config.settings_gui import AwShellSettings # AwShellSettings
+    from config.settings_gui import AwShellSettings  # AwShellSettings
     from config.settings_utils import load_bind_vars, write_hypridle
 else:
     from .settings_constants import APP_NAME

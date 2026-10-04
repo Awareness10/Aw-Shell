@@ -1,7 +1,6 @@
-import os
 import subprocess
 
-from fabric.utils import exec_shell_command_async, idle_add, remove_handler
+from fabric.utils import exec_shell_command_async, remove_handler
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.entry import Entry

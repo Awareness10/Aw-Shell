@@ -20,17 +20,21 @@ fi
 context="$(mktemp -d)"
 trap 'rm -rf "$context"' EXIT
 cp "$repo"/{pyproject.toml,uv.lock,.python-version} "$repo/tests_gtk/Dockerfile" "$context/"
-docker build -q -t "$image" "$context" >/dev/null
+echo "==> Building test image ($image)"
+docker build -t "$image" "$context"
 
 # Give the caller's UID an account (see Dockerfile) and a writable HOME
 setup='mkdir -p "$HOME" && { id -un >/dev/null 2>&1 || echo "tester:x:$(id -u):$(id -g)::$HOME:/bin/sh" >> /etc/passwd; }'
 pytest="uv run --frozen --no-sync pytest -p no:cacheprovider"
 if $all; then
     # Separate processes: tests/ mocks gi, tests_gtk/ needs the real one
-    cmd="$setup && $pytest tests --cov-report= $* && $pytest tests_gtk --cov-append --cov-report=term --cov-report=json:coverage.json $*"
+    cmd="$setup && echo '==> Unit tests (tests/)' && $pytest tests --cov-report= $*"
+    cmd="$cmd && echo '==> GTK tests (tests_gtk/), merging coverage'"
+    cmd="$cmd && $pytest tests_gtk --cov-append --cov-report=term --cov-report=json:coverage.json $*"
 else
-    cmd="$setup && $pytest tests_gtk $*"
+    cmd="$setup && echo '==> GTK tests (tests_gtk/)' && $pytest tests_gtk $*"
 fi
+echo "==> Running in container"
 
 tty=()
 [[ -t 1 ]] && tty=(-t)

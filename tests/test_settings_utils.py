@@ -1,37 +1,34 @@
 """Tests for config/settings_utils.py — bind_vars management, config generation, file ops."""
 
 import json
-import os
 import re
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from config.settings_constants import APP_NAME_CAP, DEFAULTS
 from config.settings_utils import (
-    get_bind_var,
-    set_bind_var,
-    set_all_bind_vars,
-    reset_to_defaults,
-    load_bind_vars,
-    save_bind_vars,
-    get_available_monitors,
-    apply_and_restart,
-    ensure_matugen_config,
-    ensure_face_icon,
-    ensure_current_wallpaper,
-    start_config,
-    generate_hyprlua,
-    deep_update,
-    backup_and_replace,
-    generate_hypridle,
+    APPLY_COLORS_FN,
     HYPRIDLE_HEADER,
     HYPRIDLE_START,
-    APPLY_COLORS_FN,
+    apply_and_restart,
+    backup_and_replace,
     bind_vars,
+    ensure_current_wallpaper,
+    ensure_face_icon,
+    ensure_matugen_config,
+    generate_hypridle,
+    generate_hyprlua,
+    get_available_monitors,
+    get_bind_var,
+    load_bind_vars,
+    reset_to_defaults,
+    save_bind_vars,
+    set_all_bind_vars,
+    set_bind_var,
+    start_config,
 )
-from config.settings_constants import APP_NAME_CAP
-from config.settings_constants import DEFAULTS
 
 
 @pytest.fixture(autouse=True)
@@ -183,6 +180,14 @@ class TestGenerateHyprlua:
         assert f"\n{APPLY_COLORS_FN}()\n" in conf  # applied at config load
         assert len(re.findall(r"\bactive_border\b", conf)) == 1  # only set there
 
+    def test_shell_launched_with_venv_python(self):
+        """Regression: a bare `python` runs the system interpreter, which lacks
+        the shell's dependencies."""
+        conf = generate_hyprlua()
+        launches = re.findall(r"(\S+) \S*/main\.py", conf)
+        assert len(launches) >= 3  # reload, inspector restart, autostart
+        assert all(python.endswith("/.venv/bin/python") for python in launches), launches
+
     def test_horizontal_animation_for_top(self):
         set_bind_var("bar_position", "Top")
         conf = generate_hyprlua()
@@ -286,29 +291,6 @@ class TestBackupAndReplace:
         backup_and_replace(src, dest, "TestConfig")
 
         assert not (tmp_path / "dest.conf.bak").exists()
-
-
-# =========================================================================
-# deep_update (imported from settings_utils, already tested separately
-# but verifying it's the same function)
-# =========================================================================
-
-class TestDeepUpdateImport:
-
-    def test_basic_merge(self):
-        target = {"a": 1, "b": {"x": 1}}
-        deep_update(target, {"b": {"y": 2}})
-        assert target == {"a": 1, "b": {"x": 1, "y": 2}}
-
-    def test_overwrite_non_dict(self):
-        target = {"a": "old"}
-        deep_update(target, {"a": "new"})
-        assert target == {"a": "new"}
-
-    def test_add_new_key(self):
-        target = {"a": 1}
-        deep_update(target, {"b": 2})
-        assert target == {"a": 1, "b": 2}
 
 
 # =========================================================================

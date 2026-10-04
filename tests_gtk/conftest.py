@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 import pytest
@@ -71,6 +72,8 @@ class Sandbox:
         self.procs: list[subprocess.Popen] = []
 
     def setup(self):
+        # Registered first so a failed start (e.g. no sway) still cleans up
+        atexit.register(self.teardown)
         self._set_env()
         self._install_dir()
         self._wallpaper()
@@ -79,7 +82,6 @@ class Sandbox:
         self._start_dbus()
         self._start_fake_upower()
         self._start_compositor()
-        atexit.register(self.teardown)
 
     def _set_env(self):
         for var in ("DISPLAY", "WAYLAND_SOCKET", "SWAYSOCK", "DBUS_SESSION_BUS_ADDRESS",
@@ -187,7 +189,8 @@ class Sandbox:
         return log.read_text().splitlines() if log.exists() else []
 
     def teardown(self):
-        self.hyprland.close()
+        if hasattr(self, "hyprland"):
+            self.hyprland.close()
         for proc in reversed(self.procs):
             if proc.poll() is None:
                 proc.send_signal(signal.SIGTERM)
@@ -239,6 +242,88 @@ def pump(iterations: int = 50) -> None:
             break
 
 
+def pump_until(condition, timeout: float = 5.0) -> bool:
+    """Pump the main loop until condition() holds; stubbed commands and
+    D-Bus calls finish asynchronously."""
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() > deadline:
+            return False
+        pump()
+        time.sleep(0.02)
+    return True
+
+
+def _call_notifications(method: str, args: GLib.Variant):
+    """Call the shell's notification server; async, since it answers from this
+    same main loop. Returns the reply's values."""
+    from gi.repository import Gio
+
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+
+    def server_owned() -> bool:  # the server claims its bus name asynchronously
+        reply = bus.call_sync(
+            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+            "NameHasOwner", GLib.Variant("(s)", ("org.freedesktop.Notifications",)),
+            GLib.VariantType("(b)"), Gio.DBusCallFlags.NONE, -1, None,
+        )
+        return reply.unpack()[0]
+
+    assert pump_until(server_owned), "no notification server on the bus"
+    replies = []
+    bus.call(
+        "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+        "org.freedesktop.Notifications", method, args, None, Gio.DBusCallFlags.NONE,
+        2000, None, lambda conn, result: replies.append(conn.call_finish(result).unpack()),
+    )
+    assert pump_until(lambda: replies), f"no reply to {method}"
+    return replies[0]
+
+
+def notify(summary: str, body: str = "", app_name: str = "test") -> int:
+    """Send a notification like an app would; returns its id."""
+    args = GLib.Variant("(susssasa{sv}i)", (app_name, 0, "", summary, body, [], {}, -1))
+    return _call_notifications("Notify", args)[0]
+
+
+def close_notification(notification_id: int) -> None:
+    """The sending app withdraws the notification (reason CLOSED)."""
+    _call_notifications("CloseNotification", GLib.Variant("(u)", (notification_id,)))
+
+
 @pytest.fixture
 def run_pending():
     return pump
+
+
+_gtk_criticals: list[str] = []
+
+
+def _record_gtk_critical(domain, level, message, *_):
+    # Criticals are GTK API misuse (e.g. packing a widget that has a parent);
+    # GTK prints them and carries on. Keep the Python line that caused it.
+    ours = [f for f in traceback.extract_stack()
+            if f.filename.startswith(str(REPO)) and "/tests_gtk/" not in f.filename
+            and "/.venv/" not in f.filename]
+    where = f" at {Path(ours[-1].filename).relative_to(REPO)}:{ours[-1].lineno}" if ours else ""
+    _gtk_criticals.append(f"{domain}-CRITICAL: {message}{where}")
+
+
+GLib.log_set_handler("Gtk", GLib.LogLevelFlags.LEVEL_CRITICAL, _record_gtk_critical)
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_callback_errors():
+    """Errors GTK and PyGObject only print must fail the test: exceptions in
+    GLib callbacks (idle handlers, timeouts, signal handlers), which go to
+    sys.excepthook, and Gtk criticals."""
+    errors = []
+    original = sys.excepthook
+    sys.excepthook = lambda *exc_info: errors.append(exc_info)
+    _gtk_criticals.clear()
+    yield
+    sys.excepthook = original
+    report = ["".join(traceback.format_exception(*e)) for e in errors] + _gtk_criticals
+    if report:
+        pytest.fail(f"{len(report)} error(s) GTK only printed:\n" + "\n".join(report),
+                    pytrace=False)

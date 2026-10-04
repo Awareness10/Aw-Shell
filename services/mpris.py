@@ -3,12 +3,13 @@ import contextlib
 
 # Third-party imports
 import gi
-from gi.repository import GLib  # type: ignore
-from loguru import logger
 
 # Fabric imports
 from fabric.core.service import Property, Service, Signal
 from fabric.utils import bulk_connect
+from gi.repository import GLib  # type: ignore
+from loguru import logger
+
 
 class PlayerctlImportError(ImportError):
     """An error to raise when playerctl is not installed."""

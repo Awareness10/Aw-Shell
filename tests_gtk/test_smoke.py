@@ -4,6 +4,7 @@ import importlib
 from unittest.mock import MagicMock
 
 import pytest
+from gi.repository import Gtk
 
 # Stand-ins for the parent a widget is normally built inside (Notch / Widgets)
 NOTCH = {"notch": MagicMock(name="notch")}
@@ -52,13 +53,34 @@ def _id(entry):
     return f"{cls}({args})"
 
 
+def _show(widget):
+    """Show and render the widget, so allocation and draw handlers run too.
+
+    Windows go on the sandbox compositor; other widgets into an offscreen
+    window, rendered explicitly. Returns what needs destroying afterwards.
+    """
+    if isinstance(widget, Gtk.Window):
+        widget.show_all()
+        return widget
+    host = Gtk.OffscreenWindow()
+    host.add(widget)
+    host.show_all()
+    assert host.get_pixbuf() is not None
+    return host
+
+
 @pytest.mark.parametrize("entry", WIDGETS, ids=[_id(w) for w in WIDGETS])
-def test_widget_builds(entry, run_pending):
+def test_widget_builds_and_renders(entry, run_pending):
+    """Callback errors fail the test too (see _fail_on_callback_errors)."""
     module, cls, kwargs = entry
     widget = getattr(importlib.import_module(module), cls)(**kwargs)
     run_pending()
-    assert widget is not None
-    widget.destroy()
+    shown = _show(widget)
+    run_pending()
+    assert widget.get_realized()
+    width, height = widget.get_allocated_width(), widget.get_allocated_height()
+    assert width > 0 and height > 0, f"{cls} allocated {width}x{height}"
+    shown.destroy()
     run_pending()
 
 

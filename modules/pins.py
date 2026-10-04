@@ -10,7 +10,6 @@ import subprocess
 import tempfile
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
 import cairo
 from fabric.widgets.box import Box

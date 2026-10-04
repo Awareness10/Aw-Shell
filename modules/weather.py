@@ -1,5 +1,4 @@
 import subprocess
-import urllib.parse
 
 import gi
 from fabric.widgets.button import Button

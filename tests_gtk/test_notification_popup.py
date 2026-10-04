@@ -4,45 +4,10 @@ It only moves while nothing is on screen, so a visible stack never jumps
 between monitors.
 """
 
-import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from conftest import pump
-from gi.repository import Gio, GLib
-
-
-def _pump_until(condition, timeout: float = 3.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if condition():
-            return True
-        pump()
-        time.sleep(0.01)
-    return condition()
-
-
-def _notify(summary: str) -> None:
-    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-
-    # The server claims its bus name asynchronously
-    def server_owned() -> bool:
-        reply = bus.call_sync(
-            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
-            "NameHasOwner", GLib.Variant("(s)", ("org.freedesktop.Notifications",)),
-            GLib.VariantType("(b)"), Gio.DBusCallFlags.NONE, -1, None,
-        )
-        return reply.unpack()[0]
-
-    assert _pump_until(server_owned), "no notification server on the bus"
-
-    # Async: the notification server answers from this same main loop
-    bus.call(
-        "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
-        "org.freedesktop.Notifications", "Notify",
-        GLib.Variant("(susssasa{sv}i)", ("test", 0, "", summary, "", [], {}, -1)),
-        None, Gio.DBusCallFlags.NONE, 2000, None, None,
-    )
+from conftest import notify, pump, pump_until
 
 
 def test_before_show_runs_only_when_nothing_on_screen():
@@ -54,15 +19,33 @@ def test_before_show_runs_only_when_nothing_on_screen():
         before_show=lambda: shown_before.append(len(container.notifications)),
     )
     try:
-        _notify("first")
-        assert _pump_until(lambda: len(container.notifications) == 1)
-        _notify("second")
-        assert _pump_until(lambda: len(container.notifications) == 2)
+        notify("first")
+        assert pump_until(lambda: len(container.notifications) == 1)
+        notify("second")
+        assert pump_until(lambda: len(container.notifications) == 2)
         assert shown_before == [0]
     finally:
         container.destroy()
         pump()
 
+
+
+def test_new_container_takes_over_the_server():
+    """The D-Bus server is process-wide (fabric can't register a second one);
+    a destroyed container must stop receiving and the next one must receive."""
+    from modules.notifications import NotificationContainer, NotificationHistory
+
+    first = NotificationContainer(NotificationHistory())
+    first.destroy()
+    pump()
+    second = NotificationContainer(NotificationHistory())
+    try:
+        notify("after rebuild")
+        assert pump_until(lambda: len(second.notifications) == 1)
+        assert first.notifications == []
+    finally:
+        second.destroy()
+        pump()
 
 def test_popup_follows_focus_to_shown_monitors(monkeypatch):
     from modules.notifications import NotificationPopup

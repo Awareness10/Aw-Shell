@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess as _sp
 import sys
 
@@ -24,7 +25,8 @@ if __name__ == "__main__":
 
     if not os.path.isfile(CONFIG_FILE):
         config_script_path = get_relative_path("config/config.py")
-        exec_shell_command_async(f"python {config_script_path}")
+        # The shell's own interpreter; the system python lacks its dependencies
+        exec_shell_command_async(shlex.join([sys.executable, config_script_path]))
 
     ensure_current_wallpaper()
 

@@ -3,8 +3,13 @@ import logging
 
 import cairo
 from fabric.hyprland.widgets import get_hyprland_connection
-from fabric.utils import (exec_shell_command, exec_shell_command_async,
-                          get_relative_path, idle_add, remove_handler)
+from fabric.utils import (
+    exec_shell_command,
+    exec_shell_command_async,
+    get_relative_path,
+    idle_add,
+    remove_handler,
+)
 from fabric.utils.helpers import get_desktop_applications
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -14,6 +19,7 @@ from fabric.widgets.revealer import Revealer
 from gi.repository import Gdk, GLib, Gtk
 
 import config.data as data
+import utils.apps as apps
 from modules.corners import MyCorner
 from utils.icon_resolver import IconResolver
 from widgets.wayland import WaylandWindow as Window
@@ -302,29 +308,10 @@ class Dock(Window):
         GLib.timeout_add_seconds(2, self.check_config_change)
             
     def _build_app_identifiers_map(self):
-        identifiers = {}
-        for app in self._all_apps:
-            if app.name: identifiers[app.name.lower()] = app
-            if app.display_name: identifiers[app.display_name.lower()] = app
-            if app.window_class: identifiers[app.window_class.lower()] = app
-            if app.executable: identifiers[app.executable.split('/')[-1].lower()] = app
-            if app.command_line: identifiers[app.command_line.split()[0].split('/')[-1].lower()] = app
-        return identifiers
+        return apps.build_identifier_map(self._all_apps)
 
     def _normalize_window_class(self, class_name):
-        if not class_name: return ""
-        normalized = class_name.lower()
-        suffixes = [".bin", ".exe", ".so", "-bin", "-gtk"]
-        for suffix in suffixes:
-            if normalized.endswith(suffix):
-                normalized = normalized[:-len(suffix)]
-        return normalized
-        
-    def _classes_match(self, class1, class2):
-        if not class1 or not class2: return False
-        norm1 = self._normalize_window_class(class1)
-        norm2 = self._normalize_window_class(class2)
-        return norm1 == norm2
+        return apps.normalize_window_class(class_name)
 
     def on_drag_begin(self, widget, drag_context):
         self._drag_in_progress = True
@@ -376,27 +363,10 @@ class Dock(Window):
         return True
 
     def find_app(self, app_identifier):
-        if not app_identifier: return None
-        if isinstance(app_identifier, dict):
-            for key in ["window_class", "executable", "command_line", "name", "display_name"]:
-                if key in app_identifier and app_identifier[key]:
-                    app = self.find_app_by_key(app_identifier[key])
-                    if app: return app
-            return None
-        return self.find_app_by_key(app_identifier)
-    
+        return apps.find_app(app_identifier, self.app_identifiers, self._all_apps)
+
     def find_app_by_key(self, key_value):
-        if not key_value: return None
-        normalized_id = str(key_value).lower()
-        if normalized_id in self.app_identifiers:
-            return self.app_identifiers[normalized_id]
-        for app in self._all_apps:
-            if app.name and normalized_id in app.name.lower(): return app
-            if app.display_name and normalized_id in app.display_name.lower(): return app
-            if app.window_class and normalized_id in app.window_class.lower(): return app
-            if app.executable and normalized_id in app.executable.lower(): return app
-            if app.command_line and normalized_id in app.command_line.lower(): return app
-        return None
+        return apps.find_app_by_key(key_value, self.app_identifiers, self._all_apps)
 
     def update_app_map(self):
         self._all_apps = get_desktop_applications()

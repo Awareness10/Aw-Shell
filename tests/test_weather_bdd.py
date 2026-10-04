@@ -8,12 +8,11 @@ successful fetch.
 import subprocess
 import sys
 import types
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 # Ensure config.data has VERTICAL attr (conftest mocks may not include it)
 import config.data as _data
+
 if not hasattr(_data, "VERTICAL"):
     _data.VERTICAL = False
 
@@ -70,7 +69,6 @@ sys.modules.setdefault("modules.icons", _icons)
 
 # Now safe to import
 from modules.weather import Weather  # noqa: E402
-
 
 # ── helpers ──
 

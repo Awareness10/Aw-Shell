@@ -12,10 +12,9 @@ from fabric.widgets.button import Button
 from fabric.widgets.entry import Entry
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
-from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
 from PIL import Image
 
-import config.config
 import config.data as data
 import modules.icons as icons
 
@@ -42,10 +41,17 @@ class WallpaperSelector(Box):
         os.makedirs(self.CACHE_DIR, exist_ok=True)
 
         self.files = []
-        GLib.idle_add(self._load_wallpapers_async().__next__)
         self.thumbnails = []
         self.thumbnail_queue = []
         self.executor = ThreadPoolExecutor(max_workers=4)  # Shared executor
+        # Background loading must stop with the widget (e.g. its notch is
+        # destroyed when a monitor goes away)
+        self._destroyed = False
+        self.connect("destroy", self._on_destroy)
+        # One step per idle call; False once the generator is done
+        # (a bare __next__ would leak StopIteration into GLib)
+        loader = self._load_wallpapers_async()
+        GLib.idle_add(lambda: not self._destroyed and next(loader, False))
 
         # Variable to control the selection (similar to AppLauncher)
         self.selected_index = -1
@@ -232,7 +238,9 @@ class WallpaperSelector(Box):
                             )
                         except Exception as e:
                             print(f"Error renaming file {full_path}: {e}")
-                        yield
+                        # True keeps the idle handler running; a bare yield
+                        # returned None and stopped loading after one rename
+                        yield True
 
         # Process files in small batches to keep UI responsive
         file_list = os.listdir(data.WALLPAPERS_DIR)
@@ -242,7 +250,8 @@ class WallpaperSelector(Box):
         for i in range(0, len(file_list), batch_size):
             batch = file_list[i : i + batch_size]
             for filename in batch:
-                if self._is_image(filename):
+                # The directory monitor may already have added files renamed above
+                if self._is_image(filename) and filename not in self.files:
                     self.files.append(filename)
 
             # Sort the current batch to maintain order
@@ -286,7 +295,7 @@ class WallpaperSelector(Box):
         file_name = random.choice(self.files)
         full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
         selected_scheme = self.scheme_dropdown.get_active_id()
-        current_wall = os.path.expanduser(f"~/.current.wall")
+        current_wall = os.path.expanduser("~/.current.wall")
 
         if os.path.isfile(current_wall) or os.path.islink(
             current_wall
@@ -371,7 +380,7 @@ class WallpaperSelector(Box):
         file_name = model[path][1]
         full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
         selected_scheme = self.scheme_dropdown.get_active_id()
-        current_wall = os.path.expanduser(f"~/.current.wall")
+        current_wall = os.path.expanduser("~/.current.wall")
         if os.path.isfile(current_wall) or os.path.islink(current_wall):
             os.remove(current_wall)
         os.symlink(full_path, current_wall)
@@ -555,14 +564,25 @@ class WallpaperSelector(Box):
         thread = GLib.Thread.new("thumbnail-loader", self._preload_thumbnails, None)
 
     def _preload_thumbnails(self, _data):
-        futures = [
-            self.executor.submit(self._process_file, file_name)
-            for file_name in self.files
-        ]
+        try:
+            futures = [
+                self.executor.submit(self._process_file, file_name)
+                for file_name in self.files
+            ]
+        except RuntimeError:  # executor shut down: the widget was destroyed
+            return
         concurrent.futures.wait(futures)
         GLib.idle_add(self._process_batch)
 
+    def _on_destroy(self, *_):
+        self._destroyed = True
+        self.executor.shutdown(wait=False, cancel_futures=True)
+        if getattr(self, "file_monitor", None):
+            self.file_monitor.cancel()
+
     def _process_file(self, file_name):
+        if self._destroyed:
+            return
         full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
         cache_path = self._get_cache_path(file_name)
         if not os.path.exists(cache_path):
@@ -584,6 +604,8 @@ class WallpaperSelector(Box):
         GLib.idle_add(self._process_batch)
 
     def _process_batch(self):
+        if self._destroyed:
+            return False
         batch = self.thumbnail_queue[:10]
         del self.thumbnail_queue[:10]
         replaced = False

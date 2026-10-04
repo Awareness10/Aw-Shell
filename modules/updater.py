@@ -14,16 +14,25 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QProcess, QThread, Qt, QTimer, Signal, Slot
-from PySide6.QtWidgets import (
-    QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QSizePolicy, QTextEdit, QVBoxLayout, QWidget,
-)
-from PySide6.QtGui import QColor
-
-from glaze.theme import get_dialog_stylesheet, get_table_container_style, get_current_theme
+from glaze.theme import get_current_theme, get_dialog_stylesheet, get_table_container_style
 from glaze.widgets import FramelessMainWindow
+from PySide6.QtCore import QObject, QProcess, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
+from config.screen_fit import ScreenFit
 from config.settings_constants import APP_NAME, APP_NAME_CAP
 
 # ---------------------------------------------------------------------------
@@ -326,6 +335,14 @@ class UpdateCheckWorker(QObject):
 # ---------------------------------------------------------------------------
 
 
+# Initial window size, relative to the screen it opens on: a slim dialog that
+# grows taller when the update log is shown
+HEIGHT_FRACTION = 0.6
+WIDTH_PER_HEIGHT = 0.75
+LOG_HEIGHT_FRACTION = 0.8
+MIN_SIZE = (400, 380)
+
+
 class UpdaterWindow(FramelessMainWindow):
     """PySide6 updater dialog following the FramelessMainWindow pattern."""
 
@@ -353,7 +370,7 @@ class UpdaterWindow(FramelessMainWindow):
 
         title = f"{APP_NAME_CAP} Updater" + (" (preview)" if preview else "")
         super().__init__(width=500, height=480, title=title)
-        self.setMinimumSize(400, 380)
+        self.screen_fit = ScreenFit(self, HEIGHT_FRACTION, WIDTH_PER_HEIGHT, MIN_SIZE)
 
     # -- FramelessMainWindow overrides --
 
@@ -615,9 +632,10 @@ class UpdaterWindow(FramelessMainWindow):
         return cmd
 
     def _on_update(self) -> None:
-        # Show log area and resize
+        # Show log area and grow taller to make room for it
         self.log_area.setVisible(True)
-        self.resize(500, 600)
+        log_height = round(self.screen().availableGeometry().height() * LOG_HEIGHT_FRACTION)
+        self.resize(self.width(), max(self.height(), log_height))
         cmd = self._update_command()
 
         if self._preview:

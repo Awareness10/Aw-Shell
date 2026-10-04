@@ -302,15 +302,15 @@ class NetworkClient(Service):
     def _get_primary_device(self) -> Literal["wifi", "wired"] | None:
         if not self._client:
             return None
-        return (
-            "wifi"
-            if "wireless"
-            in str(self._client.get_primary_connection().get_connection_type())
-            else "wired"
-            if "ethernet"
-            in str(self._client.get_primary_connection().get_connection_type())
-            else None
-        )
+        primary = self._client.get_primary_connection()
+        if primary is None:  # offline
+            return None
+        connection_type = str(primary.get_connection_type())
+        if "wireless" in connection_type:
+            return "wifi"
+        if "ethernet" in connection_type:
+            return "wired"
+        return None
 
     def _find_saved_wifi_connection(self, ssid: str | None) -> NM.RemoteConnection | None:
         if not self._client or not ssid:
