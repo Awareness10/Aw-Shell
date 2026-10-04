@@ -55,6 +55,10 @@ addopts = "--cov --cov-report=term-missing"
 filterwarnings = [
     # No GTK3 replacement for the connector name (Gdk.Monitor.get_connector is GTK4)
     "ignore:Gdk.Screen.get_monitor_plug_name is deprecated:DeprecationWarning",
+    # Raised inside dependencies, not fixable here
+    "ignore::DeprecationWarning:fabric\\.",
+    "ignore:g_object_notify.*has no property named:Warning:fabric\\.core\\.service",
+    "ignore:Gio.DBusConnection.register_object is deprecated:DeprecationWarning:gi\\.overrides\\.Gio",
 ]
 
 [tool.coverage.run]
