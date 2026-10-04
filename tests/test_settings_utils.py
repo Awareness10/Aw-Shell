@@ -181,6 +181,14 @@ class TestGenerateHyprlua:
         assert f"\n{APPLY_COLORS_FN}()\n" in conf  # applied at config load
         assert len(re.findall(r"\bactive_border\b", conf)) == 1  # only set there
 
+    def test_shell_launched_with_venv_python(self):
+        """Regression: a bare `python` runs the system interpreter, which lacks
+        the shell's dependencies."""
+        conf = generate_hyprlua()
+        launches = re.findall(r"(\S+) \S*/main\.py", conf)
+        assert len(launches) >= 3  # reload, inspector restart, autostart
+        assert all(python.endswith("/.venv/bin/python") for python in launches), launches
+
     def test_horizontal_animation_for_top(self):
         set_bind_var("bar_position", "Top")
         conf = generate_hyprlua()
