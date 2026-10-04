@@ -242,6 +242,18 @@ def pump(iterations: int = 50) -> None:
             break
 
 
+def pump_until(condition, timeout: float = 5.0) -> bool:
+    """Pump the main loop until condition() holds; stubbed commands and
+    D-Bus calls finish asynchronously."""
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() > deadline:
+            return False
+        pump()
+        time.sleep(0.02)
+    return True
+
+
 @pytest.fixture
 def run_pending():
     return pump

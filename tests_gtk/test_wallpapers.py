@@ -6,10 +6,10 @@ call needs `--source-color-index 0`.
 """
 
 import os
-import time
 from pathlib import Path
 
 import pytest
+from conftest import pump_until
 from gi.repository import Gtk
 
 WALLPAPER = "example.jpg"
@@ -30,15 +30,13 @@ def selector(sandbox, run_pending):
     current_wall.symlink_to(original)
 
 
-def matugen_calls(sandbox, run_pending, before, timeout=5.0):
+def matugen_calls(sandbox, run_pending, before):
     """matugen commands logged since `before`; the stub runs asynchronously."""
-    deadline = time.monotonic() + timeout
-    while True:
-        run_pending()
-        calls = [c for c in sandbox.commands()[before:] if c.startswith("matugen ")]
-        if calls or time.monotonic() > deadline:
-            return calls
-        time.sleep(0.05)
+    def calls():
+        return [c for c in sandbox.commands()[before:] if c.startswith("matugen ")]
+
+    pump_until(calls)
+    return calls()
 
 
 def assert_non_interactive(calls):
@@ -69,14 +67,6 @@ def test_changing_scheme(sandbox, run_pending, selector):
     assert_non_interactive(matugen_calls(sandbox, run_pending, before))
 
 
-def _pump_until(run_pending, condition, timeout=5.0):
-    deadline = time.monotonic() + timeout
-    while not condition() and time.monotonic() < deadline:
-        run_pending()
-        time.sleep(0.02)
-    return condition()
-
-
 def test_loads_every_wallpaper_and_normalises_names(run_pending, monkeypatch, tmp_path):
     """Names with capitals or spaces get renamed; loading must not stop at the
     first rename."""
@@ -95,7 +85,7 @@ def test_loads_every_wallpaper_and_normalises_names(run_pending, monkeypatch, tm
     selector = WallpaperSelector()
     try:
         expected = ["big-sky.jpg", "forest.jpg", "night-city.png"]
-        assert _pump_until(run_pending, lambda: len(selector.viewport.get_model()) == 3), \
+        assert pump_until(lambda: len(selector.viewport.get_model()) == 3), \
             f"files={selector.files}, on disk={sorted(os.listdir(walls))}"
         assert selector.files == expected
         assert sorted(os.listdir(walls)) == expected
