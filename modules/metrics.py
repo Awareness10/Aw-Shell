@@ -172,6 +172,12 @@ class MetricsProvider:
 
 shared_provider = MetricsProvider()
 
+def _repeat_while_alive(widget, source_id: int) -> None:
+    """Stop a periodic update when its widget is destroyed (bars go away with
+    their monitor); it would keep writing to dead widgets."""
+    widget.connect("destroy", lambda *_: GLib.source_remove(source_id))
+
+
 class SingularMetric:
     def __init__(self, id, name, icon):
         self.usage = Scale(
@@ -240,7 +246,7 @@ class Metrics(Box):
         for x in self.scales:
             self.add(x)
 
-        GLib.timeout_add_seconds(2, self.update_status)
+        _repeat_while_alive(self, GLib.timeout_add_seconds(2, self.update_status))
 
     def update_status(self):
         cpu, mem, disks, gpus = shared_provider.get_metrics()
@@ -337,7 +343,7 @@ class MetricsSmall(Button):
         self.connect("enter-notify-event", self.on_mouse_enter)
         self.connect("leave-notify-event", self.on_mouse_leave)
 
-        GLib.timeout_add_seconds(2, self.update_metrics)
+        _repeat_while_alive(self, GLib.timeout_add_seconds(2, self.update_metrics))
 
         self.hide_timer = None
         self.hover_counter = 0
@@ -464,6 +470,7 @@ class Battery(Button):
             default_value=0
         )
         self.batt_fabricator.changed.connect(self.update_battery)
+        self.connect("destroy", lambda *_: self.batt_fabricator.stop())
         GLib.idle_add(self.update_battery, None, shared_provider.get_battery())
 
         self.hide_timer = None
@@ -583,7 +590,7 @@ class NetworkApplet(Button):
 
         self.last_counters = psutil.net_io_counters()
         self.last_time = time.time()
-        invoke_repeater(1000, self.update_network)
+        _repeat_while_alive(self, invoke_repeater(1000, self.update_network))
 
         self.connect("enter-notify-event", self.on_mouse_enter)
         self.connect("leave-notify-event", self.on_mouse_leave)

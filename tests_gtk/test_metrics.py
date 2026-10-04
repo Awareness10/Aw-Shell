@@ -46,3 +46,20 @@ def test_battery_read_with_upower():
     provider = MetricsProvider()
     provider._update()
     assert provider.get_battery() == (80.0, False, 5400)
+
+
+def test_destroyed_widgets_stop_updating(run_pending):
+    """Bars are destroyed when their monitor goes away; their periodic updates
+    must stop, or they hit dead widgets (Gtk-CRITICALs, caught by conftest)."""
+    import time
+
+    from modules.metrics import Battery, Metrics, MetricsSmall, NetworkApplet
+
+    widgets = [Metrics(), MetricsSmall(), Battery(), NetworkApplet()]
+    run_pending()
+    for widget in widgets:
+        widget.destroy()
+    deadline = time.monotonic() + 2.5  # every update interval elapses at least once
+    while time.monotonic() < deadline:
+        run_pending()
+        time.sleep(0.05)

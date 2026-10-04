@@ -20,7 +20,24 @@
 
 ---
 
-<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Camera%20with%20Flash.png" alt="Camera with Flash" width="25" height="25" /></sub> Screenshots</h2>
+## Table of Contents
+
+- [Screenshots](#screenshots)
+- [Installation](#installation)
+  - [Supported systems](#supported-systems)
+  - [Install script](#install-script)
+  - [Manual Installation](#manual-installation)
+- [Features](#features)
+- [Testing](#testing)
+  - [Running](#running)
+  - [The GTK sandbox](#the-gtk-sandbox)
+  - [CI](#ci)
+  - [Limitations](#limitations)
+- [Changes from Ax-Shell](#changes-from-ax-shell)
+
+---
+
+<h2 id="screenshots"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Camera%20with%20Flash.png" alt="Camera with Flash" width="25" height="25" /></sub> Screenshots</h2>
 <table align="center">
   <tr>
     <td colspan="5"><img src="assets/screenshots/1.png"></td>
@@ -33,49 +50,28 @@
   </tr>
 </table>
 
-<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Wrench.png" alt="Wrench" width="25" height="25" /></sub> Changes from Ax-Shell</h2>
+<h2 id="installation"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
 
-Aw-Shell started from Ax-Shell, which is now deprecated upstream, and has since grown into its own project:
+### Supported systems
 
-**Hyprland compatibility**
-- **Lua config** — keybinds and settings generate a native Hyprland Lua config, compatible with Hyprland 0.56.2+ (including the 0.57 module changes)
-- **Live theme updates** — border colors apply over Hyprland IPC after a wallpaper change, no reload needed
+| System | Status |
+|---|---|
+| Arch Linux | Supported |
+| CachyOS | Supported (used daily) |
+| Other distros on Arch's own repositories (e.g. EndeavourOS) | Expected to work, not tested |
+| Manjaro | Untested: its delayed repositories can clash with the AUR packages |
+| Non-Arch distros (Debian, Ubuntu, Fedora, NixOS, ...) | Not supported |
 
-**Performance**
-- **No process polling** — toolbox status (screen recorder, pomodoro, gamemode) is checked in-process by one shared poller instead of spawning `pgrep` and scripts every 2 seconds on every monitor
-- **Event-driven notch hiding** — the notch reacts to Hyprland events per monitor instead of polling the active window twice a second
-- **Shared pollers** — tray watcher and headset battery run once and serve every bar
-
-**Multi-monitor**
-- Monitor ids match screens, and the main monitor is whichever holds workspace 1 — no hard-coded connector names
-- Tray icons on every bar; dashboard, launcher, workspaces and notifications open on the focused monitor
-- Rounded corners and notch hiding work per monitor
-
-**Settings & theming**
-- **PySide6 (Qt6) settings window** — the first step of the migration to Qt, styled with [Glaze](https://github.com/Awareness10/Glaze); sizes itself to the screen it opens on
-- **Color schemes** — the selected Matugen scheme is remembered and applied immediately; the full palette is written to `config/colors.json` for other tools
-- **Matugen 4** support
-- **Idle** — "Suspend when idle" option, a working Caffeine toggle, and a single hypridle instance after Apply
-
-**New & rewritten**
-- **Bluetooth** — rewritten on BlueZ D-Bus and `bluetoothctl`
-- **Updater** — fresh version checks via the GitHub API, changelog grouped by version with one row per change
-- **Peripherals** — headset battery (via `headsetcontrol`) and Logitech mouse battery in the control panel
-- **Screen recorder indicator**, weather widget, and tooltips throughout
-- **Fixes** — Wi-Fi no longer creates duplicate profiles, wallpaper thumbnails refresh when files change, metrics work without UPower, overview handles close confirmations
-
-**Development**
-- **`uv`** — reproducible installs with `uv sync` instead of a manual pip/venv setup
-- **Tests & CI** — unit tests plus real-GTK tests in a sandbox, with coverage on every push (see Testing below)
-- **Code quality** — dead code removed, `pathlib` over `os.path`, cleaned imports and typings
-
-<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
+Requirements:
+- Hyprland 0.56.2 or newer
+- [uwsm](https://github.com/Vladimir-csp/uwsm): the installer and the generated Hyprland config launch the shell with `uwsm app`
+- `pacman` with access to the AUR; the installer uses `paru` or `yay` and installs `yay-bin` if neither is present. Several dependencies (fabric-cli, Gray, matugen) only exist in the AUR
+- systemd
 
 > [!NOTE]
-> You need a functioning Hyprland installation (0.56.2 or newer).
-> This will also enable NetworkManager if it is not already enabled.
+> The installer enables NetworkManager if it is not already enabled, and disables `iwd` if it is running.
 
-### Arch Linux
+### Install script
 
 > [!TIP]
 > This command also works for updating an existing installation!
@@ -113,7 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
     uwsm app -- .venv/bin/python main.py > /dev/null 2>&1 & disown
     ```
 
-<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" /></sub> Features</h2>
+<h2 id="features"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" /></sub> Features</h2>
 
 - App Launcher
 - Bluetooth Manager
@@ -147,7 +143,7 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 - Workspaces Overview
 - Multi-monitor support
 
-<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Test%20Tube.png" alt="Test Tube" width="25" height="25" /></sub> Testing</h2>
+<h2 id="testing"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Test%20Tube.png" alt="Test Tube" width="25" height="25" /></sub> Testing</h2>
 
 There are two test suites. They must run in separate processes: `tests/` replaces `gi` with mocks, `tests_gtk/` needs the real one.
 
@@ -159,12 +155,12 @@ There are two test suites. They must run in separate processes: `tests/` replace
 ### Running
 
 ```bash
-uv sync                          # includes the dev group (pytest, pytest-cov, ruff)
-uv run pytest                    # unit tests (tests/)
-uv run pytest tests_gtk          # GTK tests, needs sway plus the shell's system deps (see below)
-scripts/test-gtk.sh --all        # both suites in Docker, exactly like CI, merged coverage
-scripts/test-gtk.sh              # GTK tests only, in Docker
-uv run ruff check .              # lint
+uv sync                       # includes the dev group (pytest, pytest-cov, ruff)
+uv run pytest                 # unit tests (tests/)
+uv run pytest tests_gtk       # GTK tests, needs sway plus the shell's system deps (see below)
+scripts/test-gtk.sh --all     # both suites in Docker, exactly like CI, merged coverage
+scripts/test-gtk.sh           # GTK tests only, in Docker
+uv run ruff check .           # lint
 ```
 
 Running `tests_gtk` locally needs `sway` (`pacman -S sway`) and the libraries the shell itself uses (e.g. gtk-layer-shell, Gray, NetworkManager and playerctl typelibs); with a working Aw-Shell install, only sway is missing. Without them, use the Docker script.
@@ -194,6 +190,42 @@ Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs whil
 - **Some code is only reached by the smoke tests or not at all,** e.g. the UPower client and Bluetooth service are partly covered, global keybinds and the tooltip helper not at all.
 - **Real hardware isn't exercised.** Monitors, audio, Bluetooth, NetworkManager and brightness are faked, stubbed or absent in the sandbox.
 - **PyGObject is pinned to 3.50.0** by fabric; newer versions break its enum properties. A few deprecation warnings from fabric and PyGObject are filtered in `pyproject.toml` because they can't be fixed here.
+
+<h2 id="changes-from-ax-shell"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Wrench.png" alt="Wrench" width="25" height="25" /></sub> Changes from Ax-Shell</h2>
+
+Aw-Shell started from Ax-Shell, which is now deprecated upstream, and has since grown into its own project:
+
+**Hyprland compatibility**
+- **Lua config** — keybinds and settings generate a native Hyprland Lua config, compatible with Hyprland 0.56.2+ (including the 0.57 module changes)
+- **Live theme updates** — border colors apply over Hyprland IPC after a wallpaper change, no reload needed
+
+**Performance**
+- **No process polling** — toolbox status (screen recorder, pomodoro, gamemode) is checked in-process by one shared poller instead of spawning `pgrep` and scripts every 2 seconds on every monitor
+- **Event-driven notch hiding** — the notch reacts to Hyprland events per monitor instead of polling the active window twice a second
+- **Shared pollers** — tray watcher and headset battery run once and serve every bar
+
+**Multi-monitor**
+- Monitor ids match screens, and the main monitor is whichever holds workspace 1 — no hard-coded connector names
+- Tray icons on every bar; dashboard, launcher, workspaces and notifications open on the focused monitor
+- Rounded corners and notch hiding work per monitor
+
+**Settings & theming**
+- **PySide6 (Qt6) settings window** — the first step of the migration to Qt, styled with [Glaze](https://github.com/Awareness10/Glaze); sizes itself to the screen it opens on
+- **Color schemes** — the selected Matugen scheme is remembered and applied immediately; the full palette is written to `config/colors.json` for other tools
+- **Matugen 4** support
+- **Idle** — "Suspend when idle" option, a working Caffeine toggle, and a single hypridle instance after Apply
+
+**New & rewritten**
+- **Bluetooth** — rewritten on BlueZ D-Bus and `bluetoothctl`
+- **Updater** — fresh version checks via the GitHub API, changelog grouped by version with one row per change
+- **Peripherals** — headset battery (via `headsetcontrol`) and Logitech mouse battery in the control panel
+- **Screen recorder indicator**, weather widget, and tooltips throughout
+- **Fixes** — Wi-Fi no longer creates duplicate profiles, wallpaper thumbnails refresh when files change, metrics work without UPower, overview handles close confirmations
+
+**Development**
+- **`uv`** — reproducible installs with `uv sync` instead of a manual pip/venv setup
+- **Tests & CI** — unit tests plus real-GTK tests in a sandbox, with coverage on every push (see [Testing](#testing))
+- **Code quality** — dead code removed, `pathlib` over `os.path`, cleaned imports and typings
 
 ---
 
