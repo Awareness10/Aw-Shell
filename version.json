@@ -1,7 +1,14 @@
 {
-  "version": "1.2.12",
+  "version": "1.2.13",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.13",
+      "changes": [
+        "<b>fix:</b> Bar metrics, battery and network speed stop updating when their bar goes away (e.g. a monitor is unplugged), instead of writing to removed widgets",
+        "<b>update:</b> README has a table of contents, lists the supported systems and puts installation first"
+      ]
+    },
     {
       "version": "1.2.12",
       "changes": [
@@ -169,13 +176,7 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> Notifications that an app withdraws now disappear right away instead of staying until they time out",
-    "<b>fix:</b> Wallpapers with capitals or spaces in their name no longer stop the wallpaper list from loading, and no longer show up twice",
-    "<b>fix:</b> The launcher calculator handles exp(), factorials (5!) and scientific notation (1e3)",
-    "<b>fix:</b> Settings opens from the launcher and on first start even when the system Python lacks the shell's dependencies",
-    "<b>fix:</b> The network applet keeps updating while you're offline",
-    "<b>fix:</b> The update window opens at a size that fits the screen it's on",
-    "<b>perf:</b> The shell no longer loads the Qt settings libraries at startup, using less memory",
-    "<b>update:</b> Much larger test suite, including real-GTK tests that catch errors GTK only logs; the README explains how to run it"
+    "<b>fix:</b> Bar metrics, battery and network speed stop updating when their bar goes away (e.g. a monitor is unplugged), instead of writing to removed widgets",
+    "<b>update:</b> README has a table of contents, lists the supported systems and puts installation first"
   ]
 }
