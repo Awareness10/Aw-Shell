@@ -66,7 +66,7 @@ Aw-Shell started from Ax-Shell, which is now deprecated upstream, and has since 
 
 **Development**
 - **`uv`** — reproducible installs with `uv sync` instead of a manual pip/venv setup
-- **Tests & CI** — unit tests with coverage on every push
+- **Tests & CI** — unit tests plus real-GTK tests in a sandbox, with coverage on every push (see Testing below)
 - **Code quality** — dead code removed, `pathlib` over `os.path`, cleaned imports and typings
 
 <h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
@@ -146,6 +146,52 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 - Weather
 - Workspaces Overview
 - Multi-monitor support
+
+<h2><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Test%20Tube.png" alt="Test Tube" width="25" height="25" /></sub> Testing</h2>
+
+There are two test suites. They must run in separate processes: `tests/` replaces `gi` with mocks, `tests_gtk/` needs the real one.
+
+| Suite | What it covers | How |
+|---|---|---|
+| `tests/` | Logic: settings, config generation, monitor mapping, layout, conversions, updater, weather | `gi`, GTK and parts of fabric are mocked in `tests/conftest.py`; PySide6 runs offscreen |
+| `tests_gtk/` | Widgets built against real GTK/fabric: build smoke tests for the bar, notch, dock and most panels, plus notifications, overview, metrics, system tray | Runs inside a sandbox (see below) |
+
+### Running
+
+```bash
+uv sync                          # includes the dev group (pytest, pytest-cov, ruff)
+uv run pytest                    # unit tests (tests/)
+uv run pytest tests_gtk          # GTK tests, needs sway installed (pacman -S sway)
+scripts/test-gtk.sh --all        # both suites in Docker, exactly like CI, merged coverage
+scripts/test-gtk.sh              # GTK tests only, in Docker
+uv run ruff check .              # lint
+```
+
+Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs while working, and the Docker run before pushing: it uses Ubuntu 24.04 like CI, so results can differ from Arch, which ships newer libraries.
+
+### The GTK sandbox
+
+`tests_gtk/conftest.py` sets everything up before anything imports `gi`, so the tests never touch your running session:
+
+- a private **headless sway** as the Wayland compositor (it has the layer-shell protocol fabric needs). Nothing appears on screen, and sway doesn't need seatd/polkit setup for this
+- a private **D-Bus** session/system bus with a fake UPower (`fake_upower.py`)
+- fake **Hyprland** IPC sockets and a `hyprctl` stub (`fake_hyprland.py`)
+- a temporary `HOME`/XDG dirs with a copy of `config/` and `styles/`, without your `config.json`
+- stubs for commands with side effects (`systemctl`, `pkill`, `matugen`, `notify-send`, ...), which log their arguments instead of running (read them with `sandbox.commands()`)
+
+`test_sandbox.py` checks the isolation itself. Everything is cleaned up when the run ends, including after a failed start.
+
+### CI
+
+`.github/workflows/test.yml` runs `scripts/test-gtk.sh --all` on pushes to `main`/`dev` and on pull requests to `main`. On push, the merged coverage is published to the `badges` branch for the coverage badge above.
+
+### Limitations
+
+- **Coverage is split by design.** Plain `uv run pytest` reports only what the unit tests reach, so it looks low; the real number is the merged one from `scripts/test-gtk.sh --all`, which is what the badge shows.
+- **Smoke tests check that widgets build, not how they look or behave in depth.** Only a few modules have behaviour tests (`test_notification_popup`, `test_overview`, `test_metrics`, `test_systemtray`).
+- **Some code is only reached by the smoke tests or not at all,** e.g. the UPower client and Bluetooth service are partly covered, global keybinds and the tooltip helper not at all.
+- **Real hardware isn't exercised.** Monitors, audio, Bluetooth, NetworkManager and brightness are faked, stubbed or absent in the sandbox.
+- **PyGObject is pinned to 3.50.0** by fabric; newer versions break its enum properties. A few deprecation warnings from fabric and PyGObject are filtered in `pyproject.toml` because they can't be fixed here.
 
 ---
 
