@@ -71,6 +71,8 @@ class Sandbox:
         self.procs: list[subprocess.Popen] = []
 
     def setup(self):
+        # Registered first so a failed start (e.g. no sway) still cleans up
+        atexit.register(self.teardown)
         self._set_env()
         self._install_dir()
         self._wallpaper()
@@ -79,7 +81,6 @@ class Sandbox:
         self._start_dbus()
         self._start_fake_upower()
         self._start_compositor()
-        atexit.register(self.teardown)
 
     def _set_env(self):
         for var in ("DISPLAY", "WAYLAND_SOCKET", "SWAYSOCK", "DBUS_SESSION_BUS_ADDRESS",
@@ -187,7 +188,8 @@ class Sandbox:
         return log.read_text().splitlines() if log.exists() else []
 
     def teardown(self):
-        self.hyprland.close()
+        if hasattr(self, "hyprland"):
+            self.hyprland.close()
         for proc in reversed(self.procs):
             if proc.poll() is None:
                 proc.send_signal(signal.SIGTERM)
