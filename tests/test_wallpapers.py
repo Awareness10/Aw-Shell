@@ -127,6 +127,7 @@ class TestThumbnailCacheInvalidation:
             def __init__(self):
                 self.files = []
                 self.thumbnail_queue = []
+                self._destroyed = False
 
             def _process_batch(self):
                 """Draining the queue needs GTK; the tests read it directly."""

@@ -67,3 +67,38 @@ def test_changing_scheme(sandbox, run_pending, selector):
     before = len(sandbox.commands())
     selector._apply_scheme()
     assert_non_interactive(matugen_calls(sandbox, run_pending, before))
+
+
+def _pump_until(run_pending, condition, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while not condition() and time.monotonic() < deadline:
+        run_pending()
+        time.sleep(0.02)
+    return condition()
+
+
+def test_loads_every_wallpaper_and_normalises_names(run_pending, monkeypatch, tmp_path):
+    """Names with capitals or spaces get renamed; loading must not stop at the
+    first rename."""
+    from PIL import Image
+
+    import config.data as data
+    from modules.wallpapers import WallpaperSelector
+
+    walls = tmp_path / "walls"
+    walls.mkdir()
+    for name in ("Big Sky.jpg", "Night City.PNG", "forest.jpg"):
+        Image.new("RGB", (8, 8), "teal").save(walls / name, format="PNG")
+    monkeypatch.setattr(data, "WALLPAPERS_DIR", str(walls))
+    monkeypatch.setattr(WallpaperSelector, "CACHE_DIR", str(tmp_path / "thumbs"))
+
+    selector = WallpaperSelector()
+    try:
+        expected = ["big-sky.jpg", "forest.jpg", "night-city.png"]
+        assert _pump_until(run_pending, lambda: len(selector.viewport.get_model()) == 3), \
+            f"files={selector.files}, on disk={sorted(os.listdir(walls))}"
+        assert selector.files == expected
+        assert sorted(os.listdir(walls)) == expected
+    finally:
+        selector.destroy()
+        run_pending()
