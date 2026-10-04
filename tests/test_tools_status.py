@@ -36,7 +36,9 @@ def _proc(pid, cmdline, create_time=0.0):
 
 
 def _scan(tools, procs):
-    with patch.object(tools.psutil, "process_iter", return_value=procs):
+    # Pin our own pid: in a container pytest's real pid can match a fake one
+    with patch.object(tools.psutil, "process_iter", return_value=procs), \
+            patch.object(tools.os, "getpid", return_value=1):
         return tools.ToolsStatusMonitor._scan_processes()
 
 
