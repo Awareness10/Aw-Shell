@@ -161,6 +161,7 @@ uv run pytest tests_gtk       # GTK tests, needs sway plus the shell's system de
 scripts/test-gtk.sh --all     # both suites in Docker, exactly like CI, merged coverage
 scripts/test-gtk.sh           # GTK tests only, in Docker
 uv run ruff check .           # lint
+uv audit --preview-features audit-command   # known vulnerabilities in locked dependencies
 ```
 
 Running `tests_gtk` locally needs `sway` (`pacman -S sway`) and the libraries the shell itself uses (e.g. gtk-layer-shell, Gray, NetworkManager and playerctl typelibs); with a working Aw-Shell install, only sway is missing. Without them, use the Docker script.
@@ -182,6 +183,8 @@ Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs whil
 ### CI
 
 `.github/workflows/test.yml` runs `scripts/test-gtk.sh --all` on pushes to `main`/`dev` and on pull requests to `main`. On push, the merged coverage is published to the `badges` branch for the coverage badge above.
+
+`.github/workflows/audit.yml` runs `uv audit` on the same pushes and weekly on `main`, since advisories appear without any change here. Advisories that don't apply are listed under `[tool.uv.audit]` in `pyproject.toml`, with the reason.
 
 ### Limitations
 
