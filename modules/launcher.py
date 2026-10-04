@@ -1,14 +1,12 @@
 import json
-import math
 import os
-import re
+import shlex
 import subprocess
 import subprocess as _sp
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-import numpy as np
 from fabric.utils import (
     DesktopApp,
     exec_shell_command_async,
@@ -28,10 +26,16 @@ from gi.repository import Gdk, GLib
 import config.data as data
 import modules.icons as icons
 import utils.apps as apps
+import utils.calculator as calculator
 from modules.dock import Dock
 from utils.conversion import Conversion
 
 tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"
+# The shell's own interpreter: a bare `python` is the system one, which
+# lacks the settings window's dependencies (PySide6, glaze)
+SETTINGS_COMMAND = shlex.join(
+    [sys.executable, str(Path(__file__).resolve().parent.parent / "config" / "config.py")]
+)
 tooltip_close = "<b>Close</b>"
 
 class AppLauncher(Box):
@@ -97,7 +101,7 @@ class AppLauncher(Box):
                     name="config-button",
                     tooltip_markup=tooltip_settings,
                     child=Label(name="config-label", markup=icons.config),
-                    on_clicked=lambda *_: (exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py"), self.close_launcher()),
+                    on_clicked=lambda *_: (exec_shell_command_async(SETTINGS_COMMAND), self.close_launcher()),
                 ),
                 self.search_entry,
                 Button(
@@ -179,6 +183,8 @@ class AppLauncher(Box):
         )
 
     def handle_arrange_complete(self, should_resize, query):
+        # Returning False ends the idle source; don't try to remove it later
+        self._arranger_handler = None
         if query.strip() != "" and self.viewport.get_children():
             self.update_selection(0)
         return False
@@ -273,9 +279,9 @@ class AppLauncher(Box):
                 self.evaluate_calculator_expression(text)
             return
         if text.startswith(";"):
-            # If in calculator mode and no history item is selected, evaluate new expression.
+            # In conversion mode with no history item selected, convert the new expression
             if self.selected_index == -1:
-                self.evaluate_calculator_expression(text)
+                self.evaluate_conversion_expression(text)
             return
         match text:
             case ":w":
@@ -290,10 +296,10 @@ class AppLauncher(Box):
                     cwd=str(Path(__file__).resolve().parent.parent),
                 )
             case ":settings":
-                exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py")
+                exec_shell_command_async(SETTINGS_COMMAND)
                 self.close_launcher()
             case ":config":
-                exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/config/config.py")
+                exec_shell_command_async(SETTINGS_COMMAND)
                 self.close_launcher()
             case _:
                 children = self.viewport.get_children()
@@ -471,75 +477,10 @@ class AppLauncher(Box):
             json.dump(self.conversion_history, f)
 
     def evaluate_calculator_expression(self, text: str):
-
-        print(f"Evaluating calculator expression: {text}")
-        
-
         expr = text.lstrip("=").strip()
         if not expr:
             return
-            
-
-        replacements = {
-            "^": "**",
-            "×": "*",
-            "÷": "/",
-            "π": "np.pi",
-            "pi": "np.pi",
-            "e": "np.e",
-            "sin(": "np.sin(",
-            "cos(": "np.cos(",
-            "tan(": "np.tan(",
-            "log(": "np.log10(",
-            "ln(": "np.log(",
-            "sqrt(": "np.sqrt(",
-            "abs(": "np.abs(",
-            "exp(": "np.exp("
-        }
-        
-
-        for old, new in replacements.items():
-            expr = expr.replace(old, new)
-            
-
-        expr = re.sub(r'(\d+)!', r'np.factorial(\1)', expr)
-        
-
-        for old, new in [("[", "("), ("]", ")"), ("{", "("), ("}", ")")]:
-            expr = expr.replace(old, new)
-            
-
-        safe_dict = {
-            'np': np,
-            'math': math,
-            'arange': np.arange,
-            'linspace': np.linspace,
-            'array': np.array
-        }
-        
-        try:
-
-            result = eval(expr, {"__builtins__": None}, safe_dict)
-            
-
-            if isinstance(result, np.ndarray):
-                if result.size > 10:
-                    result_str = f"Array of shape {result.shape}"
-                else:
-                    result_str = str(result)
-            elif isinstance(result, (int, float, np.number)):
-
-                if isinstance(result, (int, np.integer)) or result.is_integer():
-                    result_str = str(int(result))
-                else:
-                    result_str = f"{float(result):.10g}"
-            else:
-                result_str = str(result)
-                
-        except Exception as e:
-            result_str = f"Error: {str(e)}"
-            
-
+        result_str = calculator.evaluate(expr)
         self.calc_history.insert(0, f"{text} => {result_str}")
         self.save_calc_history()
         self.update_calculator_viewport()
