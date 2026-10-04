@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 import time
 
@@ -7,8 +8,6 @@ from fabric.core.service import Property, Service, Signal
 from fabric.utils import exec_shell_command_async
 from gi.repository import GLib
 from loguru import logger
-
-import utils.functions as helpers
 
 
 class Brightness(Service):
@@ -121,7 +120,7 @@ class Brightness(Service):
             return backend
 
         # Try brightnessctl first (preferred for laptop internal displays)
-        if helpers.executable_exists("brightnessctl"):
+        if shutil.which("brightnessctl"):
             device = self._get_screen_device()
             if device:  # Non-empty string means device found
                 logger.info(f"Using brightnessctl backend with device: {device}")
@@ -132,7 +131,7 @@ class Brightness(Service):
                 )
 
         # Try ddcutil for external monitors (via DDC/CI protocol)
-        if helpers.executable_exists("ddcutil"):
+        if shutil.which("ddcutil"):
             bus = self._detect_ddcutil_bus()
             if bus != -1:
                 self.ddcutil_bus = bus
