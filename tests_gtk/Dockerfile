@@ -12,7 +12,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gir1.2-cvc-1.0 \
         valac gobject-introspection libdbusmenu-gtk3-dev libdbusmenu-glib-dev \
         adwaita-icon-theme fonts-dejavu-core \
+        jq procps \
     && rm -rf /var/lib/apt/lists/*
+
+# hyprshot for tests/test_screenshot_script.py (not packaged by Ubuntu; it's
+# a single bash script, run with fake slurp/grim/hyprctl)
+ARG HYPRSHOT_COMMIT=054b8967c4adcb56f0f71e3e3f54ba5febdbcca2
+ARG HYPRSHOT_SHA256=6f7c7633b6f611eee03626c17d3d5863ae0cf2ee2da581a2dc166fd23e47dd49
+RUN curl -fsSL "https://raw.githubusercontent.com/Gustash/Hyprshot/$HYPRSHOT_COMMIT/hyprshot" \
+        -o /usr/local/bin/hyprshot \
+    && echo "$HYPRSHOT_SHA256  /usr/local/bin/hyprshot" | sha256sum -c - \
+    && chmod +x /usr/local/bin/hyprshot
 
 # Fabric's system tray library (not packaged by Ubuntu)
 ARG GRAY_COMMIT=d5a8452c39b074ef6da25be95305a22203cf230e
