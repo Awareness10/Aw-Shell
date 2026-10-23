@@ -1,6 +1,6 @@
 [project]
 name = "aw-shell"
-version = "1.2.13"
+version = "1.2.14.dev0"
 description = "A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,11 +13,11 @@ keywords = ["hyprland", "shell", "wayland", "desktop", "fabric", "gtk", "pyside6
 dependencies = [
     "dbus-python>=1.3.2",
     "fabric",
-    "glaze",
+    "glaze>=0.2.2",
     "ijson>=3.3.0",
     "loguru>=0.7.0",
     "numpy>=1.26.0",
-    "pillow>=10.0.0",
+    "pillow>=13.0.0",
     "psutil>=5.9.0",
     "pycairo>=1.25.0",
     "pygobject>=3.50.0",
@@ -29,6 +29,11 @@ dependencies = [
     "toml>=0.10.2",
     "watchdog>=3.0.0",
 ]
+
+[tool.uv]
+# Floor for the CA bundle requests uses: 2026.10.19 drops the roots behind the
+# compromised eMudhra intermediates (Oct 2026). Raise it on future CA distrusts.
+constraint-dependencies = ["certifi>=2026.10.19"]
 
 [tool.uv.sources]
 glaze = { git = "https://github.com/awareness10/glaze" }
@@ -68,3 +73,10 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["config", "modules", "services", "utils", "widgets"]
+
+[tool.uv.audit]
+ignore = [
+    # CVE-2011-2185 is for the SSH library `fabric` (github.com/fabric/fabric);
+    # ours is Fabric-Development/fabric from git, which shares the name only
+    "GHSA-xwg2-qc6c-7c3q",
+]

@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-sleep 0.5
+# Let the menu that launched us close before capturing (tests set it to 0)
+sleep "${AW_SCREENSHOT_DELAY:-0.5}"
 
 if [ -z "$XDG_PICTURES_DIR" ]; then
     XDG_PICTURES_DIR="$HOME/Pictures"
@@ -23,32 +24,30 @@ print_error() {
 EOF
 }
 
+# hyprshot exits as soon as the selection closes and captures in the
+# background, so neither its exit code (pkill's) nor its timing says anything
+# about the file. With --raw the image goes to stdout, and the pipe only
+# closes once grim has finished (a plain > would return too early).
+part_path="$full_path.part"
+capture() {
+    hyprshot "$@" --raw | cat > "$part_path"
+}
+
 case $1 in
-    p)
-        hyprshot -z -s -m output -o "$save_dir" -f "$save_file"
-        hyprshot_exit=$?
-        ;;
-    s)
-        hyprshot -z -s -m region -o "$save_dir" -f "$save_file"
-        hyprshot_exit=$?
-        ;;
-    w)
-        hyprshot -s -m window -o "$save_dir" -f "$save_file"
-        hyprshot_exit=$?
-        ;;
+    p) capture -z -m output ;;
+    s) capture -z -m region ;;
+    w) capture -m window ;;
     *)
         print_error
         exit 1
         ;;
 esac
 
-# Wait for file to appear (up to 3 seconds) if hyprshot didn't explicitly fail
-if [ "$hyprshot_exit" -eq 0 ]; then
-    wait_count=0
-    while [ ! -f "$full_path" ] && [ "$wait_count" -lt 30 ]; do
-        sleep 0.1
-        wait_count=$((wait_count + 1))
-    done
+# No image means the selection was cancelled
+if [ -s "$part_path" ]; then
+    mv "$part_path" "$full_path"
+else
+    rm -f "$part_path"
 fi
 
 if [ -f "$full_path" ]; then

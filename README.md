@@ -40,15 +40,16 @@
 <h2 id="screenshots"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Camera%20with%20Flash.png" alt="Camera with Flash" width="25" height="25" /></sub> Screenshots</h2>
 <table align="center">
   <tr>
-    <td colspan="5"><img src="assets/screenshots/1.png"></td>
+    <td width="50%"><img src="assets/screenshots/1.png" alt="Dashboard"></td>
+    <td width="50%"><img src="assets/screenshots/2.png" alt="App launcher"></td>
   </tr>
   <tr>
-    <td colspan="2"><img src="assets/screenshots/2.png"></td>
-    <td colspan="1"><img src="assets/screenshots/3.png"></td>
-    <td colspan="1" align="center"><img src="assets/screenshots/4.png"></td>
-    <td colspan="2" align="center"><img src="assets/screenshots/5.png"></td>
+    <td width="50%"><img src="assets/screenshots/3.png" alt="Wallpaper picker with Material You colors"></td>
+    <td width="50%"><img src="assets/screenshots/4.png" alt="Aw-Shell settings"></td>
   </tr>
 </table>
+
+<p align="center"><sub>Colors follow the wallpaper via matugen. Aurora by <a href="https://unsplash.com/photos/snow-mountain-with-aurora-borealis-EvKBHBGgaUo">Jonatan Pie</a> and dunes by <a href="https://unsplash.com/photos/a-large-sand-dune-in-the-middle-of-a-desert-hoT_2bL5LxU">Tim Arterbury</a> on Unsplash.</sub></p>
 
 <h2 id="installation"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
 
@@ -161,6 +162,7 @@ uv run pytest tests_gtk       # GTK tests, needs sway plus the shell's system de
 scripts/test-gtk.sh --all     # both suites in Docker, exactly like CI, merged coverage
 scripts/test-gtk.sh           # GTK tests only, in Docker
 uv run ruff check .           # lint
+uv audit --preview-features audit-command   # known vulnerabilities in locked dependencies
 ```
 
 Running `tests_gtk` locally needs `sway` (`pacman -S sway`) and the libraries the shell itself uses (e.g. gtk-layer-shell, Gray, NetworkManager and playerctl typelibs); with a working Aw-Shell install, only sway is missing. Without them, use the Docker script.
@@ -182,6 +184,8 @@ Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs whil
 ### CI
 
 `.github/workflows/test.yml` runs `scripts/test-gtk.sh --all` on pushes to `main`/`dev` and on pull requests to `main`. On push, the merged coverage is published to the `badges` branch for the coverage badge above.
+
+`.github/workflows/audit.yml` runs `uv audit` on the same pushes and weekly on `main`, since advisories appear without any change here. Advisories that don't apply are listed under `[tool.uv.audit]` in `pyproject.toml`, with the reason.
 
 ### Limitations
 
