@@ -40,15 +40,16 @@
 <h2 id="screenshots"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Camera%20with%20Flash.png" alt="Camera with Flash" width="25" height="25" /></sub> Screenshots</h2>
 <table align="center">
   <tr>
-    <td colspan="5"><img src="assets/screenshots/1.png"></td>
+    <td width="50%"><img src="assets/screenshots/1.png" alt="Dashboard"></td>
+    <td width="50%"><img src="assets/screenshots/2.png" alt="App launcher"></td>
   </tr>
   <tr>
-    <td colspan="2"><img src="assets/screenshots/2.png"></td>
-    <td colspan="1"><img src="assets/screenshots/3.png"></td>
-    <td colspan="1" align="center"><img src="assets/screenshots/4.png"></td>
-    <td colspan="2" align="center"><img src="assets/screenshots/5.png"></td>
+    <td width="50%"><img src="assets/screenshots/3.png" alt="Wallpaper picker with Material You colors"></td>
+    <td width="50%"><img src="assets/screenshots/4.png" alt="Aw-Shell settings"></td>
   </tr>
 </table>
+
+<p align="center"><sub>Colors follow the wallpaper via matugen. Aurora by <a href="https://unsplash.com/photos/snow-mountain-with-aurora-borealis-EvKBHBGgaUo">Jonatan Pie</a> and dunes by <a href="https://unsplash.com/photos/a-large-sand-dune-in-the-middle-of-a-desert-hoT_2bL5LxU">Tim Arterbury</a> on Unsplash.</sub></p>
 
 <h2 id="installation"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" alt="Package" width="25" height="25" /></sub> Installation</h2>
 
