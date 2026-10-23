@@ -39,6 +39,24 @@ echo "==> Running in container"
 tty=()
 [[ -t 1 ]] && tty=(-t)
 
+# Rootless Docker maps container UIDs 1.. onto the user's /etc/subuid range,
+# so our UID in the container can't write to the repo. Let that sub-UID write
+# coverage.json, the only file the tests write there, and nothing else.
+if $all && docker info --format '{{.SecurityOptions}}' | grep -q 'name=rootless'; then
+    subuid_start=$(awk -F: -v name="$(id -un)" -v uid="$(id -u)" \
+        '$1 == name || $1 == uid { print $2; exit }' /etc/subuid)
+    if [[ -z "$subuid_start" ]]; then
+        echo "error: rootless Docker but no /etc/subuid entry for $(id -un)" >&2
+        exit 1
+    fi
+    if ! command -v setfacl >/dev/null; then
+        echo "error: rootless Docker needs setfacl (package: acl) to write coverage.json" >&2
+        exit 1
+    fi
+    touch "$repo/coverage.json"
+    setfacl -m "u:$((subuid_start + $(id -u) - 1)):rw" "$repo/coverage.json"
+fi
+
 # Run as the invoking user so nothing root-owned lands in the mounted repo
 docker run --rm "${tty[@]}" \
     --user "$(id -u):$(id -g)" \
