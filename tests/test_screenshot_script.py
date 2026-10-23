@@ -76,34 +76,40 @@ cat > "$LOG_DIR/clipboard"
 }
 
 
-@pytest.fixture
-def run(tmp_path):
-    fakes = tmp_path / "bin"
-    fakes.mkdir()
+@pytest.fixture(scope="module")
+def run(tmp_path_factory):
+    """Run the script once per (mode, cancel) and share the result: each run
+    takes seconds, and several tests check the same run."""
+    fakes = tmp_path_factory.mktemp("bin")
     for name, body in FAKES.items():
         (fakes / name).write_text(body)
         (fakes / name).chmod(0o755)
-    logs = tmp_path / "logs"
-    logs.mkdir()
-    save_dir = tmp_path / "shots"
+    results = {}
 
     def _run(mode, cancel=False):
+        if (mode, cancel) in results:
+            return results[mode, cancel]
+        logs = tmp_path_factory.mktemp("logs")
+        save_dir = logs / "shots"
         env = dict(os.environ,
                    PATH=f"{fakes}:{os.environ['PATH']}",
                    LOG_DIR=str(logs),
-                   SLURP_DELAY=str(SLURP_DELAY),
+                   AW_SCREENSHOT_DELAY="0",
+                   # The slow pick only matters when there's an image to wait for
+                   SLURP_DELAY=str(0.3 if cancel else SLURP_DELAY),
                    SLURP_CANCEL="1" if cancel else "")
         subprocess.run(["bash", str(SCRIPT), mode, "", str(save_dir)],
                        env=env, stdin=subprocess.DEVNULL, timeout=30, check=False)
         summary, size, sent_at = (logs / "notify").read_text().strip().split("|")
         clipboard = logs / "clipboard"
-        return {
+        results[mode, cancel] = {
             "summary": summary,
             "icon_size": int(size) if size else None,
             "notify_delay": float(sent_at) - float((logs / "slurp_done").read_text()),
             "files": sorted(save_dir.iterdir()),
             "clipboard": clipboard.read_bytes() if clipboard.exists() else None,
         }
+        return results[mode, cancel]
 
     return _run
 

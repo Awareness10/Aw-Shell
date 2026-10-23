@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-sleep 0.5
+# Let the menu that launched us close before capturing (tests set it to 0)
+sleep "${AW_SCREENSHOT_DELAY:-0.5}"
 
 if [ -z "$XDG_PICTURES_DIR" ]; then
     XDG_PICTURES_DIR="$HOME/Pictures"
