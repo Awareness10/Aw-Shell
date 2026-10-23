@@ -1,7 +1,17 @@
 {
-  "version": "1.2.13",
+  "version": "1.2.14",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.14",
+      "changes": [
+        "<b>fix:</b> Screenshots no longer say \"Screenshot Aborted\" when the capture worked, and the clipboard and notification always get the complete image",
+        "<b>fix:</b> Opening Settings no longer re-applies your color theme and wallpaper in the background or resets the color scheme to Tonal Spot",
+        "<b>fix:</b> Web requests no longer trust the compromised eMudhra certificate authorities",
+        "<b>update:</b> Pillow 13 (39 security fixes), PySide6 6.12 and other updated packages",
+        "<b>update:</b> New README screenshots; the screenshot script is covered by tests and local test runs work with rootless Docker"
+      ]
+    },
     {
       "version": "1.2.13",
       "changes": [
@@ -176,7 +186,10 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> Bar metrics, battery and network speed stop updating when their bar goes away (e.g. a monitor is unplugged), instead of writing to removed widgets",
-    "<b>update:</b> README has a table of contents, lists the supported systems and puts installation first"
+    "<b>fix:</b> Screenshots no longer say \"Screenshot Aborted\" when the capture worked, and the clipboard and notification always get the complete image",
+    "<b>fix:</b> Opening Settings no longer re-applies your color theme and wallpaper in the background or resets the color scheme to Tonal Spot",
+    "<b>fix:</b> Web requests no longer trust the compromised eMudhra certificate authorities",
+    "<b>update:</b> Pillow 13 (39 security fixes), PySide6 6.12 and other updated packages",
+    "<b>update:</b> New README screenshots; the screenshot script is covered by tests and local test runs work with rootless Docker"
   ]
 }
