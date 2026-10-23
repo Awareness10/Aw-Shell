@@ -30,6 +30,11 @@ dependencies = [
     "watchdog>=3.0.0",
 ]
 
+[tool.uv]
+# Floor for the CA bundle requests uses: 2026.10.19 drops the roots behind the
+# compromised eMudhra intermediates (Oct 2026). Raise it on future CA distrusts.
+constraint-dependencies = ["certifi>=2026.10.19"]
+
 [tool.uv.sources]
 glaze = { git = "https://github.com/awareness10/glaze" }
 fabric = { git = "https://github.com/Fabric-Development/fabric" }
