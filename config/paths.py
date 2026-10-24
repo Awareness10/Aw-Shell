@@ -60,6 +60,24 @@ CAVA_FIFO = RUNTIME_DIR / "cava.fifo"
 CAVA_CONFIG = RUNTIME_DIR / "cava.ini"  # the shipped one, pointed at CAVA_FIFO
 REMOTE_VERSION_FILE = RUNTIME_DIR / "remote_version.json"
 
+# What an old clone kept next to its code, relative to the clone (and to
+# USER_DIR now); --migrate copies these out
+USER_FILES = (
+    "config/config.json",
+    "config/dock.json",
+    "config/dock.json.bak",
+    "config/colors.json",
+    "styles/colors.css",
+    "styles/user.css",
+    "config/hypr/aw-shell.lua",
+    "config/hypr/aw-shell.conf",
+    "config/hypr/colors.lua",
+    "config/hypr/colors.conf",
+    "config/hypr/hypridle.conf",
+    "config/matugen/matugen-state",
+    "config/matugen/matugen-scheme",
+)
+
 # Shipped with the code
 MAIN_CSS = APP_DIR / "main.css"
 DEFAULT_CSS_COLORS = APP_DIR / "styles" / "colors.default.css"

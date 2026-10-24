@@ -134,3 +134,16 @@ def test_ensure_dir_is_private(monkeypatch, tmp_path):
     assert made.stat().st_mode & 0o777 == 0o700
     assert made.parent.stat().st_mode & 0o777 == 0o700
     assert paths.ensure_dir(made) == made  # already there: fine
+
+
+def test_user_files_cover_everything_gitignored_next_to_the_code(monkeypatch):
+    """--migrate copies USER_FILES out of an old clone; a generated file that
+    is gitignored but missing here would be left behind."""
+    paths = _reload(monkeypatch)
+    ignored = [
+        line.strip() for line in (REPO / ".gitignore").read_text().splitlines()
+        if line.strip().startswith(("config/", "styles/"))
+    ]
+    assert ignored
+    assert set(ignored) <= set(paths.USER_FILES)
+    assert "styles/user.css" in paths.USER_FILES
