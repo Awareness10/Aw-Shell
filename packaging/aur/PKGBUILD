@@ -1,0 +1,92 @@
+# Maintainer: Robin Martinsen (Awareness10) <robmart99 at gmail dot com>
+#
+# Kept in the Aw-Shell repo (packaging/aur/); scripts/aur-release.sh sets the
+# versions and checksums and publishes it. scripts/test-aur.sh builds it.
+
+pkgname=aw-shell
+pkgver=1.2.15.dev0
+pkgrel=1
+_commit=ac622ba93492134261d49eeb7401c01768322ab8
+# Pinned like uv.lock (tests/test_pkgbuild.py checks). fabric comes from a fork
+# with a fix for PyGObject 3.51+; glaze isn't packaged for Arch.
+_fabric_commit=7f1df352e7081e92937f0fb5c7c592a41351fe6e
+_glaze_commit=c77f7b2481f62e5d91d399962659c4d615776b3d
+pkgdesc="A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
+arch=('any')
+url="https://github.com/Awareness10/Aw-Shell"
+license=('AGPL-3.0-or-later')
+depends=(
+  # Python and its libraries (fabric and glaze are bundled)
+  'python' 'python-gobject' 'python-cairo' 'python-click' 'python-dbus'
+  'python-ijson' 'python-loguru' 'python-numpy' 'python-pillow' 'python-psutil'
+  'python-pywayland' 'python-requests' 'python-setproctitle' 'python-toml'
+  'python-watchdog' 'pyside6'
+  # GTK and the typelibs the shell loads
+  'gtk3' 'gtk-layer-shell' 'gdk-pixbuf2' 'glib2' 'libnm' 'playerctl'
+  'cinnamon-desktop' 'libdbusmenu-gtk3' 'gray-git'
+  # Programs the shell runs
+  'hyprland' 'uwsm' 'fabric-cli' 'matugen' 'awww' 'cliphist' 'wl-clipboard'
+  'libnotify' 'brightnessctl' 'imagemagick' 'hypridle' 'hyprlock' 'upower'
+  'networkmanager'
+  # Fonts the styles use
+  'ttf-nerd-fonts-symbols-mono' 'noto-fonts-emoji'
+)
+optdepends=(
+  'hyprpicker: color picker'
+  'hyprshot: screenshots'
+  'swappy: editing screenshots'
+  'hyprsunset: night light'
+  'gpu-screen-recorder: screen recording'
+  'tesseract: text recognition (OCR)'
+  'tesseract-data-eng: OCR in English'
+  'cava: audio visualizer'
+  'tmux: tmux session picker'
+  'nvtop: GPU usage'
+  'ddcutil: brightness of external monitors'
+  'headsetcontrol: headset battery'
+  'power-profiles-daemon: power profiles'
+  'bluez-utils: Bluetooth'
+  'network-manager-applet: network settings'
+  'nm-connection-editor: network settings'
+  'webp-pixbuf-loader: WebP wallpapers'
+)
+source=("Aw-Shell-$_commit.tar.gz::$url/archive/$_commit.tar.gz"
+        "fabric-$_fabric_commit.tar.gz::https://github.com/Awareness10/fabric/archive/$_fabric_commit.tar.gz"
+        "glaze-$_glaze_commit.tar.gz::https://github.com/Awareness10/glaze/archive/$_glaze_commit.tar.gz"
+        'aw-shell.sh')
+sha256sums=('103480271a068951eaa405f9293a2161c203edf4e7b295c6bcd717cdc9c74cb5'
+            '11aa6c6198456f0fe777c099851e8cb61d3b3c5105396d7ce252fb5c74fc91f3'
+            'd553f7c999d86db0aae0b2ddc28f20b43145e61138e9e14b3e5a1077449e57e0'
+            'aed39d119ffcb7abfff335c5e6b12386b8e493b379006912f12279d202044a1f')
+
+package() {
+  local app="$pkgdir/usr/share/aw-shell"
+  install -d "$app/vendor"
+
+  cd "$srcdir/Aw-Shell-$_commit"
+  cp -r main.py main.css version.json assets config modules scripts services styles \
+    utils widgets "$app/"
+  # Development scripts, README images; the icon font goes to /usr/share/fonts
+  rm -f "$app/scripts/test-gtk.sh" "$app/scripts/test-aur.sh" "$app/scripts/aur-release.sh"
+  rm -rf "$app/assets/screenshots" "$app/assets/fonts"
+  rm -f "$app/assets/banner.png" "$app/assets/default.png" "$app/assets/ko-fi.gif"
+  install -Dm644 assets/fonts/tabler-icons/tabler-icons.ttf \
+    "$pkgdir/usr/share/fonts/aw-shell/tabler-icons.ttf"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+  cp -r "$srcdir/fabric-$_fabric_commit/fabric" "$app/vendor/"
+  cp -r "$srcdir/Glaze-$_glaze_commit/src/glaze" "$app/vendor/"
+  # glaze reads its version from package metadata (importlib.metadata)
+  local glaze_version
+  glaze_version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$srcdir/Glaze-$_glaze_commit/pyproject.toml")"
+  install -Dm644 /dev/stdin "$app/vendor/glaze-$glaze_version.dist-info/METADATA" <<EOF
+Metadata-Version: 2.1
+Name: glaze
+Version: $glaze_version
+EOF
+
+  install -Dm755 "$srcdir/aw-shell.sh" "$pkgdir/usr/bin/aw-shell"
+
+  # The folder is read-only at run time, so Python can't cache bytecode itself
+  python -m compileall -q -s "$pkgdir" -p / "$app"
+}
