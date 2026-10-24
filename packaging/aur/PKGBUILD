@@ -11,7 +11,7 @@ _commit=ac622ba93492134261d49eeb7401c01768322ab8
 # Pinned like uv.lock (tests/test_pkgbuild.py checks). fabric comes from a fork
 # with a fix for PyGObject 3.51+; glaze isn't packaged for Arch.
 _fabric_commit=7f1df352e7081e92937f0fb5c7c592a41351fe6e
-_glaze_commit=c77f7b2481f62e5d91d399962659c4d615776b3d
+_glaze_commit=e5047a5e95ffb60b1197408b7e3f4a3ff5bd0814
 # Gray (system tray library) is built in: the AUR's gray-git installs without
 # DESTDIR and fails. Same commit as tests_gtk/Dockerfile.
 _gray_commit=d5a8452c39b074ef6da25be95305a22203cf230e
@@ -62,7 +62,7 @@ source=("Aw-Shell-$_commit.tar.gz::$url/archive/$_commit.tar.gz"
         'aw-shell.sh')
 sha256sums=('103480271a068951eaa405f9293a2161c203edf4e7b295c6bcd717cdc9c74cb5'
             '11aa6c6198456f0fe777c099851e8cb61d3b3c5105396d7ce252fb5c74fc91f3'
-            'd553f7c999d86db0aae0b2ddc28f20b43145e61138e9e14b3e5a1077449e57e0'
+            '1a584d5440eac4174e777b9c1a68d4c101ec788069f11afec712f633408645d8'
             'a7e540519a41b5c2dff49cf5e2bd2d0bb02ec288411a8dc9d1daa8b9c67642cb'
             '445cc9311c4b21e6971ea2c3bdc1c28020c1d80f31e9a21bd3ac8d7e46717d41')
 
