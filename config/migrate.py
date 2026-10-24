@@ -94,5 +94,5 @@ def main() -> int:
         print("Nothing to migrate.")
         return 0
     print("\n".join(lines))
-    print(f"Restart {APP_NAME_CAP} to use the new folders.")
+    print(f"Run 'hyprctl reload' and restart {APP_NAME_CAP} to use the new folders.")
     return 0

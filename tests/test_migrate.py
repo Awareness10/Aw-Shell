@@ -108,7 +108,7 @@ def test_main_runs_every_step(tmp_path, capsys, error, code):
         assert "no" in out
         legacy.assert_not_called()
     else:
-        assert "Copied x" in out and "Restart" in out
+        assert "Copied x" in out and "hyprctl reload" in out
         legacy.assert_called_once_with()
         generated.assert_called_once_with()
 
