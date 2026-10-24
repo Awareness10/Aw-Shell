@@ -9,13 +9,14 @@ from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
 from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
-from config.paths import self_updatable
+from config.paths import APP_DIR, self_updatable
 from config.settings_utils import ensure_current_wallpaper
 from modules.bar import Bar
 from modules.corners import Corners
 from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
+from utils.stylesheet import build_stylesheet
 from utils.tooltips import install_tooltip_dedup
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
@@ -153,9 +154,7 @@ if __name__ == "__main__":
     app = Application(f"{APP_NAME}", *app_components)
 
     def set_css():
-        app.set_stylesheet_from_file(
-            get_relative_path("main.css"),
-        )
+        app.set_stylesheet_from_string(build_stylesheet(), base_path=str(APP_DIR))
 
     app.set_css = set_css
 
