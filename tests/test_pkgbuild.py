@@ -41,7 +41,7 @@ TYPELIBS = {
     "GtkLayerShell": "gtk-layer-shell",
     "NM": "libnm",
     "Playerctl": "playerctl",
-    "Gray": "gray-git",
+    "Gray": "bundled",  # built by the PKGBUILD (the AUR's gray-git is broken)
     "Cvc": "cinnamon-desktop",  # fabric.audio
 }
 
@@ -89,13 +89,21 @@ def test_every_typelib_the_shell_loads_has_its_package(depends):
     assert "cinnamon-desktop" in depends  # Cvc, loaded by fabric.audio (not scanned)
     for namespace in namespaces:
         assert namespace in TYPELIBS, f"{namespace}: add its package to TYPELIBS and the PKGBUILD"
-        assert TYPELIBS[namespace] in depends, namespace
+        if TYPELIBS[namespace] != "bundled":
+            assert TYPELIBS[namespace] in depends, namespace
+
+
+def test_gray_commit_matches_the_gtk_test_image():
+    dockerfile = (REPO / "tests_gtk" / "Dockerfile").read_text()
+    pinned = re.search(r"ARG GRAY_COMMIT=(\w+)", dockerfile).group(1)
+    assert _pkgbuild('"$_gray_commit"').strip() == pinned
 
 
 def test_launcher_runs_the_bundled_libraries():
     launcher = (AUR / "aw-shell.sh").read_text()
     assert "export AW_SHELL_LAUNCH=/usr/bin/aw-shell" in launcher
     assert "/usr/share/aw-shell/vendor" in launcher
+    assert "/usr/lib/aw-shell/lib/girepository-1.0" in launcher  # bundled Gray
     assert "exec python /usr/share/aw-shell/main.py" in launcher
 
 

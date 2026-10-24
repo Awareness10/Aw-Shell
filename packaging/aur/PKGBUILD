@@ -11,8 +11,11 @@ _commit=ac622ba93492134261d49eeb7401c01768322ab8
 # with a fix for PyGObject 3.51+; glaze isn't packaged for Arch.
 _fabric_commit=7f1df352e7081e92937f0fb5c7c592a41351fe6e
 _glaze_commit=c77f7b2481f62e5d91d399962659c4d615776b3d
+# Gray (system tray library) is built in: the AUR's gray-git installs without
+# DESTDIR and fails. Same commit as tests_gtk/Dockerfile.
+_gray_commit=d5a8452c39b074ef6da25be95305a22203cf230e
 pkgdesc="A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
-arch=('any')
+arch=('x86_64' 'aarch64')
 url="https://github.com/Awareness10/Aw-Shell"
 license=('AGPL-3.0-or-later')
 depends=(
@@ -23,7 +26,7 @@ depends=(
   'python-watchdog' 'pyside6'
   # GTK and the typelibs the shell loads
   'gtk3' 'gtk-layer-shell' 'gdk-pixbuf2' 'glib2' 'libnm' 'playerctl'
-  'cinnamon-desktop' 'libdbusmenu-gtk3' 'gray-git'
+  'cinnamon-desktop' 'libdbusmenu-gtk3'
   # Programs the shell runs
   'hyprland' 'uwsm' 'fabric-cli' 'matugen' 'awww' 'cliphist' 'wl-clipboard'
   'libnotify' 'brightnessctl' 'imagemagick' 'hypridle' 'hyprlock' 'upower'
@@ -31,6 +34,7 @@ depends=(
   # Fonts the styles use
   'ttf-nerd-fonts-symbols-mono' 'noto-fonts-emoji'
 )
+makedepends=('meson' 'vala' 'gobject-introspection')
 optdepends=(
   'hyprpicker: color picker'
   'hyprshot: screenshots'
@@ -53,11 +57,20 @@ optdepends=(
 source=("Aw-Shell-$_commit.tar.gz::$url/archive/$_commit.tar.gz"
         "fabric-$_fabric_commit.tar.gz::https://github.com/Awareness10/fabric/archive/$_fabric_commit.tar.gz"
         "glaze-$_glaze_commit.tar.gz::https://github.com/Awareness10/glaze/archive/$_glaze_commit.tar.gz"
+        "gray-$_gray_commit.tar.gz::https://github.com/Fabric-Development/gray/archive/$_gray_commit.tar.gz"
         'aw-shell.sh')
 sha256sums=('103480271a068951eaa405f9293a2161c203edf4e7b295c6bcd717cdc9c74cb5'
             '11aa6c6198456f0fe777c099851e8cb61d3b3c5105396d7ce252fb5c74fc91f3'
             'd553f7c999d86db0aae0b2ddc28f20b43145e61138e9e14b3e5a1077449e57e0'
-            'aed39d119ffcb7abfff335c5e6b12386b8e493b379006912f12279d202044a1f')
+            'a7e540519a41b5c2dff49cf5e2bd2d0bb02ec288411a8dc9d1daa8b9c67642cb'
+            '445cc9311c4b21e6971ea2c3bdc1c28020c1d80f31e9a21bd3ac8d7e46717d41')
+
+build() {
+  # Private copy; its typelib points at /usr/lib/aw-shell/lib/libgray by path
+  meson setup --prefix=/usr/lib/aw-shell --libdir=lib --buildtype=plain \
+    "gray-$_gray_commit" build
+  meson compile -C build
+}
 
 package() {
   local app="$pkgdir/usr/share/aw-shell"
@@ -84,6 +97,11 @@ Metadata-Version: 2.1
 Name: glaze
 Version: $glaze_version
 EOF
+
+  meson install -C "$srcdir/build" --destdir "$pkgdir"
+  # Only the library and its typelib are needed at run time
+  rm -rf "$pkgdir/usr/lib/aw-shell/include" "$pkgdir/usr/lib/aw-shell/share" \
+    "$pkgdir/usr/lib/aw-shell/lib/pkgconfig"
 
   install -Dm755 "$srcdir/aw-shell.sh" "$pkgdir/usr/bin/aw-shell"
 
