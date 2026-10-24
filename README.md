@@ -27,6 +27,9 @@
   - [Supported systems](#supported-systems)
   - [Install script](#install-script)
   - [Manual Installation](#manual-installation)
+  - [Where Aw-Shell keeps its files](#where-aw-shell-keeps-its-files)
+  - [Updating from an older version](#updating-from-an-older-version)
+  - [Uninstalling](#uninstalling)
 - [Features](#features)
 - [Testing](#testing)
   - [Running](#running)
@@ -82,6 +85,8 @@ Requirements:
 curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.sh | bash
 ```
 
+It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose another folder) and starts the shell, which opens its settings the first time. From a clone of the repository, `./install.sh --dev` runs Aw-Shell from that clone instead.
+
 ### Manual Installation
 
 1. Install [uv](https://docs.astral.sh/uv/):
@@ -102,13 +107,42 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
     - `tesseract-data-spa` `tmux` `unzip` `upower` `uwsm` `vte3`
     - `webp-pixbuf-loader` `wl-clipboard`
 
-3. Clone, install Python deps, and run:
+3. Clone, install Python deps, and run (any folder works; `~/.config/aw-shell` is for your settings):
     ```bash
-    git clone https://github.com/Awareness10/Aw-Shell.git ~/.config/aw-shell
-    cd ~/.config/aw-shell
+    git clone https://github.com/Awareness10/Aw-Shell.git ~/.local/src/aw-shell
+    cd ~/.local/src/aw-shell
     uv sync
     uwsm app -- .venv/bin/python main.py > /dev/null 2>&1 & disown
     ```
+
+### Where Aw-Shell keeps its files
+
+The code never changes while the shell runs, so it can live in a read-only folder. Everything the shell writes follows the [XDG Base Directory](https://specifications.freedesktop.org/basedir-spec/latest/) folders:
+
+| Folder | What's in it |
+|---|---|
+| `~/.local/src/aw-shell` | The code (the install script's clone) |
+| `~/.config/aw-shell` | Your settings (`config/config.json`), the dock's pinned apps, the generated Hyprland config and the wallpaper's colors |
+| `~/.local/share/aw-shell` | Kanban board and pins |
+| `~/.local/state/aw-shell` | Calculator and unit-conversion history |
+| `~/.cache/aw-shell` | Icon cache and wallpaper thumbnails; safe to delete |
+| `$XDG_RUNTIME_DIR/aw-shell` | Notification history and other files for the current session |
+
+To change the look without editing the code, create `~/.config/aw-shell/styles/user.css`. It loads after the built-in styles, so its rules win, and `SUPER SHIFT + B` reloads it.
+
+### Updating from an older version
+
+Older versions kept the code and your settings together in `~/.config/aw-shell`. The install script moves such an install to `~/.local/src/aw-shell` and keeps your settings; the in-app updater runs it for you. Your kanban board, pins and history move to their new folders on the next start.
+
+To move it by hand, run `.venv/bin/python main.py --migrate` from the new location. It never deletes or overwrites anything: an old install it can't move is kept as `~/.config/aw-shell.bak-<date>`.
+
+### Uninstalling
+
+```bash
+~/.local/src/aw-shell/uninstall.sh
+```
+
+It removes the code, the cache and the line in your Hyprland config, then asks before deleting your settings, kanban board, pins and history.
 
 <h2 id="features"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" /></sub> Features</h2>
 
@@ -176,7 +210,7 @@ Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs whil
 - a private **headless sway** as the Wayland compositor (it has the layer-shell protocol fabric needs). Nothing appears on screen, and sway doesn't need seatd/polkit setup for this
 - a private **D-Bus** session/system bus with a fake UPower (`fake_upower.py`)
 - fake **Hyprland** IPC sockets and a `hyprctl` stub (`fake_hyprland.py`)
-- a temporary `HOME`/XDG dirs with a copy of `config/` and `styles/`, without your `config.json`
+- a temporary `HOME`/XDG dirs with an empty `~/.config/aw-shell`, like a fresh package install. The Docker script mounts the code read-only, so a test that writes next to the code fails
 - stubs for commands with side effects (`systemctl`, `pkill`, `matugen`, `notify-send`, ...), which log their arguments instead of running (read them with `sandbox.commands()`)
 
 `test_sandbox.py` checks the isolation itself. Everything is cleaned up when the run ends, including after a failed start.
@@ -193,7 +227,7 @@ Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs whil
 - **Smoke tests check that widgets build, not how they look or behave in depth.** Only a few modules have behaviour tests (`test_notification_popup`, `test_overview`, `test_metrics`, `test_systemtray`, `test_wallpapers`, `test_wayland`).
 - **Some code is only reached by the smoke tests or not at all,** e.g. the UPower client and Bluetooth service are partly covered, global keybinds and the tooltip helper not at all.
 - **Real hardware isn't exercised.** Monitors, audio, Bluetooth, NetworkManager and brightness are faked, stubbed or absent in the sandbox.
-- **PyGObject is pinned to 3.50.0** by fabric; newer versions break its enum properties. A few deprecation warnings from fabric and PyGObject are filtered in `pyproject.toml` because they can't be fixed here.
+- **fabric comes from a fork** ([Awareness10/fabric](https://github.com/Awareness10/fabric)) with a fix for PyGObject 3.51+, until [upstream](https://github.com/Fabric-Development/fabric/pull/186) merges it. A few deprecation warnings from fabric and PyGObject are filtered in `pyproject.toml` because they can't be fixed here.
 
 <h2 id="changes-from-ax-shell"><sub><img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Wrench.png" alt="Wrench" width="25" height="25" /></sub> Changes from Ax-Shell</h2>
 
