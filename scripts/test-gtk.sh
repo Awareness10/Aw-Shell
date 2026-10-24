@@ -39,9 +39,17 @@ echo "==> Running in container"
 tty=()
 [[ -t 1 ]] && tty=(-t)
 
+# The code is mounted read-only, as in a package install (/usr/share/aw-shell):
+# a test that writes next to the code fails. coverage.json, the only file the
+# tests write to the repo, gets its own writable mount.
+mounts=(-v "$repo:/src:ro")
+if $all; then
+    touch "$repo/coverage.json"
+    mounts+=(-v "$repo/coverage.json:/src/coverage.json")
+fi
+
 # Rootless Docker maps container UIDs 1.. onto the user's /etc/subuid range,
-# so our UID in the container can't write to the repo. Let that sub-UID write
-# coverage.json, the only file the tests write there, and nothing else.
+# so our UID in the container can't write to coverage.json; let that sub-UID.
 if $all && docker info --format '{{.SecurityOptions}}' | grep -q 'name=rootless'; then
     subuid_start=$(awk -F: -v name="$(id -un)" -v uid="$(id -u)" \
         '$1 == name || $1 == uid { print $2; exit }' /etc/subuid)
@@ -53,14 +61,13 @@ if $all && docker info --format '{{.SecurityOptions}}' | grep -q 'name=rootless'
         echo "error: rootless Docker needs setfacl (package: acl) to write coverage.json" >&2
         exit 1
     fi
-    touch "$repo/coverage.json"
     setfacl -m "u:$((subuid_start + $(id -u) - 1)):rw" "$repo/coverage.json"
 fi
 
 # Run as the invoking user so nothing root-owned lands in the mounted repo
 docker run --rm "${tty[@]}" \
     --user "$(id -u):$(id -g)" \
-    -v "$repo:/src" \
+    "${mounts[@]}" \
     -e HOME=/tmp/home \
     -e PYTHONDONTWRITEBYTECODE=1 \
     -e UV_CACHE_DIR=/tmp/uv-cache \

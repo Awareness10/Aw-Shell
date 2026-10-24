@@ -8,7 +8,9 @@ touch the user's session:
 - private dbus-daemon, used as both session and system bus, with a fake
   UPower (tests_gtk/fake_upower.py)
 - fake Hyprland IPC sockets + `hyprctl` stub (tests_gtk/fake_hyprland.py)
-- temporary HOME / XDG dirs, with a copy of the install dir's config/
+- temporary HOME / XDG dirs; ~/.config/aw-shell starts empty and the code
+  stays in the repo, like a package install (scripts/test-gtk.sh mounts the
+  repo read-only, so a write next to the code fails the test)
 - stub executables for commands with side effects (systemctl, pkill, ...)
 
 The environment is set up at import time, before anything imports gi,
@@ -54,11 +56,6 @@ STUBBED_COMMANDS = [
     "grim", "slurp", "wf-recorder", "gpu-screen-recorder", "tmux",
 ]
 
-# Install-dir entries that get written to; copied instead of symlinked
-COPIED_DIRS = ["config", "styles"]
-# User state that should not leak into tests
-SKIPPED_CONFIG_FILES = {"config.json", "dock.json", "dock.json.bak"}
-
 
 class Sandbox:
     def __init__(self):
@@ -75,7 +72,7 @@ class Sandbox:
         # Registered first so a failed start (e.g. no sway) still cleans up
         atexit.register(self.teardown)
         self._set_env()
-        self._install_dir()
+        self._user_dir()
         self._wallpaper()
         self._stub_commands()
         self.hyprland = FakeHyprland(self.runtime, self.bin)
@@ -101,20 +98,9 @@ class Sandbox:
             "NO_AT_BRIDGE": "1",
         })
 
-    def _install_dir(self):
-        """Mirror ~/.config/aw-shell: symlink the repo, copy what gets written."""
-        install = self.home / ".config" / "aw-shell"
-        install.mkdir(parents=True)
-        for entry in REPO.iterdir():
-            if entry.name.startswith(".") or entry.name in COPIED_DIRS:
-                continue
-            (install / entry.name).symlink_to(entry)
-        for name in COPIED_DIRS:
-            shutil.copytree(
-                REPO / name, install / name, symlinks=True,
-                ignore=lambda d, names: [n for n in names
-                                         if n in SKIPPED_CONFIG_FILES or n == "__pycache__"],
-            )
+    def _user_dir(self):
+        """A fresh install: an empty ~/.config/aw-shell, the code in the repo."""
+        (self.home / ".config" / "aw-shell").mkdir(parents=True)
 
     def _wallpaper(self):
         """~/.current.wall always exists on a real install (see modules/wallpapers.py)."""

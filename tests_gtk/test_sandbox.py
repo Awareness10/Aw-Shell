@@ -15,9 +15,13 @@ def test_home_is_temporary(sandbox):
 
 def test_config_data_uses_sandbox_paths(sandbox):
     import config.data as data
+    import config.paths as paths
+    from conftest import REPO
 
-    assert data.AW_CONFIG_DIR == sandbox.home / ".config" / "aw-shell" / "config"
-    assert not data.AW_CONFIG_DIR.is_symlink()
+    assert paths.APP_DIR == REPO
+    assert paths.USER_DIR == sandbox.home / ".config" / "aw-shell"
+    assert not paths.USER_DIR.is_relative_to(paths.APP_DIR)
+    assert data.AW_CONFIG_DIR == paths.USER_DIR / "config"
 
 
 def test_display_is_sandbox_compositor(sandbox):
