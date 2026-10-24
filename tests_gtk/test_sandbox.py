@@ -14,9 +14,10 @@ def test_home_is_temporary(sandbox):
 
 
 def test_config_data_uses_sandbox_paths(sandbox):
+    from conftest import REPO
+
     import config.data as data
     import config.paths as paths
-    from conftest import REPO
 
     assert paths.APP_DIR == REPO
     assert paths.USER_DIR == sandbox.home / ".config" / "aw-shell"

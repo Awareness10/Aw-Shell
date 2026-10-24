@@ -36,7 +36,8 @@ def test_loads_with_default_colors(styles):
 
 def test_user_colors_and_user_css_win(styles):
     default = paths.DEFAULT_CSS_COLORS.read_text()
-    (styles / "colors.css").write_text(default.replace("--primary:", "--primary: #123456; --old-primary:", 1))
+    custom = default.replace("--primary:", "--primary: #123456; --old-primary:", 1)
+    (styles / "colors.css").write_text(custom)
     (styles / "user.css").write_text("#bar-inner { margin: 7px; }\n")
     compiled, errors = _compile_and_load(build_stylesheet())
     assert "@define-color primary #123456;" in compiled
