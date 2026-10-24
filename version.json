@@ -1,7 +1,20 @@
 {
-  "version": "1.2.14",
+  "version": "1.2.15",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.15",
+      "changes": [
+        "<b>feat:</b> New folder layout: the code lives in ~/.local/src/aw-shell and ~/.config/aw-shell holds only your settings. Updating moves your install for you and keeps your settings; nothing is deleted",
+        "<b>feat:</b> Kanban board and pins move to ~/.local/share/aw-shell, calculator history to ~/.local/state/aw-shell, and session files out of the shared /tmp. They move over on their own at startup",
+        "<b>feat:</b> Change the look without editing the code: ~/.config/aw-shell/styles/user.css loads after the built-in styles",
+        "<b>fix:</b> Fresh installs follow the wallpaper's colors again; applying settings had stopped setting up matugen in 1.0.2",
+        "<b>fix:</b> The installer builds the system tray library (Gray) itself; its AUR package couldn't install, which left some installs without a tray",
+        "<b>fix:</b> Caffeine starts its idle inhibitor with the shell's own Python, so it works without the libraries installed system-wide",
+        "<b>update:</b> PyGObject 3.58, the version Arch ships, with a fix in Aw-Shell's copy of fabric; unused packages dropped (Zed Sans font, vte3, unzip, pyopengl)",
+        "<b>update:</b> uninstall.sh asks before deleting your settings, kanban board and pins; an AUR package is on the way"
+      ]
+    },
     {
       "version": "1.2.14",
       "changes": [
@@ -186,10 +199,13 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> Screenshots no longer say \"Screenshot Aborted\" when the capture worked, and the clipboard and notification always get the complete image",
-    "<b>fix:</b> Opening Settings no longer re-applies your color theme and wallpaper in the background or resets the color scheme to Tonal Spot",
-    "<b>fix:</b> Web requests no longer trust the compromised eMudhra certificate authorities",
-    "<b>update:</b> Pillow 13 (39 security fixes), PySide6 6.12 and other updated packages",
-    "<b>update:</b> New README screenshots; the screenshot script is covered by tests and local test runs work with rootless Docker"
+    "<b>feat:</b> New folder layout: the code lives in ~/.local/src/aw-shell and ~/.config/aw-shell holds only your settings. Updating moves your install for you and keeps your settings; nothing is deleted",
+    "<b>feat:</b> Kanban board and pins move to ~/.local/share/aw-shell, calculator history to ~/.local/state/aw-shell, and session files out of the shared /tmp. They move over on their own at startup",
+    "<b>feat:</b> Change the look without editing the code: ~/.config/aw-shell/styles/user.css loads after the built-in styles",
+    "<b>fix:</b> Fresh installs follow the wallpaper's colors again; applying settings had stopped setting up matugen in 1.0.2",
+    "<b>fix:</b> The installer builds the system tray library (Gray) itself; its AUR package couldn't install, which left some installs without a tray",
+    "<b>fix:</b> Caffeine starts its idle inhibitor with the shell's own Python, so it works without the libraries installed system-wide",
+    "<b>update:</b> PyGObject 3.58, the version Arch ships, with a fix in Aw-Shell's copy of fabric; unused packages dropped (Zed Sans font, vte3, unzip, pyopengl)",
+    "<b>update:</b> uninstall.sh asks before deleting your settings, kanban board and pins; an AUR package is on the way"
   ]
 }
