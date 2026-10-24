@@ -7,12 +7,11 @@ import struct
 import subprocess
 from math import pi
 
-from fabric.utils.helpers import get_relative_path
 from fabric.widgets.overlay import Overlay
 from gi.repository import Gdk, GLib, Gtk
 from loguru import logger
 
-from config.paths import colors_css
+from config.paths import CAVA_CONFIG, CAVA_FIFO, CAVA_TEMPLATE, colors_css, ensure_dir
 
 
 def get_bars(file_path):
@@ -20,9 +19,18 @@ def get_bars(file_path):
     config.read(file_path)
     return int(config['general']['bars'])
 
-CAVA_CONFIG = get_relative_path("../config/cavalcade/cava.ini")
+bars = get_bars(str(CAVA_TEMPLATE))
 
-bars = get_bars(CAVA_CONFIG)
+
+def write_cava_config() -> str:
+    """The shipped cava.ini with raw_target pointed at our FIFO in the private
+    runtime folder (not the shared /tmp); the code folder may be read-only."""
+    text = CAVA_TEMPLATE.read_text(encoding="utf-8")
+    text = re.sub(r"(?m)^raw_target\s*=.*$", f"raw_target = {CAVA_FIFO}", text)
+    ensure_dir(CAVA_CONFIG.parent)
+    CAVA_CONFIG.write_text(text, encoding="utf-8")
+    return str(CAVA_CONFIG)
+
 
 def set_death_signal():
     """
@@ -53,9 +61,8 @@ class Cava:
 
     def __init__(self):
         self.bars = bars
-        self.path = "/tmp/cava.fifo"
-
-        self.cava_config_file = CAVA_CONFIG
+        self.cava_config_file = write_cava_config()
+        self.path = str(CAVA_FIFO)
         self._handlers = []
         self._started = False
         self.command = ["cava", "-p", self.cava_config_file]
