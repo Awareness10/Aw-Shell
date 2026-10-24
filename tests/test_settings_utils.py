@@ -961,10 +961,10 @@ class TestEnsureCurrentWallpaper:
 
     def test_default_wallpaper_ships_with_repo(self):
         import config.settings_utils as su
-        from config.settings_constants import APP_NAME
 
         repo = Path(__file__).resolve().parent.parent
-        assert (repo / su.DEFAULT_WALLPAPER.relative_to(su.CONFIG_DIR / APP_NAME)).is_file()
+        assert su.DEFAULT_WALLPAPER.is_relative_to(repo)
+        assert su.DEFAULT_WALLPAPER.is_file()
 
     def test_creates_link_when_missing(self, wall_env):
         _, current_wall, default = wall_env
