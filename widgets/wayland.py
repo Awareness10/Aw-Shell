@@ -28,7 +28,7 @@ class WaylandWindowExclusivity(Enum):
     AUTO = 3
 
 
-# Use GtkLayerShell's C-registered enums directly (compatible with PyGObject 3.50+)
+# GtkLayerShell's own enums; PyGObject 3.51+ needs the Awareness10/fabric fork's Property fix
 Layer = GtkLayerShell.Layer
 KeyboardMode = GtkLayerShell.KeyboardMode
 Edge = GtkLayerShell.Edge

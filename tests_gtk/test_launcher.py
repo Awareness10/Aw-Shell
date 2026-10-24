@@ -135,4 +135,7 @@ def test_new_search_after_results_finished_loading(launcher):
     _search(launcher, "file")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        # PyGObject's asyncio integration warns on every main loop iteration
+        # (Python 3.14 deprecated the event loop policy API); not this bug
+        warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"gi\.events")
         _search(launcher, "fire")

@@ -39,7 +39,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dbus-python", specifier = ">=1.3.2" },
-    { name = "fabric", git = "https://github.com/Fabric-Development/fabric" },
+    { name = "fabric", git = "https://github.com/awareness10/fabric" },
     { name = "glaze", git = "https://github.com/awareness10/glaze" },
     { name = "ijson", specifier = ">=3.3.0" },
     { name = "loguru", specifier = ">=0.7.0" },
@@ -427,7 +427,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/f3/cc/23f24bc7cbfec3a0a
 [[package]]
 name = "fabric"
 version = "0.0.2"
-source = { git = "https://github.com/Fabric-Development/fabric#094db66e54bcfc0d30a910090fbfef3447c9a5c9" }
+source = { git = "https://github.com/awareness10/fabric#7f1df352e7081e92937f0fb5c7c592a41351fe6e" }
 dependencies = [
     { name = "click" },
     { name = "loguru" },
@@ -792,12 +792,12 @@ wheels = [
 
 [[package]]
 name = "pygobject"
-version = "3.50.0"
+version = "3.58.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pycairo" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/58/d34e67a79631177e3c08e7d02b5165147f590171f2cae6769502af5f7f7e/pygobject-3.50.0.tar.gz", hash = "sha256:4500ad3dbf331773d8dedf7212544c999a76fc96b63a91b3dcac1e5925a1d103", size = 1080367, upload-time = "2024-09-12T12:05:22.579Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/65/1e/d590f82e14db75945b03f6b63e0f19662e0340babd8f574fdb1bb5a015e2/pygobject-3.58.1.tar.gz", hash = "sha256:4c80598ade17fbaa7798e01a25d0bf29ce109740786026a074c5c62bb3e79d23", size = 1408671, upload-time = "2026-10-09T11:29:48.929Z" }
 
 [[package]]
 name = "pyopengl"
