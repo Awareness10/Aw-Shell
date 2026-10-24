@@ -10,7 +10,6 @@ REPO_URL="https://github.com/awareness10/Aw-Shell.git"
 OLD_DIR="$HOME/.config/aw-shell"
 INSTALL_DIR="${AW_SHELL_DIR:-$HOME/.local/src/aw-shell}"
 FONT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
-ZED_FONT_URL="https://github.com/zed-industries/zed-fonts/releases/download/1.2.0/zed-sans-1.2.0.zip"
 DEV_MODE=false
 PACKAGES=(
   awww-git
@@ -44,10 +43,8 @@ PACKAGES=(
   tesseract-data-spa
   tmux
   ttf-nerd-fonts-symbols-mono
-  unzip
   upower
   uwsm
-  vte3
   webp-pixbuf-loader
   wl-clipboard
 )
@@ -120,15 +117,6 @@ install_python_deps() {
 }
 
 install_fonts() {
-  local zed_dir="$FONT_DIR/zed-sans" zip
-  if [[ ! -d "$zed_dir" ]]; then
-    log "Installing Zed Sans into $zed_dir..."
-    zip="$(mktemp --suffix=.zip)"
-    curl -fL -o "$zip" "$ZED_FONT_URL"
-    mkdir -p "$zed_dir"
-    unzip -o -q "$zip" -d "$zed_dir"
-    rm -f "$zip"
-  fi
   log "Installing bundled fonts into $FONT_DIR/aw-shell..."
   mkdir -p "$FONT_DIR/aw-shell"
   cp -r "$INSTALL_DIR/assets/fonts/." "$FONT_DIR/aw-shell/"

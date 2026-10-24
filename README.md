@@ -25,6 +25,7 @@
 - [Screenshots](#screenshots)
 - [Installation](#installation)
   - [Supported systems](#supported-systems)
+  - [AUR](#aur)
   - [Install script](#install-script)
   - [Manual Installation](#manual-installation)
   - [Where Aw-Shell keeps its files](#where-aw-shell-keeps-its-files)
@@ -75,6 +76,14 @@ Requirements:
 > [!NOTE]
 > The installer enables NetworkManager if it is not already enabled, and disables `iwd` if it is running.
 
+### AUR
+
+```bash
+paru -S aw-shell    # or: yay -S aw-shell
+```
+
+Then run `uwsm app -- aw-shell` once. Its settings window opens; applying it adds Aw-Shell to your `hyprland.lua`, so it starts with Hyprland from then on. Updates come with your AUR helper, and `pacman -R aw-shell` removes it while keeping your settings.
+
 ### Install script
 
 > [!TIP]
@@ -104,7 +113,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
     - `imagemagick` `libnotify` `networkmanager` `network-manager-applet`
     - `nm-connection-editor` `noto-fonts-emoji` `nvtop` `playerctl`
     - `power-profiles-daemon` `swappy` `tesseract` `tesseract-data-eng`
-    - `tesseract-data-spa` `tmux` `unzip` `upower` `uwsm` `vte3`
+    - `tesseract-data-spa` `tmux` `upower` `uwsm`
     - `webp-pixbuf-loader` `wl-clipboard`
 
 3. Clone, install Python deps, and run (any folder works; `~/.config/aw-shell` is for your settings):
