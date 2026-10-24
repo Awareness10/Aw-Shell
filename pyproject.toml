@@ -9,6 +9,9 @@ authors = [
     { name = "Adriano Tisera (Axenide)" },
     { name = "Robin Martinsen (Awareness10)" },
 ]
+maintainers = [
+    { name = "Robin Martinsen (Awareness10)" },
+]
 keywords = ["hyprland", "shell", "wayland", "desktop", "fabric", "gtk", "pyside6"]
 dependencies = [
     "dbus-python>=1.3.2",
