@@ -70,7 +70,7 @@
 Requirements:
 - Hyprland 0.56.2 or newer
 - [uwsm](https://github.com/Vladimir-csp/uwsm): the installer and the generated Hyprland config launch the shell with `uwsm app`
-- `pacman` with access to the AUR; the installer uses `paru` or `yay` and installs `yay-bin` if neither is present. Several dependencies (fabric-cli, Gray, matugen) only exist in the AUR
+- `pacman` with access to the AUR; the installer uses `paru` or `yay` and installs `yay-bin` if neither is present. fabric-cli only exists in the AUR. Gray (fabric's system tray library) has no working package, so the installer builds it into `~/.local/lib/aw-shell`
 - systemd
 
 > [!NOTE]
@@ -105,7 +105,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
 
 2. Install system dependencies (Arch Linux):
     - [fabric-cli](https://github.com/Fabric-Development/fabric-cli)
-    - [Gray](https://github.com/Fabric-Development/gray)
+    - [Gray](https://github.com/Fabric-Development/gray): its AUR package can't install, so build it into `~/.local/lib/aw-shell`, where Aw-Shell looks for it: `source install.sh && build_gray` (needs `meson` and `vala`)
     - [Matugen](https://github.com/InioX/matugen)
     - `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
     - `bluez-utils` `gobject-introspection` `gpu-screen-recorder` `headsetcontrol`

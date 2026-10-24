@@ -1,6 +1,10 @@
 # ruff: noqa: E402
 import sys
 
+from utils.typelibs import add_private_typelibs
+
+add_private_typelibs()  # before anything imports gi (see utils/typelibs.py)
+
 if __name__ == "__main__" and sys.argv[1:] == ["--migrate"]:
     # Before the widget imports below: they need a display and Hyprland
     from config.migrate import main as migrate

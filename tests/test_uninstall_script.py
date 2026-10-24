@@ -19,7 +19,8 @@ def home(tmp_path):
         (bin_dir / name).chmod(0o755)
     for d in (".local/src/aw-shell", ".cache/aw-shell", ".config/aw-shell",
               ".local/share/aw-shell", ".local/state/aw-shell",
-              ".local/share/fonts/aw-shell", ".config/hypr"):
+              ".local/share/fonts/aw-shell", ".local/lib/aw-shell/girepository-1.0",
+              ".config/hypr"):
         (tmp_path / d).mkdir(parents=True)
     (tmp_path / ".local/src/aw-shell/main.py").write_text("# shell")
     (tmp_path / ".config/aw-shell/marker").write_text("settings")
@@ -41,6 +42,7 @@ def test_keeps_user_data_unless_asked(home):
     assert not (home / ".local/src/aw-shell").exists()
     assert not (home / ".cache/aw-shell").exists()
     assert not (home / ".local/share/fonts/aw-shell").exists()
+    assert not (home / ".local/lib/aw-shell").exists()  # Gray built by install.sh
     assert (home / ".config/aw-shell/marker").exists()
     assert (home / ".local/share/aw-shell").exists()
     assert (home / ".local/state/aw-shell").exists()

@@ -12,6 +12,7 @@ DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/aw-shell"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/aw-shell"
 FONT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts/aw-shell"
+GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"  # Gray, built by install.sh
 HYPR_LUA="$CONFIG_HOME/hypr/hyprland.lua"
 HYPR_CONF="$CONFIG_HOME/hypr/hyprland.conf"
 
@@ -61,7 +62,7 @@ remove_hyprland_lines() {
 }
 
 main() {
-  echo "This removes Aw-Shell's code ($INSTALL_DIR), cache and Hyprland config line."
+  echo "This removes Aw-Shell's code ($INSTALL_DIR), cache, fonts, Gray library and Hyprland config line."
   if ! ask "Continue?"; then
     echo "Aborted."
     exit 1
@@ -74,6 +75,7 @@ main() {
   fi
   remove_path "$CACHE_DIR"
   remove_path "$FONT_DIR"
+  remove_path "$GRAY_LIB_DIR"
   fc-cache -f &>/dev/null || true
   remove_hyprland_lines
 
