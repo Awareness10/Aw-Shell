@@ -43,11 +43,11 @@ def _configure_sys_path_for_direct_execution():
 _configure_sys_path_for_direct_execution()
 
 if __name__ == "__main__" and not __package__:
-    from config.settings_constants import APP_NAME
+    from config.paths import HYPRLOCK_TEMPLATE
     from config.settings_gui import AwShellSettings  # AwShellSettings
     from config.settings_utils import load_bind_vars, write_hypridle
 else:
-    from .settings_constants import APP_NAME
+    from .paths import HYPRLOCK_TEMPLATE
     from .settings_gui import AwShellSettings
     from .settings_utils import load_bind_vars, write_hypridle
 
@@ -61,7 +61,7 @@ def open_config():
 
     #show_lock_checkbox = True
     dest_lock = Path.home() / ".config/hypr/hyprlock.conf"
-    src_lock = Path.home() / f".config/{APP_NAME}/config/hypr/hyprlock.conf"
+    src_lock = HYPRLOCK_TEMPLATE
     if not dest_lock.exists() and src_lock.exists():
         try:
             os.makedirs(os.path.dirname(dest_lock), exist_ok=True)

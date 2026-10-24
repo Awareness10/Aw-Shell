@@ -1,4 +1,6 @@
+import shlex
 import subprocess
+import sys
 import time
 
 import gi
@@ -9,6 +11,7 @@ from fabric.widgets.label import Label
 from gi.repository import Gdk, GLib, Gtk
 
 import config.data as data
+from config.paths import SCRIPTS_DIR
 
 gi.require_version('Gtk', '3.0')
 import modules.icons as icons
@@ -407,7 +410,7 @@ class CaffeineButton(Button):
             exec_shell_command_async("pkill ax-inhibit")
             enabled = False
         except subprocess.CalledProcessError:
-            exec_shell_command_async(f"python {data.HOME_DIR}/.config/{data.APP_NAME}/scripts/inhibit.py")
+            exec_shell_command_async(shlex.join([sys.executable, str(SCRIPTS_DIR / "inhibit.py")]))
             # Report what actually happened: the script exits if it can't inhibit
             time.sleep(1)
             enabled = subprocess.run(["pgrep", "ax-inhibit"], capture_output=True).returncode == 0

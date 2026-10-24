@@ -1,4 +1,4 @@
-"""Pins: saved to ~/.pins.json, and clicks open, copy or clear a pin."""
+"""Pins: saved to ~/.local/share/aw-shell/pins.json, and clicks open, copy or clear a pin."""
 
 import json
 
@@ -19,7 +19,7 @@ def no_favicon_download(monkeypatch):
 
 @pytest.fixture
 def save_file(sandbox):
-    path = sandbox.home / ".pins.json"
+    path = sandbox.home / ".local" / "share" / "aw-shell" / "pins.json"
     assert pins.SAVE_FILE == str(path)  # never the user's real pins
     path.unlink(missing_ok=True)
     yield path

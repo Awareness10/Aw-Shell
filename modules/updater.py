@@ -7,6 +7,7 @@ the update process via QProcess. No GTK dependencies.
 import json
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -32,6 +33,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import config.paths as paths
 from config.screen_fit import ScreenFit
 from config.settings_constants import APP_NAME, APP_NAME_CAP
 
@@ -43,7 +45,7 @@ _MODULE_DIR = Path(__file__).resolve().parent
 _PROJECT_DIR = _MODULE_DIR.parent
 
 VERSION_FILE = str(_PROJECT_DIR / "version.json")
-REMOTE_VERSION_FILE = "/tmp/remote_version.json"
+REMOTE_VERSION_FILE = str(paths.REMOTE_VERSION_FILE)
 REMOTE_URL = (
     "https://raw.githubusercontent.com/awareness10/Aw-Shell/"
     "refs/heads/main/version.json"
@@ -53,7 +55,7 @@ REMOTE_API_URL = (
 )
 REPO_DIR = str(_PROJECT_DIR)
 
-CACHE_DIR = os.path.expanduser(f"~/.cache/{APP_NAME}")
+CACHE_DIR = str(paths.CACHE_DIR)
 
 SNOOZE_FILE_NAME = "updater_snooze.txt"
 UPDATER_DISABLE_FILE_NAME = "updater_disabled.flag"
@@ -101,6 +103,7 @@ def fetch_remote_version() -> None:
     fall back to the raw file (with a cache-busting query) if it refuses.
     """
     try:
+        paths.ensure_dir(paths.RUNTIME_DIR)  # curl -o doesn't create folders
         if _curl(REMOTE_API_URL, "-H", "Accept: application/vnd.github.raw+json") != 0:
             _curl(f"{REMOTE_URL}?t={int(time.time())}")
     except subprocess.TimeoutExpired:
@@ -627,7 +630,7 @@ class UpdaterWindow(FramelessMainWindow):
                 f'echo "2..." && sleep 1 && '
                 f'echo "1..." && sleep 1 && '
                 f'killall {APP_NAME} && '
-                f'setsid python "{REPO_DIR}/main.py"'
+                f"setsid {shlex.join(paths.launch_command())}"
             )
         return cmd
 

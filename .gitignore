@@ -19,7 +19,8 @@ config/matugen/matugen-scheme
 Aw-Shell.code-workspace
 
 *.md
-!README.md
+!/README.md
+!/ROADMAP.md
 .coverage
 coverage.json
 coverage/

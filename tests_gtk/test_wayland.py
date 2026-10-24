@@ -1,8 +1,8 @@
 """WaylandWindow's layer-shell properties must reach gtk-layer-shell.
 
-The enum types are GtkLayerShell's own C-registered enums; custom Python
-GEnum subclasses broke with PyGObject 3.50. PyGObject 3.51+ rejects even these
-as property types, which is why it is pinned to 3.50.0.
+The enum types are GtkLayerShell's own C-registered enums. PyGObject 3.51+
+makes them plain IntEnums without a GType, which fabric's Property couldn't
+handle; Aw-Shell uses the Awareness10/fabric fork, which can.
 """
 
 import pytest
@@ -15,6 +15,14 @@ def test_enums_are_gtk_layer_shell_types():
     assert Layer is GtkLayerShell.Layer
     assert KeyboardMode is GtkLayerShell.KeyboardMode
     assert Edge is GtkLayerShell.Edge
+
+
+def test_runs_on_pygobject_3_51_or_newer():
+    # Guards against falling back to the old PyGObject 3.50.0 pin; the AUR
+    # package runs on Arch's PyGObject, which is newer
+    import gi
+
+    assert gi.version_info >= (3, 51)
 
 
 @pytest.fixture

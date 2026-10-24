@@ -6,10 +6,22 @@ import gi
 
 from .settings_constants import APP_NAME, APP_NAME_CAP, DEFAULTS  # noqa: F401
 
+# Modules that import this first and Gtk later still get GTK 3
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, GLib  # type: ignore # noqa: E402
 
-CACHE_DIR = str(GLib.get_user_cache_dir()) + f"/{APP_NAME}"
+from .paths import (  # noqa: E402, F401  (re-exported; many modules import them from here)
+    AW_CONFIG_DIR,
+    CONFIG_FILE,
+    DEFAULT_FACE_ICON,
+    DEFAULT_WALLPAPER,
+    DOCK_FILE,
+    MATUGEN_SCHEME_FILE,
+    MATUGEN_STATE_FILE,
+)
+from .paths import CACHE_DIR as _CACHE_DIR  # noqa: E402
+from .paths import CONFIG_HOME as CONFIG_DIR  # noqa: E402, F401  ($XDG_CONFIG_HOME: hypr, matugen)
+
+CACHE_DIR = str(_CACHE_DIR)  # callers build paths with string concatenation
 
 try:
     USERNAME = os.getlogin()
@@ -18,20 +30,7 @@ except OSError:
 HOSTNAME = os.uname().nodename
 
 HOME_DIR = Path.home()
-CONFIG_DIR = HOME_DIR / ".config"
-AW_CONFIG_DIR = CONFIG_DIR / f"{APP_NAME}" / "config"
-CONFIG_FILE = AW_CONFIG_DIR / "config.json"
-
 FACE_ICON = HOME_DIR / ".face.icon"
-DEFAULT_FACE_ICON = CONFIG_DIR / f"{APP_NAME}" / "assets" / "tanjiro-kamado-red.png"
-DEFAULT_WALLPAPER = CONFIG_DIR / f"{APP_NAME}" / "assets" / "wallpapers_example" / "ax-red.jpg"
-
-MATUGEN_STATE_FILE = AW_CONFIG_DIR / "matugen" / "matugen-state"
-MATUGEN_SCHEME_FILE = AW_CONFIG_DIR / "matugen" / "matugen-scheme"
-
-screen = Gdk.Screen.get_default()
-CURRENT_WIDTH = screen.get_width()
-CURRENT_HEIGHT = screen.get_height()
 
 def load_config():
     """Load the configuration from config.json"""

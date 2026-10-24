@@ -68,3 +68,16 @@ def test_drop_moves_window_silently(sandbox):
         "follow = false })"
     ]
     box.destroy()
+
+
+def test_screen_size_without_deprecated_api():
+    """The fallback size spans all monitors, as Gdk.Screen.get_width/height
+    did (deprecated); the sandbox has one 1920x1080 output."""
+    import warnings
+
+    from modules.overview import CURRENT_HEIGHT, CURRENT_WIDTH, _screen_size
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        assert _screen_size() == (1920, 1080)
+    assert (CURRENT_WIDTH, CURRENT_HEIGHT) == (1920, 1080)

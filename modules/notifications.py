@@ -3,6 +3,7 @@ import locale
 import os
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from fabric.notifications.service import Notification, NotificationAction, Notifications
 from fabric.widgets.box import Box
@@ -17,11 +18,13 @@ from loguru import logger
 
 import config.data as data
 import modules.icons as icons
+from config.paths import NOTIFICATION_HISTORY, NOTIFICATIONS_DIR, ensure_dir
 from widgets.image import CustomImage
 from widgets.wayland import WaylandWindow as Window
 
-PERSISTENT_DIR = f"/tmp/{data.APP_NAME}/notifications"
-PERSISTENT_HISTORY_FILE = os.path.join(PERSISTENT_DIR, "notification_history.json")
+# Session-only, private to the user: $XDG_RUNTIME_DIR/aw-shell/notifications
+PERSISTENT_DIR = str(NOTIFICATIONS_DIR)
+PERSISTENT_HISTORY_FILE = str(NOTIFICATION_HISTORY)
 
 
 # Get configurable app lists from settings
@@ -41,7 +44,7 @@ def cache_notification_pixbuf(notification_box):
     """
     notification = notification_box.notification
     if notification.image_pixbuf:
-        os.makedirs(PERSISTENT_DIR, exist_ok=True)
+        ensure_dir(Path(PERSISTENT_DIR))
         cache_file = os.path.join(
             PERSISTENT_DIR, f"notification_{notification_box.uuid}.png"
         )
@@ -652,8 +655,7 @@ class NotificationHistory(Box):
         self.rebuild_with_separators()
 
     def _load_persistent_history(self):
-        if not os.path.exists(PERSISTENT_DIR):
-            os.makedirs(PERSISTENT_DIR, exist_ok=True)
+        ensure_dir(Path(PERSISTENT_DIR))
         if os.path.exists(PERSISTENT_HISTORY_FILE):
             try:
                 with open(PERSISTENT_HISTORY_FILE, "r") as f:

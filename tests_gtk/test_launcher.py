@@ -24,6 +24,7 @@ class FakeApp:
         self.command_line = self.executable
         self.generic_name = None
         self.window_class = self.name
+        self.icon_name = None
         self.description = description
         self.launched = 0
 
@@ -115,8 +116,45 @@ def test_settings_use_the_shells_interpreter(launcher, run, command):
 def test_update_runs_updater_with_shells_interpreter(launcher, monkeypatch):
     spawned = []
     monkeypatch.setattr(launcher_module._sp, "Popen", lambda args, **kw: spawned.append(args))
+    monkeypatch.setattr(launcher_module, "self_updatable", lambda: True)
     launcher.on_search_entry_activate(":update")
     assert spawned == [[sys.executable, "-m", "modules.updater", "--force"]]
+
+
+def test_update_on_package_install_points_to_package_manager(launcher, run, monkeypatch):
+    spawned = []
+    monkeypatch.setattr(launcher_module._sp, "Popen", lambda args, **kw: spawned.append(args))
+    monkeypatch.setattr(launcher_module, "self_updatable", lambda: False)
+    launcher.on_search_entry_activate(":update")
+    assert spawned == []
+    assert len(run) == 1 and run[0].startswith("notify-send")
+    assert "package manager" in run[0]
+
+
+def test_pinning_writes_dock_json_to_the_user_folder(launcher, monkeypatch):
+    import config.data as data
+    from config.paths import APP_DIR
+
+    monkeypatch.setattr(launcher_module.Dock, "notify_config_change", lambda: None)
+    data.DOCK_FILE.unlink(missing_ok=True)
+    _search(launcher, "firefox")
+    launcher.selected_index = 0
+    launcher.add_selected_app_to_dock()
+    assert not data.DOCK_FILE.is_relative_to(APP_DIR)
+    pinned = json.loads(data.DOCK_FILE.read_text())["pinned_apps"]
+    assert [app["name"] for app in pinned] == ["firefox"]
+
+
+def test_history_lives_in_the_state_folder(launcher, sandbox):
+    import config.paths as paths
+
+    fresh = launcher_module.AppLauncher(notch=MagicMock(name="notch"))
+    try:
+        assert fresh.calc_history_path == str(paths.CALC_HISTORY)
+        assert fresh.conversion_history_path == str(paths.CONVERSION_HISTORY)
+        assert paths.CALC_HISTORY.is_relative_to(sandbox.home / ".local" / "state")
+    finally:
+        fresh.destroy()
 
 
 def test_calculator_result_saved(launcher):
@@ -135,4 +173,7 @@ def test_new_search_after_results_finished_loading(launcher):
     _search(launcher, "file")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        # PyGObject's asyncio integration warns on every main loop iteration
+        # (Python 3.14 deprecated the event loop policy API); not this bug
+        warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"gi\.events")
         _search(launcher, "fire")

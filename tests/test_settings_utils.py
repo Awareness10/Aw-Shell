@@ -27,7 +27,7 @@ from config.settings_utils import (
     save_bind_vars,
     set_all_bind_vars,
     set_bind_var,
-    start_config,
+    write_generated_config,
 )
 
 
@@ -187,6 +187,24 @@ class TestGenerateHyprlua:
         launches = re.findall(r"(\S+) \S*/main\.py", conf)
         assert len(launches) >= 3  # reload, inspector restart, autostart
         assert all(python.endswith("/.venv/bin/python") for python in launches), launches
+
+    def test_shell_launched_with_aw_shell_launch(self, monkeypatch):
+        """Package installs set AW_SHELL_LAUNCH; every launch must use it."""
+        monkeypatch.setenv("AW_SHELL_LAUNCH", "/usr/bin/aw-shell")
+        conf = generate_hyprlua()
+        launch_lines = [line for line in conf.splitlines()
+                        if "uwsm-app" in line and not line.strip().startswith("--")]
+        assert len(launch_lines) >= 3  # reload, inspector restart, autostart
+        assert all("/usr/bin/aw-shell" in line for line in launch_lines), launch_lines
+        assert ".venv" not in conf
+
+    def test_bundled_files_referenced_from_app_dir(self):
+        from config.paths import APP_DIR
+        conf = generate_hyprlua()
+        assert f"{APP_DIR}/scripts/start-awww.sh" in conf
+        assert f"{APP_DIR}/assets/tanjiro-kamado-red.png" in conf
+        assert ".config/aw-shell/scripts" not in conf
+        assert ".config/aw-shell/assets" not in conf
 
     def test_horizontal_animation_for_top(self):
         set_bind_var("bar_position", "Top")
@@ -399,12 +417,13 @@ class TestApplyAndRestart:
     def test_replace_lock(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
         set_bind_var("auto_append_hyprland", False)
-        lock_src = aw_config_dir / "hypr" / "hyprlock.conf"
+        lock_src = tmp_path / "app" / "hyprlock.conf"
         lock_src.parent.mkdir(parents=True, exist_ok=True)
         lock_src.write_text("lock config")
         mock_popen = MagicMock()
         mock_popen.return_value.wait.return_value = None
-        with self._patches(aw_config_dir, config_dir, config_file):
+        with self._patches(aw_config_dir, config_dir, config_file), \
+                patch("config.settings_utils.HYPRLOCK_TEMPLATE", lock_src):
             with patch("config.settings_utils.subprocess.run"):
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart(replace_lock=True)
@@ -549,6 +568,52 @@ class TestApplyAndRestart:
         else:
             assert ".venv/bin/python" in restart_call
 
+    def test_restart_uses_aw_shell_launch(self, ar_env, monkeypatch):
+        monkeypatch.setenv("AW_SHELL_LAUNCH", "/usr/bin/aw-shell")
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        mock_popen = MagicMock()
+        mock_popen.return_value.wait.return_value = None
+        with self._patches(aw_config_dir, config_dir, config_file):
+            with patch("config.settings_utils.subprocess.run"):
+                with patch("config.settings_utils.subprocess.Popen", mock_popen):
+                    apply_and_restart()
+        lists = [c[0][0] for c in mock_popen.call_args_list if c[0] and isinstance(c[0][0], list)]
+        assert ["uwsm", "app", "--", "/usr/bin/aw-shell"] in lists
+
+    def test_replace_lock_copies_the_shipped_template(self, ar_env):
+        from config.paths import HYPRLOCK_TEMPLATE
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        with self._patches(aw_config_dir, config_dir, config_file):
+            with patch("config.settings_utils.subprocess.run"), \
+                    patch("config.settings_utils.subprocess.Popen"), \
+                    patch("config.settings_utils.backup_and_replace") as replace:
+                apply_and_restart(replace_lock=True)
+        lock_calls = [c for c in replace.call_args_list if c[0][2] == "Hyprlock"]
+        assert lock_calls and lock_calls[0][0][0] == HYPRLOCK_TEMPLATE
+
+    @pytest.mark.parametrize("colors_exist, generate", [(False, True), (True, False)])
+    def test_apply_sets_up_matugen_and_face_icon(self, ar_env, colors_exist, generate):
+        """Regression (v1.0.2 dropped start_config): fresh installs never got
+        aw-shell's matugen templates, so the theme never followed the wallpaper.
+        Colors are generated on the first apply only."""
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        css_colors = tmp_path / "styles" / "colors.css"
+        if colors_exist:
+            css_colors.parent.mkdir(parents=True)
+            css_colors.write_text(":vars {}")
+        with self._patches(aw_config_dir, config_dir, config_file), \
+                patch("config.settings_utils.CSS_COLORS", css_colors), \
+                patch("config.settings_utils.subprocess.run"), \
+                patch("config.settings_utils.subprocess.Popen"), \
+                patch("config.settings_utils.ensure_matugen_config") as matugen, \
+                patch("config.settings_utils.ensure_face_icon") as face:
+            apply_and_restart()
+        matugen.assert_called_once_with(generate=generate)
+        face.assert_called_once_with()
+
     def test_killall_timeout_handled(self, ar_env):
         import subprocess as sp
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -637,6 +702,14 @@ class TestEnsureMatugenConfig:
         stack.enter_context(patch("config.settings_utils.CSS_COLORS", css_colors))
         return stack
 
+    def test_generate_false_only_writes_the_config(self, matugen_env):
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.exec_shell_command_async") as run:
+                ensure_matugen_config(generate=False)
+        assert (config_dir / "matugen" / "config.toml").exists()
+        run.assert_not_called()
+
     def test_creates_config_when_missing(self, matugen_env):
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
         matugen_config = config_dir / "matugen" / "config.toml"
@@ -674,6 +747,25 @@ class TestEnsureMatugenConfig:
         template = toml.loads(matugen_config.read_text())["templates"]["aw-shell-colors-json"]
         assert template["input_path"].endswith("/matugen/templates/colors.json")
         assert template["output_path"] == f"{aw_dir}/colors.json"
+
+    def test_templates_from_app_dir_outputs_to_user_dir(self, matugen_env):
+        """The templates ship with the (possibly read-only) code; matugen
+        writes only into the user's folder."""
+        import toml
+
+        from config.paths import MATUGEN_TEMPLATES
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        matugen_config = config_dir / "matugen" / "config.toml"
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.exec_shell_command_async"):
+                ensure_matugen_config()
+        templates = toml.loads(matugen_config.read_text())["templates"]
+        ours = {k: v for k, v in templates.items() if k.startswith(("aw-shell", "hyprland"))}
+        assert ours
+        for name, template in ours.items():
+            assert template["input_path"].startswith(f"{MATUGEN_TEMPLATES}/"), name
+            assert template["output_path"].startswith(str(aw_dir.parent)), name
+        assert templates["aw-shell"]["output_path"] == str(css_colors)
 
     def test_merges_with_existing_config(self, matugen_env):
         import toml
@@ -846,55 +938,30 @@ class TestBackupAndReplaceErrors:
 
 
 # =========================================================================
-# start_config
+# write_generated_config (used by --migrate)
 # =========================================================================
 
-class TestStartConfig:
+class TestWriteGeneratedConfig:
 
-    def _sc_patches(self, aw_config_dir, config_dir):
+    def _patches(self, aw_config_dir, config_dir):
         from contextlib import ExitStack
         stack = ExitStack()
         stack.enter_context(patch("config.settings_utils.AW_CONFIG_DIR", aw_config_dir))
         stack.enter_context(patch("config.settings_utils.CONFIG_DIR", config_dir))
         return stack
 
-    def test_orchestrates_all_steps(self, tmp_path):
+    def test_rewrites_hyprlua_and_matugen_config_without_running_anything(self, tmp_path):
         aw_config_dir = tmp_path / "aw-shell" / "config"
         config_dir = tmp_path / "config"
-        mock_matugen = MagicMock()
-        mock_face = MagicMock()
-        mock_exec = MagicMock()
-        with self._sc_patches(aw_config_dir, config_dir):
-            with patch("config.settings_utils.ensure_matugen_config", mock_matugen):
-                with patch("config.settings_utils.ensure_face_icon", mock_face):
-                    with patch("config.settings_utils.exec_shell_command_async", mock_exec):
-                        start_config()
-        mock_matugen.assert_called_once()
-        mock_face.assert_called_once()
-        mock_exec.assert_called_once_with("hyprctl reload")
-
-    def test_writes_hyprconf_file(self, tmp_path):
-        aw_config_dir = tmp_path / "aw-shell" / "config"
-        config_dir = tmp_path / "config"
-        with self._sc_patches(aw_config_dir, config_dir):
-            with patch("config.settings_utils.ensure_matugen_config"):
-                with patch("config.settings_utils.ensure_face_icon"):
-                    with patch("config.settings_utils.exec_shell_command_async"):
-                        start_config()
-        hypr_lua = aw_config_dir / "hypr" / "aw-shell.lua"
-        assert hypr_lua.exists()
-        assert "hl.bind(" in hypr_lua.read_text()
-
-    def test_handles_write_error(self, tmp_path, capsys):
-        aw_config_dir = tmp_path / "aw-shell" / "config"
-        config_dir = tmp_path / "config"
-        with self._sc_patches(aw_config_dir, config_dir):
-            with patch("config.settings_utils.ensure_matugen_config"):
-                with patch("config.settings_utils.ensure_face_icon"):
-                    with patch("config.settings_utils.exec_shell_command_async"):
-                        with patch.object(Path, "write_text", side_effect=OSError("nope")):
-                            start_config()
-        assert "Error writing Hyprland config" in capsys.readouterr().out
+        with self._patches(aw_config_dir, config_dir), \
+                patch("config.settings_utils.load_bind_vars") as load, \
+                patch("config.settings_utils.ensure_matugen_config") as matugen, \
+                patch("config.settings_utils.exec_shell_command_async") as run:
+            write_generated_config()
+        load.assert_called_once_with()
+        matugen.assert_called_once_with(generate=False)
+        run.assert_not_called()
+        assert "hl.bind(" in (aw_config_dir / "hypr" / "aw-shell.lua").read_text()
 
 
 # =========================================================================
@@ -961,10 +1028,10 @@ class TestEnsureCurrentWallpaper:
 
     def test_default_wallpaper_ships_with_repo(self):
         import config.settings_utils as su
-        from config.settings_constants import APP_NAME
 
         repo = Path(__file__).resolve().parent.parent
-        assert (repo / su.DEFAULT_WALLPAPER.relative_to(su.CONFIG_DIR / APP_NAME)).is_file()
+        assert su.DEFAULT_WALLPAPER.is_relative_to(repo)
+        assert su.DEFAULT_WALLPAPER.is_file()
 
     def test_creates_link_when_missing(self, wall_env):
         _, current_wall, default = wall_env

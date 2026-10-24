@@ -6,7 +6,6 @@ from fabric.hyprland.widgets import get_hyprland_connection
 from fabric.utils import (
     exec_shell_command,
     exec_shell_command_async,
-    get_relative_path,
     idle_add,
     remove_handler,
 )
@@ -27,9 +26,8 @@ from widgets.wayland import WaylandWindow as Window
 
 def read_config():
     """Read and return the full configuration from the JSON file, handling missing file."""
-    config_path = get_relative_path("../config/dock.json")
     try:
-        with open(config_path, "r") as file:
+        with open(data.DOCK_FILE, "r") as file:
             config_data = json.load(file)
             
         if "pinned_apps" in config_data and config_data["pinned_apps"] and isinstance(config_data["pinned_apps"][0], str):
@@ -152,7 +150,6 @@ class Dock(Window):
         self.conn = get_hyprland_connection()
         self.icon_resolver = IconResolver() 
         self.pinned = self.config.get("pinned_apps", [])
-        self.config_path = get_relative_path("../config/dock.json")
         self.app_map = {}
         self._all_apps = get_desktop_applications()
         self.app_identifiers = self._build_app_identifiers_map()
@@ -740,9 +737,9 @@ class Dock(Window):
         return True 
 
     def update_pinned_apps_file(self):
-        config_path = get_relative_path("../config/dock.json")
         try:
-            with open(config_path, "w") as file:
+            data.DOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(data.DOCK_FILE, "w") as file:
                 json.dump(self.config, file, indent=4)
             return True
         except Exception as e:

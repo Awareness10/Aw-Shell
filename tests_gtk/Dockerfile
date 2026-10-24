@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential pkg-config meson ninja-build \
         sway dbus-daemon \
-        libgtk-3-dev libgirepository1.0-dev libcairo2-dev libdbus-1-dev \
+        libgtk-3-dev libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev libdbus-1-dev \
         libwayland-dev libffi-dev \
         gir1.2-gtk-3.0 gir1.2-gtklayershell-0.1 gir1.2-nm-1.0 gir1.2-playerctl-2.0 \
         gir1.2-cvc-1.0 \

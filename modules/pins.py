@@ -1,6 +1,7 @@
 import gi
 
 import config.data as data
+from config.paths import PINS_FILE, ensure_dir
 
 gi.require_version('Gtk', '3.0')
 import json
@@ -21,7 +22,7 @@ from watchdog.observers import Observer
 
 import modules.icons as icons
 
-SAVE_FILE = os.path.expanduser("~/.pins.json")
+SAVE_FILE = str(PINS_FILE)
 
 icon_size = 80
 if data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]:
@@ -447,6 +448,7 @@ class Pins(Gtk.Box):
                 'content': cell.content
             })
         try:
+            ensure_dir(PINS_FILE.parent)
             with open(SAVE_FILE, 'w') as f:
                 json.dump(state, f)
         except Exception as e:

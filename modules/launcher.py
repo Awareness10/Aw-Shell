@@ -14,7 +14,6 @@ from fabric.utils import (
     idle_add,
     remove_handler,
 )
-from fabric.utils.helpers import get_relative_path
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.entry import Entry
@@ -27,6 +26,13 @@ import config.data as data
 import modules.icons as icons
 import utils.apps as apps
 import utils.calculator as calculator
+from config.paths import (
+    APP_DIR,
+    CALC_HISTORY,
+    CONVERSION_HISTORY,
+    ensure_dir,
+    self_updatable,
+)
 from modules.dock import Dock
 from utils.conversion import Conversion
 
@@ -55,14 +61,14 @@ class AppLauncher(Box):
 
 
         self.converter = Conversion()
-        self.calc_history_path = f"{data.CACHE_DIR}/calc.json"
+        self.calc_history_path = str(CALC_HISTORY)
         if os.path.exists(self.calc_history_path):
             with open(self.calc_history_path, "r") as f:
                 self.calc_history = json.load(f)
         else:
             self.calc_history = []
         
-        self.conversion_history_path = f"{data.CACHE_DIR}/conversion.json"
+        self.conversion_history_path = str(CONVERSION_HISTORY)
         if os.path.exists(self.conversion_history_path):
             with open(self.conversion_history_path, "r") as f:
                 self.conversion_history = json.load(f)
@@ -291,10 +297,16 @@ class AppLauncher(Box):
             case ":p":
                 self.notch.open_notch("power")
             case ":update":
-                _sp.Popen(
-                    [sys.executable, "-m", "modules.updater", "--force"],
-                    cwd=str(Path(__file__).resolve().parent.parent),
-                )
+                if self_updatable():
+                    _sp.Popen(
+                        [sys.executable, "-m", "modules.updater", "--force"],
+                        cwd=str(APP_DIR),
+                    )
+                else:
+                    exec_shell_command_async(shlex.join([
+                        "notify-send", data.APP_NAME_CAP,
+                        "Updates come from your package manager",
+                    ]))
             case ":settings":
                 exec_shell_command_async(SETTINGS_COMMAND)
                 self.close_launcher()
@@ -425,15 +437,15 @@ class AppLauncher(Box):
             "icon_name": selected_app.icon_name
         }.items() if v is not None}
 
-        config_path = get_relative_path("../config/dock.json")
+        dock_file = data.DOCK_FILE
         try:
-            with open(config_path, "r") as file:
-                data = json.load(file)
+            with open(dock_file, "r") as file:
+                pins = json.load(file)
         except (FileNotFoundError, json.JSONDecodeError):
-            data = {"pinned_apps": []}
+            pins = {"pinned_apps": []}
 
         already_pinned = False
-        for pinned_app in data.get("pinned_apps", []):
+        for pinned_app in pins.get("pinned_apps", []):
             if isinstance(pinned_app, dict) and pinned_app.get("name") == app_data["name"]:
                 already_pinned = True
 
@@ -442,16 +454,17 @@ class AppLauncher(Box):
             elif isinstance(pinned_app, str) and pinned_app == app_data["name"]:
                 already_pinned = True
 
-                data["pinned_apps"].remove(pinned_app)
-                data["pinned_apps"].append(app_data)
+                pins["pinned_apps"].remove(pinned_app)
+                pins["pinned_apps"].append(app_data)
                 break
 
         if not already_pinned:
-            data.setdefault("pinned_apps", []).append(app_data)
+            pins.setdefault("pinned_apps", []).append(app_data)
         
 
-        with open(config_path, "w") as file:
-            json.dump(data, file, indent=4)
+        dock_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(dock_file, "w") as file:
+            json.dump(pins, file, indent=4)
             
 
         Dock.notify_config_change()
@@ -469,10 +482,12 @@ class AppLauncher(Box):
         self.update_selection(new_index)
 
     def save_calc_history(self):
+        ensure_dir(Path(self.calc_history_path).parent)
         with open(self.calc_history_path, "w") as f:
             json.dump(self.calc_history, f)
 
     def save_conversion_history(self):
+        ensure_dir(Path(self.conversion_history_path).parent)
         with open(self.conversion_history_path, "w") as f:
             json.dump(self.conversion_history, f)
 

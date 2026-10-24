@@ -1,7 +1,19 @@
+# ruff: noqa: E402
+import sys
+
+from utils.typelibs import add_private_typelibs
+
+add_private_typelibs()  # before anything imports gi (see utils/typelibs.py)
+
+if __name__ == "__main__" and sys.argv[1:] == ["--migrate"]:
+    # Before the widget imports below: they need a display and Hyprland
+    from config.migrate import main as migrate
+
+    sys.exit(migrate())
+
 import os
 import shlex
 import subprocess as _sp
-import sys
 
 import setproctitle
 from fabric import Application
@@ -9,18 +21,23 @@ from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
 from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
+from config.legacy import move_legacy_files
+from config.migrate import old_install_notice
+from config.paths import APP_DIR, USER_DIR, self_updatable
 from config.settings_utils import ensure_current_wallpaper
 from modules.bar import Bar
 from modules.corners import Corners
 from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
+from utils.stylesheet import build_stylesheet
 from utils.tooltips import install_tooltip_dedup
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
 
 if __name__ == "__main__":
     setproctitle.setproctitle(APP_NAME)
+    move_legacy_files()  # before any widget reads kanban, pins or history
     install_tooltip_dedup()
 
     if not os.path.isfile(CONFIG_FILE):
@@ -45,8 +62,10 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error launching updater: {e}")
 
-    GLib.idle_add(_launch_updater)
-    GLib.timeout_add(3600000, _launch_updater)
+    # Package installs (AUR, Nix) update through their package manager
+    if self_updatable():
+        GLib.idle_add(_launch_updater)
+        GLib.timeout_add(3600000, _launch_updater)
 
     # Initialize multi-monitor services
     try:
@@ -150,12 +169,21 @@ if __name__ == "__main__":
     app = Application(f"{APP_NAME}", *app_components)
 
     def set_css():
-        app.set_stylesheet_from_file(
-            get_relative_path("main.css"),
-        )
+        app.set_stylesheet_from_string(build_stylesheet(), base_path=str(APP_DIR))
 
     app.set_css = set_css
 
     app.set_css()
+
+    # Package installs: point users with an old clone at --migrate, once the
+    # shell's notification server is up
+    notice = old_install_notice(USER_DIR, APP_DIR)
+    if notice:
+        def _send_notice():
+            cmd = ["notify-send", "-u", "critical", APP_NAME, notice]
+            exec_shell_command_async(shlex.join(cmd))
+            return False  # once
+
+        GLib.timeout_add_seconds(10, _send_notice)
 
     app.run()
