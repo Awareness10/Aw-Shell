@@ -3,7 +3,6 @@ import os
 import shlex
 import shutil
 import subprocess
-import time
 from pathlib import Path
 
 import toml
@@ -97,6 +96,9 @@ def get_available_monitors() -> list:
 def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) -> None:
     """Save settings, generate hyprconf, and restart Aw-Shell."""
     save_bind_vars()
+    ensure_face_icon()
+    # Keeps matugen's templates current; colors only on the first apply
+    ensure_matugen_config(generate=not CSS_COLORS.exists())
 
     hypr_config_dir = AW_CONFIG_DIR / "hypr"
     hypr_config_dir.mkdir(parents=True, exist_ok=True)
@@ -179,10 +181,11 @@ def deep_update(target: dict, update: dict) -> dict:
     return target  # Aunque modifica in-place, devolverlo es una convención común
 
 
-def ensure_matugen_config():
+def ensure_matugen_config(generate: bool = True):
     """
     Ensure that the matugen configuration file exists and is updated
-    with the expected settings.
+    with the expected settings. With generate, also run matugen on the
+    current wallpaper (which applies the colors and the wallpaper).
     """
     expected_config = {
         "config": {
@@ -277,6 +280,9 @@ def ensure_matugen_config():
     # Ensure config directories exist (harmless if already present)
     HYPR_COLORS.parent.mkdir(parents=True, exist_ok=True)
     CSS_COLORS.parent.mkdir(parents=True, exist_ok=True)
+
+    if not generate:
+        return
 
     image_path = ensure_current_wallpaper()
 
@@ -623,30 +629,12 @@ def backup_and_replace(src: Path, dest: Path, config_name: str) -> None:
     except Exception as e:
         print(f"Error backing up/replacing {config_name} config: {e}")
 
-def start_config() -> None:
-    """Final setup: ensure assets/configs, write Hyprland conf, reload."""
-    print(f"{time.time():.4f}: start_config: Ensuring matugen config...")
-    ensure_matugen_config()
-
-    print(f"{time.time():.4f}: start_config: Ensuring face icon...")
-    ensure_face_icon()
-
-    print(f"{time.time():.4f}: start_config: Generating hypr conf...")
-    hypr_config_dir = AW_CONFIG_DIR / "hypr"
-    hypr_config_dir.mkdir(parents=True, exist_ok=True)
-    hypr_lua_path = hypr_config_dir / f"{APP_NAME}.lua"
-
-    try:
-        hypr_lua_path.write_text(generate_hyprlua(), encoding="utf-8")
-        print(f"Generated Hyprland config at {hypr_lua_path}")
-    except Exception as e:
-        print(f"Error writing Hyprland config: {e}")
-
-    write_hypridle()
-
-    print(f"{time.time():.4f}: start_config: Initiating hyprctl reload...")
-    try:
-        exec_shell_command_async("hyprctl reload")
-        print(f"{time.time():.4f}: start_config: Hyprland reload initiated.")
-    except Exception as e:
-        print(f"Error initiating hyprctl reload: {e}")
+def write_generated_config() -> None:
+    """Rewrite the files generated from the settings: aw-shell.lua (launch
+    command, bundled-file paths) and matugen's config (template paths).
+    Runs nothing; used by --migrate after files move."""
+    load_bind_vars()
+    hypr_lua_path = AW_CONFIG_DIR / "hypr" / f"{APP_NAME}.lua"
+    hypr_lua_path.parent.mkdir(parents=True, exist_ok=True)
+    hypr_lua_path.write_text(generate_hyprlua(), encoding="utf-8")
+    ensure_matugen_config(generate=False)

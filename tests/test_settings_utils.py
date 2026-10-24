@@ -27,7 +27,7 @@ from config.settings_utils import (
     save_bind_vars,
     set_all_bind_vars,
     set_bind_var,
-    start_config,
+    write_generated_config,
 )
 
 
@@ -593,6 +593,27 @@ class TestApplyAndRestart:
         lock_calls = [c for c in replace.call_args_list if c[0][2] == "Hyprlock"]
         assert lock_calls and lock_calls[0][0][0] == HYPRLOCK_TEMPLATE
 
+    @pytest.mark.parametrize("colors_exist, generate", [(False, True), (True, False)])
+    def test_apply_sets_up_matugen_and_face_icon(self, ar_env, colors_exist, generate):
+        """Regression (v1.0.2 dropped start_config): fresh installs never got
+        aw-shell's matugen templates, so the theme never followed the wallpaper.
+        Colors are generated on the first apply only."""
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", False)
+        css_colors = tmp_path / "styles" / "colors.css"
+        if colors_exist:
+            css_colors.parent.mkdir(parents=True)
+            css_colors.write_text(":vars {}")
+        with self._patches(aw_config_dir, config_dir, config_file), \
+                patch("config.settings_utils.CSS_COLORS", css_colors), \
+                patch("config.settings_utils.subprocess.run"), \
+                patch("config.settings_utils.subprocess.Popen"), \
+                patch("config.settings_utils.ensure_matugen_config") as matugen, \
+                patch("config.settings_utils.ensure_face_icon") as face:
+            apply_and_restart()
+        matugen.assert_called_once_with(generate=generate)
+        face.assert_called_once_with()
+
     def test_killall_timeout_handled(self, ar_env):
         import subprocess as sp
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -680,6 +701,14 @@ class TestEnsureMatugenConfig:
         stack.enter_context(patch("config.settings_utils.HYPR_COLORS", hypr_colors))
         stack.enter_context(patch("config.settings_utils.CSS_COLORS", css_colors))
         return stack
+
+    def test_generate_false_only_writes_the_config(self, matugen_env):
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.exec_shell_command_async") as run:
+                ensure_matugen_config(generate=False)
+        assert (config_dir / "matugen" / "config.toml").exists()
+        run.assert_not_called()
 
     def test_creates_config_when_missing(self, matugen_env):
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
@@ -909,55 +938,30 @@ class TestBackupAndReplaceErrors:
 
 
 # =========================================================================
-# start_config
+# write_generated_config (used by --migrate)
 # =========================================================================
 
-class TestStartConfig:
+class TestWriteGeneratedConfig:
 
-    def _sc_patches(self, aw_config_dir, config_dir):
+    def _patches(self, aw_config_dir, config_dir):
         from contextlib import ExitStack
         stack = ExitStack()
         stack.enter_context(patch("config.settings_utils.AW_CONFIG_DIR", aw_config_dir))
         stack.enter_context(patch("config.settings_utils.CONFIG_DIR", config_dir))
         return stack
 
-    def test_orchestrates_all_steps(self, tmp_path):
+    def test_rewrites_hyprlua_and_matugen_config_without_running_anything(self, tmp_path):
         aw_config_dir = tmp_path / "aw-shell" / "config"
         config_dir = tmp_path / "config"
-        mock_matugen = MagicMock()
-        mock_face = MagicMock()
-        mock_exec = MagicMock()
-        with self._sc_patches(aw_config_dir, config_dir):
-            with patch("config.settings_utils.ensure_matugen_config", mock_matugen):
-                with patch("config.settings_utils.ensure_face_icon", mock_face):
-                    with patch("config.settings_utils.exec_shell_command_async", mock_exec):
-                        start_config()
-        mock_matugen.assert_called_once()
-        mock_face.assert_called_once()
-        mock_exec.assert_called_once_with("hyprctl reload")
-
-    def test_writes_hyprconf_file(self, tmp_path):
-        aw_config_dir = tmp_path / "aw-shell" / "config"
-        config_dir = tmp_path / "config"
-        with self._sc_patches(aw_config_dir, config_dir):
-            with patch("config.settings_utils.ensure_matugen_config"):
-                with patch("config.settings_utils.ensure_face_icon"):
-                    with patch("config.settings_utils.exec_shell_command_async"):
-                        start_config()
-        hypr_lua = aw_config_dir / "hypr" / "aw-shell.lua"
-        assert hypr_lua.exists()
-        assert "hl.bind(" in hypr_lua.read_text()
-
-    def test_handles_write_error(self, tmp_path, capsys):
-        aw_config_dir = tmp_path / "aw-shell" / "config"
-        config_dir = tmp_path / "config"
-        with self._sc_patches(aw_config_dir, config_dir):
-            with patch("config.settings_utils.ensure_matugen_config"):
-                with patch("config.settings_utils.ensure_face_icon"):
-                    with patch("config.settings_utils.exec_shell_command_async"):
-                        with patch.object(Path, "write_text", side_effect=OSError("nope")):
-                            start_config()
-        assert "Error writing Hyprland config" in capsys.readouterr().out
+        with self._patches(aw_config_dir, config_dir), \
+                patch("config.settings_utils.load_bind_vars") as load, \
+                patch("config.settings_utils.ensure_matugen_config") as matugen, \
+                patch("config.settings_utils.exec_shell_command_async") as run:
+            write_generated_config()
+        load.assert_called_once_with()
+        matugen.assert_called_once_with(generate=False)
+        run.assert_not_called()
+        assert "hl.bind(" in (aw_config_dir / "hypr" / "aw-shell.lua").read_text()
 
 
 # =========================================================================
