@@ -91,3 +91,46 @@ def test_colors_css_falls_back_to_default(monkeypatch, tmp_path):
     paths.CSS_COLORS.parent.mkdir(parents=True)
     paths.CSS_COLORS.write_text(":vars {}")
     assert paths.colors_css() == paths.CSS_COLORS
+
+
+def test_data_state_runtime_follow_xdg(monkeypatch, tmp_path):
+    paths = _reload(
+        monkeypatch,
+        XDG_DATA_HOME=str(tmp_path / "data"),
+        XDG_STATE_HOME=str(tmp_path / "state"),
+        XDG_RUNTIME_DIR=str(tmp_path / "run"),
+    )
+    assert paths.DATA_DIR == tmp_path / "data" / "aw-shell"
+    assert paths.STATE_DIR == tmp_path / "state" / "aw-shell"
+    assert paths.RUNTIME_DIR == tmp_path / "run" / "aw-shell"
+    assert paths.KANBAN_FILE == paths.DATA_DIR / "kanban.json"
+    assert paths.PINS_FILE == paths.DATA_DIR / "pins.json"
+    assert paths.CALC_HISTORY == paths.STATE_DIR / "calc.json"
+    assert paths.CONVERSION_HISTORY == paths.STATE_DIR / "conversion.json"
+    assert paths.NOTIFICATION_HISTORY.parent == paths.NOTIFICATIONS_DIR
+    assert paths.NOTIFICATIONS_DIR.parent == paths.RUNTIME_DIR
+    assert paths.CAVA_FIFO.parent == paths.RUNTIME_DIR
+    assert paths.REMOTE_VERSION_FILE.parent == paths.RUNTIME_DIR
+
+
+@pytest.mark.parametrize("value", [None, "", "relative/dir"])
+def test_data_state_runtime_fallbacks(monkeypatch, tmp_path, value):
+    import os
+    import tempfile
+
+    paths = _reload(monkeypatch, HOME=str(tmp_path), XDG_DATA_HOME=value,
+                    XDG_STATE_HOME=value, XDG_RUNTIME_DIR=value)
+    assert paths.DATA_DIR == tmp_path / ".local" / "share" / "aw-shell"
+    assert paths.STATE_DIR == tmp_path / ".local" / "state" / "aw-shell"
+    # Per-user, so two users on one machine don't share it
+    assert paths.RUNTIME_DIR == Path(tempfile.gettempdir()) / f"aw-shell-{os.getuid()}"
+
+
+def test_ensure_dir_is_private(monkeypatch, tmp_path):
+    paths = _reload(monkeypatch)
+    made = paths.ensure_dir(tmp_path / "a" / "b")
+    assert made.is_dir()
+    # Every level it creates, not just the last (mkdir(parents=True) doesn't)
+    assert made.stat().st_mode & 0o777 == 0o700
+    assert made.parent.stat().st_mode & 0o777 == 0o700
+    assert paths.ensure_dir(made) == made  # already there: fine
