@@ -191,12 +191,6 @@ class Sandbox:
 SANDBOX = Sandbox()
 SANDBOX.setup()
 
-# Hardcoded outside HOME and shared with a running shell; redirect it
-import modules.notifications as _notifications  # noqa: E402
-
-_notifications.PERSISTENT_DIR = str(SANDBOX.root / "notifications")
-_notifications.PERSISTENT_HISTORY_FILE = str(SANDBOX.root / "notifications" / "history.json")
-
 from gi.repository import GLib  # noqa: E402
 
 

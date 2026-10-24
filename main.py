@@ -9,6 +9,7 @@ from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
 from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
+from config.legacy import move_legacy_files
 from config.paths import APP_DIR, self_updatable
 from config.settings_utils import ensure_current_wallpaper
 from modules.bar import Bar
@@ -23,6 +24,7 @@ fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
 
 if __name__ == "__main__":
     setproctitle.setproctitle(APP_NAME)
+    move_legacy_files()  # before any widget reads kanban, pins or history
     install_tooltip_dedup()
 
     if not os.path.isfile(CONFIG_FILE):

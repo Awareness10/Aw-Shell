@@ -1,6 +1,4 @@
 import json
-import os
-from pathlib import Path
 
 import cairo
 import gi
@@ -11,6 +9,7 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 
 import config.data as data
 import modules.icons as icons
+from config.paths import KANBAN_FILE, ensure_dir
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gdk, GLib, GObject, Gtk
@@ -306,7 +305,7 @@ class KanbanColumn(Gtk.Frame):
         widget.get_parent().get_parent().drag_unhighlight()
 
 class Kanban(Gtk.Box):
-    STATE_FILE = Path(os.path.expanduser("~/.kanban.json"))
+    STATE_FILE = KANBAN_FILE
 
     def __init__(self):
         super().__init__(name="kanban")
@@ -341,6 +340,7 @@ class Kanban(Gtk.Box):
             ]
         }
         try:
+            ensure_dir(self.STATE_FILE.parent)
             with open(self.STATE_FILE, "w") as f:
                 json.dump(state, f, indent=2)
         except Exception as e:

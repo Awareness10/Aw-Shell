@@ -80,4 +80,4 @@ def test_dbus_buses_are_private():
 def test_notification_history_redirected(sandbox):
     import modules.notifications as notifications
 
-    assert notifications.PERSISTENT_HISTORY_FILE.startswith(str(sandbox.root))
+    assert notifications.PERSISTENT_HISTORY_FILE.startswith(str(sandbox.runtime))

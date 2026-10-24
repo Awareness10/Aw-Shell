@@ -106,6 +106,18 @@ class TestFetchRemoteVersion:
         assert REMOTE_API_URL in cmd and "--fail" in cmd
         assert "Accept: application/vnd.github.raw+json" in cmd
 
+    def test_downloads_into_the_private_runtime_folder(self, tmp_path):
+        """Not the shared /tmp, where another user could plant the file."""
+        import config.paths as paths
+        from modules.updater import REMOTE_VERSION_FILE, fetch_remote_version
+        assert REMOTE_VERSION_FILE == str(paths.REMOTE_VERSION_FILE)
+        assert paths.REMOTE_VERSION_FILE.parent == paths.RUNTIME_DIR
+        runtime = tmp_path / "run" / "aw-shell"
+        with patch("modules.updater.paths.RUNTIME_DIR", runtime), \
+                patch("modules.updater.subprocess.run", return_value=MagicMock(returncode=0)):
+            fetch_remote_version()
+        assert runtime.is_dir()  # curl -o doesn't create folders
+
     def test_falls_back_to_raw_url_when_api_fails(self):
         from modules.updater import REMOTE_URL, fetch_remote_version
         with patch("modules.updater.subprocess.run",

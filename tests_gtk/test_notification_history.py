@@ -13,7 +13,7 @@ import modules.notifications as notifications
 @pytest.fixture
 def history_file(sandbox):
     path = notifications.PERSISTENT_HISTORY_FILE
-    assert path.startswith(str(sandbox.root))  # redirected away from /tmp/aw-shell
+    assert path.startswith(str(sandbox.runtime))  # the sandbox's XDG_RUNTIME_DIR, not /tmp
     if notifications.os.path.exists(path):
         notifications.os.remove(path)
     yield path

@@ -45,7 +45,7 @@ _MODULE_DIR = Path(__file__).resolve().parent
 _PROJECT_DIR = _MODULE_DIR.parent
 
 VERSION_FILE = str(_PROJECT_DIR / "version.json")
-REMOTE_VERSION_FILE = "/tmp/remote_version.json"
+REMOTE_VERSION_FILE = str(paths.REMOTE_VERSION_FILE)
 REMOTE_URL = (
     "https://raw.githubusercontent.com/awareness10/Aw-Shell/"
     "refs/heads/main/version.json"
@@ -103,6 +103,7 @@ def fetch_remote_version() -> None:
     fall back to the raw file (with a cache-busting query) if it refuses.
     """
     try:
+        paths.ensure_dir(paths.RUNTIME_DIR)  # curl -o doesn't create folders
         if _curl(REMOTE_API_URL, "-H", "Accept: application/vnd.github.raw+json") != 0:
             _curl(f"{REMOTE_URL}?t={int(time.time())}")
     except subprocess.TimeoutExpired:

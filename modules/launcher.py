@@ -26,7 +26,13 @@ import config.data as data
 import modules.icons as icons
 import utils.apps as apps
 import utils.calculator as calculator
-from config.paths import APP_DIR, self_updatable
+from config.paths import (
+    APP_DIR,
+    CALC_HISTORY,
+    CONVERSION_HISTORY,
+    ensure_dir,
+    self_updatable,
+)
 from modules.dock import Dock
 from utils.conversion import Conversion
 
@@ -55,14 +61,14 @@ class AppLauncher(Box):
 
 
         self.converter = Conversion()
-        self.calc_history_path = f"{data.CACHE_DIR}/calc.json"
+        self.calc_history_path = str(CALC_HISTORY)
         if os.path.exists(self.calc_history_path):
             with open(self.calc_history_path, "r") as f:
                 self.calc_history = json.load(f)
         else:
             self.calc_history = []
         
-        self.conversion_history_path = f"{data.CACHE_DIR}/conversion.json"
+        self.conversion_history_path = str(CONVERSION_HISTORY)
         if os.path.exists(self.conversion_history_path):
             with open(self.conversion_history_path, "r") as f:
                 self.conversion_history = json.load(f)
@@ -476,10 +482,12 @@ class AppLauncher(Box):
         self.update_selection(new_index)
 
     def save_calc_history(self):
+        ensure_dir(Path(self.calc_history_path).parent)
         with open(self.calc_history_path, "w") as f:
             json.dump(self.calc_history, f)
 
     def save_conversion_history(self):
+        ensure_dir(Path(self.conversion_history_path).parent)
         with open(self.conversion_history_path, "w") as f:
             json.dump(self.conversion_history, f)
 

@@ -145,6 +145,18 @@ def test_pinning_writes_dock_json_to_the_user_folder(launcher, monkeypatch):
     assert [app["name"] for app in pinned] == ["firefox"]
 
 
+def test_history_lives_in_the_state_folder(launcher, sandbox):
+    import config.paths as paths
+
+    fresh = launcher_module.AppLauncher(notch=MagicMock(name="notch"))
+    try:
+        assert fresh.calc_history_path == str(paths.CALC_HISTORY)
+        assert fresh.conversion_history_path == str(paths.CONVERSION_HISTORY)
+        assert paths.CALC_HISTORY.is_relative_to(sandbox.home / ".local" / "state")
+    finally:
+        fresh.destroy()
+
+
 def test_calculator_result_saved(launcher):
     launcher.search_entry.set_text("=2^10")
     launcher.evaluate_calculator_expression("=2^10")

@@ -1,4 +1,4 @@
-"""Kanban notes are saved to ~/.kanban.json and survive a rebuild."""
+"""Kanban notes are saved to ~/.local/share/aw-shell/kanban.json and survive a rebuild."""
 
 import json
 
@@ -10,7 +10,7 @@ def state_file(sandbox):
     from modules.kanban import Kanban
 
     path = Kanban.STATE_FILE
-    assert path.parent == sandbox.home  # never the user's real board
+    assert path.parent == sandbox.home / ".local" / "share" / "aw-shell"  # not the real board
     path.unlink(missing_ok=True)
     yield path
     path.unlink(missing_ok=True)
