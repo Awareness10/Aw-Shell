@@ -29,7 +29,6 @@ PYTHON_PACKAGES = {
     "watchdog": "python-watchdog",
     "fabric": "bundled",  # the Awareness10 fork, see the PKGBUILD
     "glaze": "bundled",  # not packaged for Arch
-    "pyopengl": "unused",  # listed in pyproject, but nothing imports OpenGL
 }
 
 # GI namespace -> Arch package providing its typelib
@@ -75,7 +74,7 @@ def test_every_python_dependency_has_an_arch_package(depends):
         name = re.split(r"[<>=!~ ;\[]", requirement, maxsplit=1)[0].lower()
         assert name in PYTHON_PACKAGES, f"{name}: add it to PYTHON_PACKAGES and the PKGBUILD"
         package = PYTHON_PACKAGES[name]
-        if package not in ("bundled", "unused"):
+        if package != "bundled":
             assert package in depends, f"{name} needs {package} in depends"
     assert "python-click" in depends  # fabric's own dependency
     assert "pango" in depends  # modules/notch.py uses Pango directly
