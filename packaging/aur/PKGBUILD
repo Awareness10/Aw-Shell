@@ -2,6 +2,7 @@
 #
 # Kept in the Aw-Shell repo (packaging/aur/); scripts/aur-release.sh sets the
 # versions and checksums and publishes it. scripts/test-aur.sh builds it.
+# These package files are 0BSD (LICENSE here); Aw-Shell itself is AGPL.
 
 pkgname=aw-shell
 pkgver=1.2.15.dev0
@@ -24,9 +25,9 @@ depends=(
   'python-ijson' 'python-loguru' 'python-numpy' 'python-pillow' 'python-psutil'
   'python-pywayland' 'python-requests' 'python-setproctitle' 'python-toml'
   'python-watchdog' 'pyside6'
-  # GTK and the typelibs the shell loads
-  'gtk3' 'gtk-layer-shell' 'gdk-pixbuf2' 'glib2' 'libnm' 'playerctl'
-  'cinnamon-desktop' 'libdbusmenu-gtk3'
+  # GTK and the typelibs the shell loads; glibc for the bundled Gray library
+  'gtk3' 'gtk-layer-shell' 'gdk-pixbuf2' 'glib2' 'pango' 'libnm' 'playerctl'
+  'cinnamon-desktop' 'libdbusmenu-gtk3' 'glibc'
   # Programs the shell runs
   'hyprland' 'uwsm' 'fabric-cli' 'matugen' 'awww' 'cliphist' 'wl-clipboard'
   'libnotify' 'brightnessctl' 'imagemagick' 'hypridle' 'hyprlock' 'upower'

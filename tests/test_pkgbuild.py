@@ -78,6 +78,8 @@ def test_every_python_dependency_has_an_arch_package(depends):
         if package not in ("bundled", "unused"):
             assert package in depends, f"{name} needs {package} in depends"
     assert "python-click" in depends  # fabric's own dependency
+    assert "pango" in depends  # modules/notch.py uses Pango directly
+    assert "glibc" in depends  # the bundled Gray library links it
 
 
 def test_every_typelib_the_shell_loads_has_its_package(depends):
@@ -105,6 +107,16 @@ def test_launcher_runs_the_bundled_libraries():
     assert "/usr/share/aw-shell/vendor" in launcher
     assert "/usr/lib/aw-shell/lib/girepository-1.0" in launcher  # bundled Gray
     assert "exec python /usr/share/aw-shell/main.py" in launcher
+
+
+def test_package_files_carry_archs_0bsd_license():
+    """AUR guidelines: the package sources need a license; Arch uses the
+    devtools 0BSD text verbatim (RFC 40). Aw-Shell itself stays AGPL."""
+    import hashlib
+    text = (AUR / "LICENSE").read_bytes()
+    assert hashlib.sha256(text).hexdigest() == (
+        "7056c04df17a4e0f0bac9f787f347c9cd892cee6323d1c89528090afd0b934a3")
+    assert _pkgbuild('"${license[@]}"').strip() == "AGPL-3.0-or-later"
 
 
 def test_does_not_ship_development_scripts():

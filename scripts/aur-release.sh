@@ -58,19 +58,22 @@ main() {
   local work
   work="$(mktemp -d)"
   trap 'rm -rf "${work:?}"' EXIT
-  cp "$PKGBUILD" "$REPO/packaging/aur/aw-shell.sh" "$work/"
+  cp "$PKGBUILD" "$REPO/packaging/aur/aw-shell.sh" "$REPO/packaging/aur/LICENSE" "$work/"
   set_pkgbuild_versions "$work/PKGBUILD"
   (cd "$work" && updpkgsums && makepkg --printsrcinfo > .SRCINFO)
 
   echo "==> AUR repository"
-  if ! git clone -q "$AUR_URL" "$work/aur" 2>/dev/null; then
+  if ! git -c init.defaultBranch=master clone -q "$AUR_URL" "$work/aur" 2>/dev/null; then
     $push && die "couldn't clone $AUR_URL (is your SSH key added to your AUR account?)"
     echo "Couldn't clone $AUR_URL (no AUR SSH key yet?). The files that would be published:"
     cat "$work/PKGBUILD"
     return 0
   fi
-  cp "$work/PKGBUILD" "$work/.SRCINFO" "$work/aw-shell.sh" "$work/aur/"
-  git -C "$work/aur" add PKGBUILD .SRCINFO aw-shell.sh
+  cp "$work/PKGBUILD" "$work/.SRCINFO" "$work/aw-shell.sh" "$work/LICENSE" "$work/aur/"
+  # Only the package files, never build output (AUR submission guidelines)
+  printf '%s\n' '*' '!PKGBUILD' '!.SRCINFO' '!aw-shell.sh' '!LICENSE' '!.gitignore' \
+    > "$work/aur/.gitignore"
+  git -C "$work/aur" add PKGBUILD .SRCINFO aw-shell.sh LICENSE .gitignore
   if git -C "$work/aur" diff --cached --quiet; then
     echo "The AUR already has this version."
     return 0
