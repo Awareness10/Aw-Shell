@@ -12,6 +12,8 @@ from fabric.widgets.overlay import Overlay
 from gi.repository import Gdk, GLib, Gtk
 from loguru import logger
 
+from config.paths import colors_css
+
 
 def get_bars(file_path):
     config = configparser.ConfigParser()
@@ -281,7 +283,7 @@ class Spectrum:
 
     def color_update_cached(self):
         """Set drawing color with caching to avoid file reads on every frame"""
-        color_file = get_relative_path("../styles/colors.css")
+        color_file = colors_css()
         try:
             # Check if file has been modified
             current_mtime = os.path.getmtime(color_file)
@@ -311,7 +313,7 @@ class Spectrum:
         """Set drawing color according to current settings by reading primary color from CSS"""
         color = "#a5c8ff"  # default value
         try:
-            with open(get_relative_path("../styles/colors.css"), "r") as f:
+            with open(colors_css(), "r") as f:
                 content = f.read()
                 m = re.search(r"--primary:\s*(#[0-9a-fA-F]{6})", content)
                 if m:

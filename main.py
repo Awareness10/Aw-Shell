@@ -9,6 +9,7 @@ from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
 from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
+from config.paths import self_updatable
 from config.settings_utils import ensure_current_wallpaper
 from modules.bar import Bar
 from modules.corners import Corners
@@ -45,8 +46,10 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error launching updater: {e}")
 
-    GLib.idle_add(_launch_updater)
-    GLib.timeout_add(3600000, _launch_updater)
+    # Package installs (AUR, Nix) update through their package manager
+    if self_updatable():
+        GLib.idle_add(_launch_updater)
+        GLib.timeout_add(3600000, _launch_updater)
 
     # Initialize multi-monitor services
     try:

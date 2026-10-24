@@ -7,6 +7,7 @@ the update process via QProcess. No GTK dependencies.
 import json
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -32,6 +33,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import config.paths as paths
 from config.screen_fit import ScreenFit
 from config.settings_constants import APP_NAME, APP_NAME_CAP
 
@@ -53,7 +55,7 @@ REMOTE_API_URL = (
 )
 REPO_DIR = str(_PROJECT_DIR)
 
-CACHE_DIR = os.path.expanduser(f"~/.cache/{APP_NAME}")
+CACHE_DIR = str(paths.CACHE_DIR)
 
 SNOOZE_FILE_NAME = "updater_snooze.txt"
 UPDATER_DISABLE_FILE_NAME = "updater_disabled.flag"
@@ -627,7 +629,7 @@ class UpdaterWindow(FramelessMainWindow):
                 f'echo "2..." && sleep 1 && '
                 f'echo "1..." && sleep 1 && '
                 f'killall {APP_NAME} && '
-                f'setsid python "{REPO_DIR}/main.py"'
+                f"setsid {shlex.join(paths.launch_command())}"
             )
         return cmd
 

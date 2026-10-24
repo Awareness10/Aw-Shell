@@ -547,9 +547,7 @@ class Bar(Window):
                 self.component_visibility[component_name]
             )
 
-            config_file = os.path.expanduser(
-                f"~/.config/{data.APP_NAME}/config/config.json"
-            )
+            config_file = data.CONFIG_FILE
             if os.path.exists(config_file):
                 try:
                     with open(config_file, "r") as f:

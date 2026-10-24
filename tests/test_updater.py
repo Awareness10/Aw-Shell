@@ -294,6 +294,23 @@ class TestPreviewMode:
         toggle.assert_not_called()
         assert window.toggle_btn.text() == "Enable Updater"
 
+    def test_git_update_restarts_with_launch_command(self, qapp, monkeypatch):
+        """A bare `python main.py` runs the system interpreter, which lacks
+        the shell's dependencies; restart the way Hyprland starts it."""
+        import shlex
+
+        from config.paths import launch_command
+        from modules.updater import UpdaterWindow
+        monkeypatch.setenv("AW_SHELL_LAUNCH", "'/opt/aw shell/aw-shell'")  # shell syntax
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=False, current_version="1.2.5", preview=True)
+        try:
+            cmd = win._update_command()
+        finally:
+            win.close()
+        assert f"setsid {shlex.join(launch_command())}" in cmd
+        assert "'/opt/aw shell/aw-shell'" in cmd  # quoted for bash
+
     def test_title_marks_preview(self, window):
         from PySide6.QtWidgets import QLabel
         title = window.findChild(QLabel, "updaterTitle")
