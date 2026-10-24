@@ -22,9 +22,21 @@ from utils.icon_resolver import IconResolver
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
 
-screen = Gdk.Screen.get_default()
-CURRENT_WIDTH = screen.get_width()
-CURRENT_HEIGHT = screen.get_height()
+
+def _screen_size() -> tuple[int, int]:
+    """Size of the area spanning all monitors, computed the way GTK3 did for
+    the deprecated Gdk.Screen.get_width/get_height on Wayland."""
+    display = Gdk.Display.get_default()
+    width = height = 0
+    for i in range(display.get_n_monitors()):
+        geometry = display.get_monitor(i).get_geometry()
+        width = max(width, geometry.x + geometry.width)
+        height = max(height, geometry.y + geometry.height)
+    return width, height
+
+
+# Fallback when the monitor manager has no size for a monitor
+CURRENT_WIDTH, CURRENT_HEIGHT = _screen_size()
 
 icon_resolver = IconResolver()
 connection = Hyprland()

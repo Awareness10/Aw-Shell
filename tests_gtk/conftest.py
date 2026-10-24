@@ -14,7 +14,7 @@ touch the user's session:
 - stub executables for commands with side effects (systemctl, pkill, ...)
 
 The environment is set up at import time, before anything imports gi,
-because config.data opens the display when it is imported.
+because the shell's modules open the display when they are imported.
 
 Run separately from the mocked unit tests: `pytest tests_gtk`.
 """

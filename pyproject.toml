@@ -60,9 +60,6 @@ addopts = "--cov --cov-report=term-missing"
 filterwarnings = [
     # No GTK3 replacement for the connector name (Gdk.Monitor.get_connector is GTK4)
     "ignore:Gdk.Screen.get_monitor_plug_name is deprecated:DeprecationWarning",
-    # config/data.py reads the whole screen size at import; moving it to
-    # Gdk.Monitor geometry is its own change (layouts depend on these values)
-    "ignore:Gdk.Screen.get_(width|height) is deprecated:DeprecationWarning",
     # Raised inside dependencies, not fixable here
     "ignore::DeprecationWarning:fabric\\.",
     "ignore:g_object_notify.*has no property named:Warning:fabric\\.core\\.service",
