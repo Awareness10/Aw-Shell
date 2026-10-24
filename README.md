@@ -78,6 +78,9 @@ Requirements:
 
 ### AUR
 
+> [!NOTE]
+> Coming soon: the `aw-shell` package isn't on the AUR yet. Until it is, use the install script below.
+
 ```bash
 paru -S aw-shell    # or: yay -S aw-shell
 ```
