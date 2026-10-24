@@ -1,7 +1,15 @@
+# ruff: noqa: E402
+import sys
+
+if __name__ == "__main__" and sys.argv[1:] == ["--migrate"]:
+    # Before the widget imports below: they need a display and Hyprland
+    from config.migrate import main as migrate
+
+    sys.exit(migrate())
+
 import os
 import shlex
 import subprocess as _sp
-import sys
 
 import setproctitle
 from fabric import Application
@@ -10,7 +18,8 @@ from gi.repository import GLib
 
 from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
 from config.legacy import move_legacy_files
-from config.paths import APP_DIR, self_updatable
+from config.migrate import old_install_notice
+from config.paths import APP_DIR, USER_DIR, self_updatable
 from config.settings_utils import ensure_current_wallpaper
 from modules.bar import Bar
 from modules.corners import Corners
@@ -161,5 +170,16 @@ if __name__ == "__main__":
     app.set_css = set_css
 
     app.set_css()
+
+    # Package installs: point users with an old clone at --migrate, once the
+    # shell's notification server is up
+    notice = old_install_notice(USER_DIR, APP_DIR)
+    if notice:
+        def _send_notice():
+            cmd = ["notify-send", "-u", "critical", APP_NAME, notice]
+            exec_shell_command_async(shlex.join(cmd))
+            return False  # once
+
+        GLib.timeout_add_seconds(10, _send_notice)
 
     app.run()
