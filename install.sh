@@ -52,6 +52,7 @@ PACKAGES=(
   tmux
   ttf-nerd-fonts-symbols-mono
   upower
+  uv
   vala
   uwsm
   webp-pixbuf-loader
@@ -148,8 +149,9 @@ build_gray() {
 }
 
 install_python_deps() {
+  # uv comes with the packages; this is for when its install failed
   if ! command -v uv &>/dev/null; then
-    log "Installing uv..."
+    log "Installing uv from astral.sh..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
   fi

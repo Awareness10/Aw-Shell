@@ -103,7 +103,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
 
 1. Install [uv](https://docs.astral.sh/uv/):
     ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    sudo pacman -S uv
     ```
 
 2. Install system dependencies (Arch Linux):
