@@ -123,7 +123,27 @@ get_source() {
 
 install_packages() {
   log "Installing required packages..."
+  # One failed package shouldn't stop the rest; check_packages lists it
   $aur_helper -Syy --needed --devel --noconfirm "${PACKAGES[@]}" || true
+  check_packages
+}
+
+# Warns instead of stopping: most packages are for a single feature, and a
+# missing one the shell needs shows up when it starts. The plain package
+# counts for an AUR -git/-bin one (e.g. matugen for matugen-bin)
+check_packages() {
+  local pkg missing=()
+  for pkg in "${PACKAGES[@]}"; do
+    local plain="${pkg%-git}"
+    plain="${plain%-bin}"
+    if ! pacman -Q "$pkg" &>/dev/null && ! pacman -Q "$plain" &>/dev/null; then
+      missing+=("$pkg")
+    fi
+  done
+  if (( ${#missing[@]} )); then
+    echo "WARNING: these packages didn't install: ${missing[*]}" >&2
+    echo "Install them by hand (e.g. $aur_helper -S ${missing[*]}); see the output above for why." >&2
+  fi
 }
 
 build_gray() {

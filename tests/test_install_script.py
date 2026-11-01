@@ -150,3 +150,19 @@ def test_shell_running(home, running):
     path = _fake_bin(home, pgrep=f"exit {0 if running else 1}")
     result = _run(home, "shell_running 0", PATH=path)
     assert (result.returncode == 0) is running
+
+
+def test_warns_about_packages_that_did_not_install(home):
+    # Installed: cava, and matugen standing in for matugen-bin
+    path = _fake_bin(home, pacman='[[ "$2" == cava || "$2" == matugen ]]')
+    result = _run(home, "PACKAGES=(cava matugen-bin awww-git tmux); aur_helper=yay; check_packages",
+                  PATH=path)
+    assert result.returncode == 0, result.stderr
+    assert "didn't install: awww-git tmux\n" in result.stderr
+
+
+def test_quiet_when_every_package_installed(home):
+    path = _fake_bin(home, pacman="exit 0")
+    result = _run(home, "aur_helper=yay; check_packages", PATH=path)
+    assert result.returncode == 0
+    assert result.stderr == ""
