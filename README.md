@@ -108,7 +108,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
 curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.sh | bash -s -- --shell-colors
 ```
 
-It installs `fastfetch`, plus `rust` unless you already have `cargo` (matuwrap has a Rust module), installs matuwrap with `uv tool install` unless `wrp` is already there, and runs `wrp install bash`. That **edits `~/.bashrc`** (after backing it up) to source `~/.config/matuwrap/scripts/matuwrap`. Run `source ~/.bashrc` to see it. For your own fastfetch logo instead of Arch's, set `MW_FF_LOGO` to a text file in `~/.bashrc`, before matuwrap's line. If a step fails, the installer warns and installs Aw-Shell anyway. Once it is set up the installer stops asking, and the in-app updater never asks.
+It installs `fastfetch`, plus `rust` unless you already have `cargo` (matuwrap has a Rust module), installs matuwrap with `uv tool install` unless `wrp` is already there, and runs `wrp install bash`. That **edits `~/.bashrc`** (after backing it up) to source `~/.config/matuwrap/scripts/matuwrap`. Run `source ~/.bashrc` to see it. For your own fastfetch logo instead of Arch's, export `MW_FF_LOGO` (a text file) or `MW_FF_IMAGE` (an image, in kitty, ghostty or WezTerm) in `~/.bashrc`, before matuwrap's line; `ff-toggle` switches between them. See [matuwrap's README](https://github.com/Awareness10/matuwrap#shell-integration) for the details. If a step fails, the installer warns and installs Aw-Shell anyway. Once it is set up the installer stops asking, and the in-app updater never asks.
 
 To undo it, remove the `source ~/.config/matuwrap/scripts/matuwrap` line from `~/.bashrc` and run `uv tool uninstall matuwrap`.
 

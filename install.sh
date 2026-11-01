@@ -317,7 +317,8 @@ setup_shell_colors() {
     return 0
   fi
   log "Shell colors are set up; reload with: source ~/.bashrc"
-  log "For your own fastfetch logo, set MW_FF_LOGO to a text file in ~/.bashrc, before matuwrap's line"
+  log "Custom fastfetch logo: export MW_FF_LOGO=<file.txt> or MW_FF_IMAGE=<image> in ~/.bashrc,"
+  log "  before matuwrap's source line; ff-toggle switches between text and image"
 }
 
 main() {

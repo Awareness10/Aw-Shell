@@ -256,7 +256,8 @@ def test_shell_colors_flag_runs_the_steps_in_order(home):
         "uv tool dir --bin",
         "wrp install bash",
     ]
-    assert "source ~/.bashrc" in result.stdout and "MW_FF_LOGO" in result.stdout
+    assert "source ~/.bashrc" in result.stdout
+    assert all(hint in result.stdout for hint in ("MW_FF_LOGO", "MW_FF_IMAGE", "ff-toggle"))
 
 
 def test_shell_colors_keep_an_existing_wrp(home):
