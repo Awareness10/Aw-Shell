@@ -20,6 +20,7 @@ PACKAGES=(
   awww-git
   brightnessctl
   cava
+  cinnamon-desktop  # Cvc typelib for fabric.audio; the shell won't start without it
   cliphist
   ddcutil
   fabric-cli-git

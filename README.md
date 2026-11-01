@@ -110,6 +110,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
     - [fabric-cli](https://github.com/Fabric-Development/fabric-cli)
     - [Gray](https://github.com/Fabric-Development/gray): its AUR package can't install, so build it into `~/.local/lib/aw-shell`, where Aw-Shell looks for it: `source install.sh && build_gray` (needs `meson` and `vala`)
     - [Matugen](https://github.com/InioX/matugen)
+    - `cinnamon-desktop`: its Cvc typelib is what fabric's audio service uses; the shell won't start without it
     - `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
     - `bluez-utils` `gobject-introspection` `gpu-screen-recorder` `headsetcontrol`
     - `hypridle` `hyprlock` `hyprpicker` `hyprshot` `hyprsunset`

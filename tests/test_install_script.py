@@ -113,3 +113,10 @@ def test_installs_base_devel_and_git_when_missing(home, installed):
         assert not calls.exists()  # no sudo prompt when there's nothing to do
     else:
         assert calls.read_text() == "pacman -S --needed --noconfirm base-devel git\n"
+
+
+def test_installs_the_cvc_typelib(home):
+    """fabric.audio raises CvcImportError without it, so the shell never
+    starts (tests/test_pkgbuild.py has the same for the AUR package)."""
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    assert "cinnamon-desktop" in result.stdout.split()
