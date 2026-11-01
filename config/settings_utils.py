@@ -432,8 +432,13 @@ local axMessage = {lua_str(f'notify-send "{USERNAME}" "Ya boi be cooking‼️\U
 
 -- Wallpapers directory: {get_bind_var("wallpapers_dir")}
 
--- layerrulev3 = animation 0, namespace:fabric
--- TODO: manual review - layerrulev3 has no known hl.* equivalent yet, check the Hyprland wiki
+-- The shell animates its own surfaces (bar, notch, dock, ...) in CSS, so
+-- Hyprland's layer animations on top of that would play twice
+hl.layer_rule({{
+    name = "{APP_NAME}-no-anim",
+    match = {{ namespace = "^fabric$" }},
+    no_anim = true,
+}})
 
 hl.config({{
     general = {{
@@ -485,6 +490,7 @@ hl.animation({{ leaf = "windows", enabled = true, speed = 2.5, bezier = "myBezie
 hl.animation({{ leaf = "border", enabled = true, speed = 2.5, bezier = "myBezier" }})
 hl.animation({{ leaf = "fade", enabled = true, speed = 2.5, bezier = "myBezier" }})
 hl.animation({{ leaf = "workspaces", enabled = true, speed = 2.5, bezier = "myBezier", style = "{animation_type} 20%" }})
+-- To use your own animations, define them in hyprland.lua after loading this file.
 
 -- Autostart
 hl.on("hyprland.start", function()
