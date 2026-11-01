@@ -166,3 +166,30 @@ def test_quiet_when_every_package_installed(home):
     result = _run(home, "aur_helper=yay; check_packages", PATH=path)
     assert result.returncode == 0
     assert result.stderr == ""
+
+
+def test_terminal_list_matches_the_shell():
+    from config.terminal import TERMINALS
+    result = _run(Path("/nonexistent"), 'printf "%s\\n" "${TERMINALS[@]}"')
+    assert result.stdout.split() == list(TERMINALS)
+
+
+@pytest.mark.parametrize("stubs, env, kitty", [
+    ({}, {}, True),  # no terminal at all
+    ({"foot": "exit 0"}, {}, False),
+    ({"wezterm": "exit 0"}, {"TERMINAL": "wezterm"}, False),
+    ({"st": "exit 0"}, {"TERMINAL": "st"}, False),  # $TERMINAL needn't be one we know
+    ({}, {"TERMINAL": "st"}, True),  # $TERMINAL that isn't installed
+    ({"xdg-terminal-exec": "exit 0"}, {}, False),
+    ({"xdg-terminal-exec": "exit 1"}, {}, True),  # installed, but finds no terminal
+])
+def test_installs_kitty_only_without_a_terminal(home, stubs, env, kitty):
+    calls = home / "calls"
+    _fake_bin(home, yay=f'echo "$*" >> "{calls}"', pacman="exit 0", **stubs)
+    (home / "bin" / "bash").symlink_to("/bin/bash")
+    # Only the stubs: this machine's own terminals must not count
+    result = _run(home, "aur_helper=yay; install_packages", PATH=str(home / "bin"), **env)
+    assert result.returncode == 0, result.stderr
+    packages = calls.read_text().split()
+    assert ("kitty" in packages) is kitty
+    assert "cinnamon-desktop" in packages

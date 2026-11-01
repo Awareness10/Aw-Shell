@@ -18,6 +18,9 @@ GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"
 # The first start's output, to show why it failed
 SHELL_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell/shell.log"
 DEV_MODE=false
+# Terminals Aw-Shell knows how to run commands in (config/terminal.py); with
+# none of them, nor $TERMINAL or xdg-terminal-exec, kitty is installed
+TERMINALS=(kitty foot alacritty ghostty wezterm konsole gnome-terminal ptyxis xfce4-terminal)
 PACKAGES=(
   awww-git
   brightnessctl
@@ -121,7 +124,26 @@ get_source() {
   fi
 }
 
+# The shell runs the user's terminal (config/terminal.py finds it the same way)
+has_terminal() {
+  if [[ -n "${TERMINAL:-}" ]] && command -v "$TERMINAL" &>/dev/null; then
+    return 0
+  fi
+  if command -v xdg-terminal-exec &>/dev/null && xdg-terminal-exec --print-id &>/dev/null; then
+    return 0
+  fi
+  local terminal
+  for terminal in "${TERMINALS[@]}"; do
+    command -v "$terminal" &>/dev/null && return 0
+  done
+  return 1
+}
+
 install_packages() {
+  if ! has_terminal; then
+    log "No terminal found; kitty will be installed"
+    PACKAGES+=(kitty)
+  fi
   log "Installing required packages..."
   # One failed package shouldn't stop the rest; check_packages lists it
   $aur_helper -Syy --needed --devel --noconfirm "${PACKAGES[@]}" || true

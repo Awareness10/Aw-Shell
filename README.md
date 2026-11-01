@@ -120,6 +120,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
     - `power-profiles-daemon` `swappy` `tesseract` `tesseract-data-eng`
     - `tesseract-data-spa` `tmux` `upower` `uwsm`
     - `webp-pixbuf-loader` `wl-clipboard`
+    - A terminal; the installer adds `kitty` if you have none. Aw-Shell uses `$TERMINAL`, `xdg-terminal-exec` or the first one it knows of: kitty, foot, alacritty, ghostty, wezterm, konsole, gnome-terminal, ptyxis, xfce4-terminal. Settings > Terminal changes it
 
 3. Clone, install Python deps, and run (any folder works; `~/.config/aw-shell` is for your settings):
     ```bash
