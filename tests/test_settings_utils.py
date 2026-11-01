@@ -217,6 +217,16 @@ class TestGenerateHyprlua:
         conf = generate_hyprlua()
         assert "slidefadevert" in conf
 
+    def test_shell_layers_not_animated_by_hyprland(self):
+        """Regression: the hyprlang `layerrule = animation 0, namespace:fabric`
+        was left as a TODO comment in the Lua port, so Hyprland's layer
+        animations played on top of the shell's own CSS animations."""
+        conf = generate_hyprlua()
+        rule = conf.split("hl.layer_rule({", 1)[1].split("})", 1)[0]
+        assert 'namespace = "^fabric$"' in rule
+        assert "no_anim = true" in rule
+        assert "TODO" not in conf
+
     def test_contains_wallpapers_dir_comment(self):
         set_bind_var("wallpapers_dir", "/home/user/walls")
         conf = generate_hyprlua()
