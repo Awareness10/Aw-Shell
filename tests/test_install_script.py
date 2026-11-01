@@ -86,3 +86,30 @@ def test_piped_into_bash_runs_main(home):
     result = subprocess.run(["bash"], input=piped, capture_output=True, text=True,
                             env={"HOME": str(home), "PATH": "/usr/bin:/bin"})
     assert result.stdout.strip() == "MAIN-RAN", result.stderr
+
+
+def _fake_bin(home: Path, **commands: str) -> str:
+    """PATH with stub commands (name -> bash body) in front of the system's."""
+    bin_dir = home / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    for name, body in commands.items():
+        stub = bin_dir / name
+        stub.write_text(f"#!/bin/bash\n{body}\n")
+        stub.chmod(0o755)
+    return f"{bin_dir}:/usr/bin:/bin"
+
+
+@pytest.mark.parametrize("installed", [True, False])
+def test_installs_base_devel_and_git_when_missing(home, installed):
+    calls = home / "calls"
+    path = _fake_bin(
+        home,
+        pacman=f'[[ "$1" == -T ]] && exit {0 if installed else 127}; exit 1',
+        sudo=f'echo "$*" >> "{calls}"',
+    )
+    result = _run(home, "install_build_tools", PATH=path)
+    assert result.returncode == 0, result.stderr
+    if installed:
+        assert not calls.exists()  # no sudo prompt when there's nothing to do
+    else:
+        assert calls.read_text() == "pacman -S --needed --noconfirm base-devel git\n"

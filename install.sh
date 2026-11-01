@@ -76,6 +76,16 @@ move_old_clone() {
   log "Moved the old install from $old to $new"
 }
 
+# A minimal Arch install has neither, but makepkg (yay-bin, AUR packages) and
+# get_source need them
+install_build_tools() {
+  if pacman -T base-devel git >/dev/null; then
+    return 0
+  fi
+  log "Installing base-devel and git..."
+  sudo pacman -S --needed --noconfirm base-devel git
+}
+
 ensure_aur_helper() {
   if command -v paru &>/dev/null; then
     aur_helper="paru"
@@ -194,6 +204,7 @@ main() {
     fi
   fi
 
+  install_build_tools
   ensure_aur_helper
   move_old_clone
   get_source
