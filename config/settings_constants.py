@@ -1,5 +1,7 @@
 from fabric.utils.helpers import get_relative_path
 
+from .terminal import FALLBACK as FALLBACK_TERMINAL
+
 APP_NAME_CAP = "Aw-Shell"
 APP_NAME = APP_NAME_CAP.lower()
 
@@ -55,7 +57,8 @@ DEFAULTS = {
     "vertical": False,
     "centered_bar": False,
     "datetime_12h_format": False,
-    "terminal_command": "kitty -e",
+    # Until one is saved, the user's own terminal (settings_utils.default_settings)
+    "terminal_command": FALLBACK_TERMINAL,
     "auto_append_hyprland": True,
     "idle_lock_timeout": 600,
     "idle_suspend_enabled": True,

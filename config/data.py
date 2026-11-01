@@ -5,6 +5,7 @@ from pathlib import Path
 import gi
 
 from .settings_constants import APP_NAME, APP_NAME_CAP, DEFAULTS  # noqa: F401
+from .terminal import default_terminal_command
 
 # Modules that import this first and Gtk later still get GTK 3
 gi.require_version("Gtk", "3.0")
@@ -63,7 +64,9 @@ BAR_POSITION = _get_config_var("bar_position")
 VERTICAL = BAR_POSITION in ["Left", "Right"]
 CENTERED_BAR = _get_config_var("centered_bar")
 DATETIME_12H_FORMAT = _get_config_var("datetime_12h_format")
-TERMINAL_COMMAND = _get_config_var("terminal_command")
+# Not saved yet (first run): the terminal found on this system
+TERMINAL_COMMAND = (config["terminal_command"] if "terminal_command" in config
+                    else default_terminal_command())
 DOCK_ENABLED = _get_config_var("dock_enabled")
 DOCK_ALWAYS_SHOW = _get_config_var("dock_always_show")
 DOCK_ICON_SIZE = _get_config_var("dock_icon_size")

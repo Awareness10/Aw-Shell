@@ -8,6 +8,7 @@ from pathlib import Path
 import toml
 from fabric.utils.helpers import exec_shell_command_async
 
+from . import terminal
 from .data import (
     AW_CONFIG_DIR,
     CONFIG_DIR,
@@ -71,9 +72,14 @@ def save_bind_vars() -> None:
         print(f"Error saving config: {e}")
 
 
+def default_settings() -> dict:
+    """DEFAULTS, with the terminal found on this system."""
+    return {**DEFAULTS, "terminal_command": terminal.default_terminal_command()}
+
+
 def reset_to_defaults() -> None:
     bind_vars.clear()
-    bind_vars.update(DEFAULTS.copy())
+    bind_vars.update(default_settings())
 
 
 def get_available_monitors() -> list:
@@ -313,9 +319,9 @@ def load_bind_vars() -> None:
     # Ensure config directory exists (for future saves)
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    # Reset to defaults
+    # Reset to defaults; saved values replace them below
     bind_vars.clear()
-    bind_vars.update(DEFAULTS.copy())
+    bind_vars.update(default_settings())
 
     if CONFIG_FILE.exists():
         try:
