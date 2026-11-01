@@ -15,6 +15,8 @@ FONT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
 # it). Same commit as packaging/aur/PKGBUILD and tests_gtk/Dockerfile.
 GRAY_COMMIT=d5a8452c39b074ef6da25be95305a22203cf230e
 GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"
+# The first start's output, to show why it failed
+SHELL_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell/shell.log"
 DEV_MODE=false
 PACKAGES=(
   awww-git
@@ -188,9 +190,17 @@ start_shell() {
   hyprctl reload >/dev/null 2>&1 || true
   log "Starting Aw-Shell..."
   killall aw-shell 2>/dev/null || true
+  mkdir -p "$(dirname "$SHELL_LOG")"
   # Opens the settings window on its own the first time (no config yet)
-  uwsm app -- "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/main.py" >/dev/null 2>&1 &
+  uwsm app -- "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/main.py" >"$SHELL_LOG" 2>&1 &
   disown
+}
+
+# Whether the shell is still up a few seconds after starting: it is called
+# aw-shell once its imports have loaded, and runs main.py until then
+shell_running() {
+  sleep "${1:-5}"
+  pgrep -x aw-shell >/dev/null || pgrep -f -- "$INSTALL_DIR/main.py" >/dev/null
 }
 
 main() {
@@ -217,6 +227,14 @@ main() {
   install_fonts
   setup_network
   start_shell
+  if ! shell_running; then
+    # Not an error exit: the code is installed, and the in-app updater would
+    # call the whole update failed
+    echo "WARNING: Aw-Shell stopped right after starting. The end of $SHELL_LOG:" >&2
+    tail -n 20 "$SHELL_LOG" >&2 || true
+    log "Installed, but Aw-Shell isn't running. Code: $INSTALL_DIR, settings: $OLD_DIR"
+    return 0
+  fi
   log "Installation complete. Code: $INSTALL_DIR, settings: $OLD_DIR"
 }
 

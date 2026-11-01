@@ -1,7 +1,9 @@
-"""install.sh: moving an old ~/.config/aw-shell clone, and being sourceable
-without running the installer. Sourced with a temporary HOME."""
+"""install.sh: moving an old ~/.config/aw-shell clone, being sourceable
+without running the installer, and its steps on a fresh system. Sourced with
+a temporary HOME and stub commands."""
 
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -120,3 +122,31 @@ def test_installs_the_cvc_typelib(home):
     starts (tests/test_pkgbuild.py has the same for the AUR package)."""
     result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
     assert "cinnamon-desktop" in result.stdout.split()
+
+
+def test_first_start_output_goes_to_a_log(home):
+    """A shell that crashes on start must leave its traceback somewhere."""
+    install = home / "inst"
+    venv_bin = install / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    (venv_bin / "python").write_text("#!/bin/bash\nexit 0\n")
+    (venv_bin / "python").chmod(0o755)
+    path = _fake_bin(
+        home, hyprctl="exit 0", killall="exit 1",
+        uwsm='echo "CvcImportError: Cvc is not installed" >&2; exit 1',
+    )
+    result = _run(home, "start_shell", PATH=path, AW_SHELL_DIR=str(install))
+    assert result.returncode == 0, result.stderr
+    log = home / ".local" / "state" / "aw-shell" / "shell.log"
+    for _ in range(50):  # the shell runs in the background (disowned)
+        if "CvcImportError" in log.read_text():
+            break
+        time.sleep(0.05)
+    assert "CvcImportError" in log.read_text()
+
+
+@pytest.mark.parametrize("running", [True, False])
+def test_shell_running(home, running):
+    path = _fake_bin(home, pgrep=f"exit {0 if running else 1}")
+    result = _run(home, "shell_running 0", PATH=path)
+    assert (result.returncode == 0) is running
