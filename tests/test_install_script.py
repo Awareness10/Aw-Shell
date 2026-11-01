@@ -2,6 +2,7 @@
 without running the installer, and its steps on a fresh system. Sourced with
 a temporary HOME and stub commands."""
 
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -193,3 +194,130 @@ def test_installs_kitty_only_without_a_terminal(home, stubs, env, kitty):
     packages = calls.read_text().split()
     assert ("kitty" in packages) is kitty
     assert "cinnamon-desktop" in packages
+
+
+# ── Shell colors (matuwrap), opt-in ──
+
+def _shell_colors_stubs(home: Path, cargo=False, wrp=False, fail="") -> Path:
+    """Stubs that log their calls, on an isolated PATH. `uv tool install`
+    makes wrp available in the folder `uv tool dir --bin` names."""
+    calls = home / "calls"
+    tool_bin = home / "tool-bin"
+    tool_bin.mkdir()
+    log = f'echo "${{0##*/}} $*" >> "{calls}"'
+    wrp_stub = f"#!/bin/bash\n{log}\n" + ("exit 1\n" if fail == "wrp" else "")
+    (tool_bin / "wrp").write_text(wrp_stub)
+    (tool_bin / "wrp").chmod(0o755)
+    stubs = {
+        "sudo": log + ("; exit 1" if fail == "sudo" else ""),
+        "uv": log + f'; [[ "$*" == "tool dir --bin" ]] && echo "{tool_bin}"; true',
+    }
+    if cargo:
+        stubs["cargo"] = "exit 0"
+    if wrp:
+        stubs["wrp"] = wrp_stub.removeprefix("#!/bin/bash\n")
+    _fake_bin(home, **stubs)
+    (home / "bin" / "bash").symlink_to("/bin/bash")
+    return calls
+
+
+def _calls(calls: Path) -> list[str]:
+    return calls.read_text().splitlines() if calls.exists() else []
+
+
+def _no_tty(home: Path, snippet: str, **env) -> subprocess.CompletedProcess:
+    """Like _run, also without a controlling terminal (like the in-app updater)."""
+    return subprocess.run(
+        ["/bin/bash", "-c", f'source "{SCRIPT}"; {snippet}'],
+        env={"HOME": str(home), "PATH": str(home / "bin"), **env},
+        capture_output=True, text=True, stdin=subprocess.DEVNULL, start_new_session=True,
+    )
+
+
+STEPS = "parse_args {args}; ask_shell_colors; setup_shell_colors; echo SHELL_COLORS=$SHELL_COLORS"
+
+
+def test_no_shell_colors_without_the_flag_or_a_terminal(home):
+    calls = _shell_colors_stubs(home)
+    result = _no_tty(home, STEPS.format(args=""))
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "SHELL_COLORS=no"  # never asked
+    assert "[y/N]" not in result.stdout + result.stderr
+    assert _calls(calls) == []
+
+
+def test_shell_colors_flag_runs_the_steps_in_order(home):
+    calls = _shell_colors_stubs(home)
+    result = _no_tty(home, STEPS.format(args="--shell-colors"))
+    assert result.returncode == 0, result.stderr
+    assert _calls(calls) == [
+        "sudo pacman -S --needed --noconfirm fastfetch rust",
+        "uv tool install git+https://github.com/Awareness10/matuwrap",
+        "uv tool dir --bin",
+        "wrp install bash",
+    ]
+    assert "source ~/.bashrc" in result.stdout and "MW_FF_LOGO" in result.stdout
+
+
+def test_shell_colors_keep_an_existing_wrp(home):
+    calls = _shell_colors_stubs(home, wrp=True)
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    assert not any(call.startswith("uv ") for call in _calls(calls))
+    assert _calls(calls)[-1] == "wrp install bash"
+
+
+def test_shell_colors_use_an_existing_cargo(home):
+    calls = _shell_colors_stubs(home, cargo=True)
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    assert _calls(calls)[0] == "sudo pacman -S --needed --noconfirm fastfetch"
+
+
+@pytest.mark.parametrize("fail", ["sudo", "wrp"])
+def test_failed_shell_colors_only_warn(home, fail):
+    calls = _shell_colors_stubs(home, fail=fail)
+    result = _no_tty(home, STEPS.format(args="--shell-colors") + "; echo STILL-RUNNING")
+    assert result.returncode == 0
+    assert "STILL-RUNNING" in result.stdout
+    assert "shell colors weren't set up" in result.stderr
+    if fail == "sudo":
+        assert _calls(calls) == ["sudo pacman -S --needed --noconfirm fastfetch rust"]
+
+
+def _with_tty(home: Path, answer: str, snippet: str) -> str:
+    """Runs snippet with a terminal (script(1) makes one) answering on it;
+    the snippet's stdin is /dev/null, like the script piped into bash."""
+    inner = f'source "{SCRIPT}"; {snippet}'
+    result = subprocess.run(
+        ["script", "-qec", f"bash -c {shlex.quote(inner)} </dev/null", "/dev/null"],
+        input=answer + "\n", capture_output=True, text=True,
+        env={"HOME": str(home), "PATH": "/usr/bin:/bin"},
+    )
+    return result.stdout.replace("\r", "")
+
+
+@pytest.mark.parametrize("answer, choice", [("y", "yes"), ("yes", "yes"), ("n", "no"), ("", "no")])
+def test_asks_on_the_terminal_defaulting_to_no(home, answer, choice):
+    out = _with_tty(home, answer, "ask_shell_colors; echo SHELL_COLORS=$SHELL_COLORS")
+    assert "[y/N]" in out
+    assert f"SHELL_COLORS={choice}" in out
+
+
+def test_not_asked_once_set_up(home):
+    script = home / ".config" / "matuwrap" / "scripts" / "matuwrap"
+    script.parent.mkdir(parents=True)
+    script.write_text("# matuwrap")
+    out = _with_tty(home, "y", "ask_shell_colors; echo SHELL_COLORS=$SHELL_COLORS")
+    assert "[y/N]" not in out
+    assert "SHELL_COLORS=no" in out
+
+
+@pytest.mark.parametrize("args", [["--dev", "--shell-colors"], ["--shell-colors", "--dev"]])
+def test_options_combine(home, args):
+    result = _run(home, f"parse_args {' '.join(args)}; echo $DEV_MODE $SHELL_COLORS")
+    assert result.stdout.split() == ["true", "yes"]
+
+
+def test_unknown_option(home):
+    result = _run(home, "parse_args --colors")
+    assert result.returncode == 1
+    assert "Unknown option: --colors" in result.stderr

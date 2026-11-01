@@ -100,6 +100,18 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 
 It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose another folder) and starts the shell, which opens its settings the first time. From a clone of the repository, `./install.sh --dev` runs Aw-Shell from that clone instead.
 
+#### Shell colors (optional)
+
+[matuwrap](https://github.com/Awareness10/matuwrap) can color your bash prompt and [fastfetch](https://github.com/fastfetch-cli/fastfetch) with Aw-Shell's palette, following the wallpaper. The installer sets it up only if you ask: run from a terminal, it asks once (the default is no), or pass `--shell-colors`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.sh | bash -s -- --shell-colors
+```
+
+It installs `fastfetch`, plus `rust` unless you already have `cargo` (matuwrap has a Rust module), installs matuwrap with `uv tool install` unless `wrp` is already there, and runs `wrp install bash`. That **edits `~/.bashrc`** (after backing it up) to source `~/.config/matuwrap/scripts/matuwrap`. Run `source ~/.bashrc` to see it. For your own fastfetch logo instead of Arch's, set `MW_FF_LOGO` to a text file in `~/.bashrc`, before matuwrap's line. If a step fails, the installer warns and installs Aw-Shell anyway. Once it is set up the installer stops asking, and the in-app updater never asks.
+
+To undo it, remove the `source ~/.config/matuwrap/scripts/matuwrap` line from `~/.bashrc` and run `uv tool uninstall matuwrap`.
+
 ### Manual Installation
 
 1. Install [uv](https://docs.astral.sh/uv/):

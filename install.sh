@@ -3,6 +3,10 @@
 # with AW_SHELL_DIR), or with --dev runs it from the current repo. Settings
 # live in ~/.config/aw-shell; older versions kept the code there too, and this
 # moves such an install (see `main.py --migrate`).
+#
+# --shell-colors also colors bash's prompt and fastfetch with Aw-Shell's
+# palette (matuwrap; edits ~/.bashrc). Run from a terminal without it, the
+# script asks, defaulting to no. Piped: curl ... | bash -s -- --shell-colors
 
 set -euo pipefail
 
@@ -18,6 +22,10 @@ GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"
 # The first start's output, to show why it failed
 SHELL_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell/shell.log"
 DEV_MODE=false
+# yes, no, or ask (only with a terminal to answer on)
+SHELL_COLORS=ask
+MATUWRAP_URL="https://github.com/Awareness10/matuwrap"
+MATUWRAP_SCRIPT="$HOME/.config/matuwrap/scripts/matuwrap"
 # Terminals Aw-Shell knows how to run commands in (config/terminal.py); with
 # none of them, nor $TERMINAL or xdg-terminal-exec, kitty is installed
 TERMINALS=(kitty foot alacritty ghostty wezterm konsole gnome-terminal ptyxis xfce4-terminal)
@@ -245,19 +253,87 @@ shell_running() {
   pgrep -x aw-shell >/dev/null || pgrep -f -- "$INSTALL_DIR/main.py" >/dev/null
 }
 
+parse_args() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --dev) DEV_MODE=true ;;
+      --shell-colors) SHELL_COLORS=yes ;;
+      *)
+        echo "Unknown option: $arg (options: --dev, --shell-colors)" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+# Someone is there to answer: output goes to a terminal (not the in-app
+# updater's log) and /dev/tty opens. `curl ... | bash` reads the script from
+# stdin, so the answer has to come from /dev/tty
+can_prompt() {
+  [[ -t 1 ]] && { : </dev/tty; } 2>/dev/null
+}
+
+# Asked once, up front, so the rest can run unattended. No answer means no;
+# not asked again once matuwrap's shell script is installed
+ask_shell_colors() {
+  [[ "$SHELL_COLORS" == ask ]] || return 0
+  SHELL_COLORS=no
+  if [[ -e "$MATUWRAP_SCRIPT" ]] || ! can_prompt; then
+    return 0
+  fi
+  local reply=""
+  printf "Color bash's prompt and fastfetch with Aw-Shell's palette? This edits ~/.bashrc and builds matuwrap with Rust. [y/N] " >/dev/tty
+  read -r reply </dev/tty || true
+  if [[ "$reply" == [yY]* ]]; then
+    SHELL_COLORS=yes
+  fi
+}
+
+# Steps for setup_shell_colors; returns at the first that fails
+install_shell_colors() {
+  local packages=(fastfetch)
+  # matuwrap has a Rust module; rustup users already have cargo
+  command -v cargo &>/dev/null || packages+=(rust)
+  sudo pacman -S --needed --noconfirm "${packages[@]}" || return 1
+  # Never replace an existing install (e.g. a development one)
+  if ! command -v wrp &>/dev/null; then
+    log "Installing matuwrap..."
+    uv tool install "git+$MATUWRAP_URL" || return 1
+    local bin
+    bin="$(uv tool dir --bin)" || return 1
+    export PATH="$bin:$PATH"
+  fi
+  # Writes matuwrap's shell script and sources it from ~/.bashrc (backed up);
+  # a second run changes nothing
+  wrp install bash || return 1
+}
+
+setup_shell_colors() {
+  [[ "$SHELL_COLORS" == yes ]] || return 0
+  log "Setting up shell colors (matuwrap)..."
+  if ! install_shell_colors; then
+    echo "WARNING: shell colors weren't set up (see above); Aw-Shell itself is fine. Retry with --shell-colors" >&2
+    return 0
+  fi
+  log "Shell colors are set up; reload with: source ~/.bashrc"
+  log "For your own fastfetch logo, set MW_FF_LOGO to a text file in ~/.bashrc, before matuwrap's line"
+}
+
 main() {
   if [[ "$(id -u)" -eq 0 ]]; then
     echo "Please do not run this script as root."
     exit 1
   fi
-  if [[ "${1:-}" == "--dev" ]]; then
-    DEV_MODE=true
+  parse_args "$@"
+  if $DEV_MODE; then
     INSTALL_DIR="$PWD"
     if [[ ! -d "$INSTALL_DIR/.git" || ! -f "$INSTALL_DIR/main.py" ]]; then
       echo "Dev mode must be run from inside the Aw-Shell repository."
       exit 1
     fi
   fi
+  ask_shell_colors
 
   install_build_tools
   ensure_aur_helper
@@ -268,6 +344,7 @@ main() {
   install_python_deps
   install_fonts
   setup_network
+  setup_shell_colors
   start_shell
   if ! shell_running; then
     # Not an error exit: the code is installed, and the in-app updater would
