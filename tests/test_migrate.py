@@ -6,7 +6,14 @@ from unittest.mock import patch
 
 import pytest
 
-from config.migrate import MigrationError, main, migrate, old_install_notice
+from config.migrate import (
+    MigrationError,
+    fix_hyprlock_config,
+    main,
+    migrate,
+    old_install_notice,
+)
+from config.paths import HYPRLOCK_TEMPLATE
 
 TODAY = date(2026, 10, 24)
 
@@ -134,3 +141,62 @@ def test_no_notice_in_dev_mode_or_when_clean(home):
     link.symlink_to(repo)
     assert old_install_notice(link, app_dir=repo) is None
     assert old_install_notice(home / ".config" / "clean", app_dir=repo) is None
+
+
+# The template before hyprlock 0.9: the current one plus the two old lines
+TEMPLATE = HYPRLOCK_TEMPLATE.read_text()
+OLD_TEMPLATE = (TEMPLATE.replace("general {\n", "general {\n    grace = 0\n")
+                .replace("$(uname -n)", "$(hostname)"))
+
+
+def test_old_hyprlock_template_is_fixed(home):
+    lock = home / "hyprlock.conf"
+    lock.write_text(OLD_TEMPLATE)
+    lines = fix_hyprlock_config(lock)
+    assert lock.read_text() == TEMPLATE
+    assert (home / "hyprlock.conf.bak").read_text() == OLD_TEMPLATE
+    assert lines == [f"Updated {lock} for hyprlock 0.9 (the old one is {lock}.bak)"]
+
+
+def test_hyprlock_fix_keeps_the_users_changes(home):
+    lock = home / "hyprlock.conf"
+    edited = (OLD_TEMPLATE.replace("grace = 0", "grace = 5")
+              .replace("font_size = 14", "font_size = 20"))
+    lock.write_text(edited)
+    (home / "hyprlock.conf.bak").write_text("# an older backup")
+    fix_hyprlock_config(lock)
+    assert lock.read_text() == TEMPLATE.replace("font_size = 14", "font_size = 20")
+    assert (home / "hyprlock.conf.bak").read_text() == "# an older backup"  # never overwritten
+    assert (home / "hyprlock.conf.bak-2").read_text() == edited
+
+
+def test_users_own_hyprlock_config_is_left_alone(home):
+    lock = home / "hyprlock.conf"
+    own = "general {\n    grace = 0\n}\nlabel {\n    text = cmd[update:1000] echo $(hostname)\n}\n"
+    lock.write_text(own)
+    assert fix_hyprlock_config(lock) == []
+    assert lock.read_text() == own
+    assert not (home / "hyprlock.conf.bak").exists()
+
+
+def test_hyprlock_fix_runs_once(home):
+    lock = home / "hyprlock.conf"
+    lock.write_text(OLD_TEMPLATE)
+    fix_hyprlock_config(lock)
+    assert fix_hyprlock_config(lock) == []
+    assert lock.read_text() == TEMPLATE
+    assert not (home / "hyprlock.conf.bak-2").exists()
+
+
+def test_no_hyprlock_config(home):
+    assert fix_hyprlock_config(home / "missing.conf") == []
+
+
+def test_main_fixes_hyprlock(tmp_path, capsys):
+    with patch("config.migrate.migrate", return_value=[]), \
+            patch("config.migrate.move_legacy_files", return_value=[]), \
+            patch("config.migrate.fix_hyprlock_config", return_value=["Updated lock"]) as fix, \
+            patch("config.migrate.paths.CONFIG_FILE", tmp_path / "missing.json"):
+        assert main() == 0
+    fix.assert_called_once_with()
+    assert "Updated lock" in capsys.readouterr().out

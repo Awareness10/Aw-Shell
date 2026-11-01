@@ -10,6 +10,7 @@ The shell never moves the folder it runs from; install.sh moves an old clone
 to ~/.local/src/aw-shell first, then runs --migrate from there.
 """
 
+import re
 import shutil
 from datetime import date
 from pathlib import Path
@@ -71,6 +72,40 @@ def migrate(user_dir: Path, app_dir: Path, today: date | None = None) -> list[st
     return []
 
 
+# The first line of config/hypr/hyprlock.conf, which Settings copies to
+# ~/.config/hypr/hyprlock.conf: no lock config of the user's own has it
+HYPRLOCK_MARK = f"source = ~/.config/{APP_NAME}/config/hypr/colors.conf"
+_GRACE = re.compile(r"^[ \t]*grace[ \t]*=.*\n?", re.MULTILINE)
+_GENERAL = re.compile(r"^general[ \t]*\{[^}]*\}", re.MULTILINE)
+
+
+def fix_hyprlock_config(path: Path | None = None) -> list[str]:
+    """Fix a copy of the old lock screen template for hyprlock 0.9: drop
+    general:grace (hyprlock 0.9 rejects the config over it) and show the host
+    with `uname -n` (`hostname` is in inetutils, not in base Arch). Anything
+    else the user changed stays. Lock configs of the user's own are left
+    alone; the original is kept as .bak first. Never raises: startup runs it."""
+    path = path or paths.CONFIG_HOME / "hypr" / "hyprlock.conf"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return []
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != HYPRLOCK_MARK:
+        return []
+    fixed = _GENERAL.sub(lambda m: _GRACE.sub("", m.group(0)), text)
+    fixed = fixed.replace("$(hostname)", "$(uname -n)")
+    if fixed == text:
+        return []
+    backup = _free_name(path.with_name(f"{path.name}.bak"))
+    try:
+        shutil.copy2(path, backup)
+        path.write_text(fixed, encoding="utf-8")
+    except OSError as e:
+        return [f"Could not update {path} for hyprlock 0.9: {e}"]
+    return [f"Updated {path} for hyprlock 0.9 (the old one is {backup})"]
+
+
 def old_install_notice(user_dir: Path, app_dir: Path) -> str | None:
     """A message for users who installed a package but still have an old
     clone in ~/.config/aw-shell; None otherwise (dev mode included)."""
@@ -87,6 +122,7 @@ def main() -> int:
         print(e)
         return 1
     lines += [f"Moved {old} to {new}" for old, new in move_legacy_files()]
+    lines += fix_hyprlock_config()
     if paths.CONFIG_FILE.exists():
         write_generated_config()
         lines.append(f"Rewrote {APP_NAME}.lua and matugen's config for the new paths")
