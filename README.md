@@ -72,6 +72,7 @@ Requirements:
 - [uwsm](https://github.com/Vladimir-csp/uwsm): the installer and the generated Hyprland config launch the shell with `uwsm app`
 - `pacman` with access to the AUR; the installer installs `base-devel` and `git` if missing, uses `paru` or `yay`, and installs `yay-bin` if neither is present. fabric-cli only exists in the AUR. Gray (fabric's system tray library) has no working package, so the installer builds it into `~/.local/lib/aw-shell`
 - systemd
+- About 4 GB of free RAM (or swap) while the installer builds the AUR packages; building `awww-git` alone peaks near 4 GB
 
 > [!NOTE]
 > The installer enables NetworkManager if it is not already enabled, and disables `iwd` if it is running.
