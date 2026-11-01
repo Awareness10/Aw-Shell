@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 
 from fabric.utils import exec_shell_command_async, remove_handler
@@ -10,6 +11,7 @@ from gi.repository import Gdk, GLib, Gtk
 
 import config.data as data
 import modules.icons as icons
+from config.terminal import default_terminal_command
 
 
 class TmuxManager(Box):
@@ -391,40 +393,12 @@ class TmuxManager(Box):
             print(f"Error attaching to tmux session: {e}")
 
     def get_terminal_command(self, cmd):
-        """Get terminal command based on configured terminal or available terminals"""
-        # First try to use the configured terminal command
-        if hasattr(data, 'TERMINAL_COMMAND') and data.TERMINAL_COMMAND:
-            parts = data.TERMINAL_COMMAND.split()
-            terminal = parts[0]
-            
-            try:
-                # Check if the configured terminal is available
-                subprocess.run(["which", terminal], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                return f"{data.TERMINAL_COMMAND} {cmd}"
-            except subprocess.CalledProcessError:
-                # If configured terminal is not available, fall back to defaults
-                pass
-                
-        # Fallback to checking available terminals
-        terminals = [
-            ("kitty", f"kitty -e {cmd}"),
-            ("alacritty", f"alacritty -e {cmd}"),
-            ("foot", f"foot {cmd}"),
-            ("gnome-terminal", f"gnome-terminal -- {cmd}"),
-            ("konsole", f"konsole -e {cmd}"),
-            ("xfce4-terminal", f"xfce4-terminal -e '{cmd}'"),
-        ]
-        
-        for term, term_cmd in terminals:
-            try:
-                # Check if terminal is available
-                subprocess.run(["which", term], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                return term_cmd
-            except subprocess.CalledProcessError:
-                continue
-                
-        # Default fallback
-        return f"kitty -e {cmd}"
+        """The configured terminal, or the one found on this system when that
+        one isn't installed"""
+        configured = data.TERMINAL_COMMAND
+        if configured and shutil.which(configured.split()[0]):
+            return f"{configured} {cmd}"
+        return f"{default_terminal_command()} {cmd}"
 
     def rename_session_dialog(self, old_name):
         """Show dialog to rename a session"""
