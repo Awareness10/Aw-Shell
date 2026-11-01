@@ -46,6 +46,8 @@ optdepends=(
   'tesseract-data-eng: OCR in English'
   'cava: audio visualizer'
   'tmux: tmux session picker'
+  'kitty: default terminal when none is installed'
+  'fastfetch: shell colors, with matuwrap'
   'nvtop: GPU usage'
   'ddcutil: brightness of external monitors'
   'headsetcontrol: headset battery'
