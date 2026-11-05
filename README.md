@@ -283,7 +283,7 @@ Aw-Shell started from Ax-Shell, which is now deprecated upstream, and has since 
 **New & rewritten**
 - **Bluetooth** — rewritten on BlueZ D-Bus and `bluetoothctl`
 - **Updater** — fresh version checks via the GitHub API, changelog grouped by version with one row per change
-- **Peripherals** — headset battery (via `headsetcontrol`) and Logitech mouse battery in the control panel
+- **Peripherals** — headset battery (via `headsetcontrol`) and mouse battery (any mouse UPower sees, e.g. Bluetooth; Logitech read directly so it shows the right level while charging) in the control panel
 - **Screen recorder indicator**, weather widget, and tooltips throughout
 - **Fixes** — Wi-Fi no longer creates duplicate profiles, wallpaper thumbnails refresh when files change, metrics work without UPower, overview handles close confirmations
 

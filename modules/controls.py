@@ -1,5 +1,6 @@
 import json
 import shutil
+import threading
 from abc import abstractmethod
 from typing import Callable, Optional
 
@@ -14,6 +15,7 @@ from fabric.widgets.scale import Scale
 from gi.repository import Gdk, Gio, GLib
 
 import config.data as data
+import modules.hidpp as hidpp
 import modules.icons as icons
 from modules.upower.upower import UPowerManager
 from services.brightness import Brightness
@@ -408,7 +410,7 @@ class DeviceBattery(BaseSmallControl):
         is_low = percentage <= self.LOW_THRESHOLD and not is_charging
 
         if is_charging:
-            self.control_label.set_markup(icons.charging)
+            self.control_label.set_markup(icons.bolt)
         elif is_low:
             self.control_label.set_markup(icons.alert)
         else:
@@ -429,55 +431,90 @@ class DeviceBattery(BaseSmallControl):
 
 
 class MouseBattery(DeviceBattery):
+    """Any mouse UPower knows about (Bluetooth, Logitech, ...), checked every
+    poll so one switched on or plugged in after startup still shows up.
+    Logitech mice are read over HID++ since the kernel misreports some."""
     DEVICE_TYPE_MOUSE = 5
     STATE_CHARGING = 1
 
     def __init__(self, **kwargs):
         super().__init__("button-bar-mouse-battery", "button-mouse-battery", icons.mouse, **kwargs)
+        self._in_flight = False
+        # UPower path -> whether HID++ says it's a mouse; only definite answers
+        self._hidpp_kinds: dict[str, bool] = {}
+        self.set_no_show_all(True)
+        self.set_visible(False)
         try:
             self.upower = UPowerManager()
-            self.device_path = self._find_mouse_device()
         except Exception:
-            self.device_path = None
-
-        if not self.device_path:
-            self.set_no_show_all(True)
-            self.set_visible(False)
             return
-
         self._start_polling()
 
-    def _find_mouse_device(self):
-        for path in self.upower.detect_devices():
-            info = self.upower.get_full_device_information(path)
-            if info.get("Type") == self.DEVICE_TYPE_MOUSE:
-                return path
-        return None
-
-    def _read_info(self):
-        try:
-            info = self.upower.get_full_device_information(self.device_path)
-            if info.get("IsPresent", False):
-                return info
-            # The receiver re-enumerates the mouse under a new path on reconnect
-            self.device_path = self._find_mouse_device() or self.device_path
-            info = self.upower.get_full_device_information(self.device_path)
-        except Exception:
+    @staticmethod
+    def _hidraw_for(info) -> Optional[str]:
+        native_path = str(info.get("NativePath", ""))
+        if not native_path.startswith("hidpp_battery"):
             return None
-        return info if info.get("IsPresent", False) else None
+        return hidpp.hidraw_for_power_supply(native_path)
+
+    def _present_devices(self) -> list:
+        try:
+            devices = [(path, self.upower.get_full_device_information(path))
+                       for path in self.upower.detect_devices()]
+        except Exception:
+            return []
+        return [(path, info) for path, info in devices if info.get("IsPresent", False)]
 
     def _update(self) -> bool:
-        info = self._read_info()
-        if info is None:
-            self._show_reading(None)
-            return True
-
-        self._show_reading((
-            float(info.get("Percentage", 0)),
-            int(info.get("State", 0)) == self.STATE_CHARGING,
-            (info.get("Model") or "").strip() or "Mouse",
-        ))
+        if not self._in_flight:
+            # HID++ queries can wait on a sleeping device, so keep them off the main loop
+            self._in_flight = True
+            devices = self._present_devices()
+            threading.Thread(target=self._read_in_background, args=(devices,), daemon=True).start()
         return True
+
+    def _read_in_background(self, devices) -> None:
+        reading = None
+        try:
+            reading = self._find_reading(devices)
+        finally:
+            GLib.idle_add(self._finish_update, reading)
+
+    def _is_mouse(self, path: str, info, hidraw: Optional[str]) -> bool:
+        if info.get("Type") == self.DEVICE_TYPE_MOUSE:
+            return True
+        if hidraw is None:
+            return False
+        # Logitech mice plugged in by cable show up as keyboards in UPower
+        if path not in self._hidpp_kinds:
+            kind = hidpp.is_pointer(hidraw)
+            if kind is None:
+                return False
+            self._hidpp_kinds[path] = kind
+        return self._hidpp_kinds[path]
+
+    def _find_reading(self, devices):
+        for path, info in devices:
+            hidraw = self._hidraw_for(info)
+            if not self._is_mouse(path, info, hidraw):
+                continue
+            model = (info.get("Model") or "").strip() or "Mouse"
+            battery = hidpp.read_battery(hidraw) if hidraw else None
+            if battery is not None:
+                return (battery.percentage, battery.charging, model)
+            return (
+                float(info.get("Percentage", 0)),
+                int(info.get("State", 0)) == self.STATE_CHARGING,
+                model,
+            )
+        return None
+
+    def _finish_update(self, reading) -> bool:
+        self._in_flight = False
+        # destroy() clears the poll source; don't touch a destroyed widget
+        if self._poll_source_id is not None:
+            self._show_reading(reading)
+        return False
 
 
 class HeadsetBatteryMonitor:
