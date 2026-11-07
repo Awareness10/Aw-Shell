@@ -153,3 +153,36 @@ def test_clear_history_deletes_file(shell, history_file):
     history.clear_history()
     assert history.containers == []
     assert not notifications.os.path.exists(history_file)
+
+
+def _image_boxes(widget):
+    """Visible notification image boxes under widget."""
+    found = []
+    if widget.get_name() == "notification-image" and widget.get_visible():
+        found.append(widget)
+    if hasattr(widget, "get_children"):
+        for child in widget.get_children():
+            found += _image_boxes(child)
+    return found
+
+
+ICON = str(notifications.os.path.abspath("assets/default.png"))
+
+
+def test_no_image_leaves_no_gap(shell, history_file):
+    """Without an image, an empty image box still indented the text."""
+    container, history = shell
+    notify("Recording started", app_name="Aw-Shell")
+    assert pump_until(lambda: len(container.notifications) == 1)
+    assert _image_boxes(container.notifications[0]) == []  # popup
+    container.notifications[0].close_notification()
+    assert pump_until(lambda: len(history.containers) == 1)
+    assert _image_boxes(history.containers[0]) == []  # moved to history
+    _write(history_file, [_note(0), _note(1) | {"app_icon": ICON}])
+    reloaded = notifications.NotificationHistory()
+    try:
+        assert pump_until(lambda: len(reloaded.containers) == 2)
+        assert [len(_image_boxes(c)) for c in reloaded.containers] == [0, 1]  # from file
+    finally:
+        reloaded.destroy()
+        pump()
