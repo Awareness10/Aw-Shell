@@ -71,6 +71,14 @@ def test_removes_only_aw_shells_hyprland_line(home):
         'hl.monitor("x")\nhl.bind("SUPER + Q")\n'
 
 
+def test_removes_the_home_based_hyprland_line_too(home):
+    hypr = home / ".config/hypr/hyprland.lua"
+    hypr.write_text('hl.monitor("x")\n'
+                    'dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")\n')
+    _uninstall(home, "y\nn\nn\nn\n")
+    assert hypr.read_text() == 'hl.monitor("x")\n'
+
+
 def test_symlinked_hyprland_config_stays_a_symlink(home):
     dotfiles = home / "dotfiles"
     dotfiles.mkdir()

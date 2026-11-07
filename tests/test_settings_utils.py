@@ -2,13 +2,17 @@
 
 import json
 import re
+import shlex
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from config.paths import SCRIPTS_DIR
 from config.settings_constants import APP_NAME_CAP, DEFAULTS
 from config.settings_utils import (
+    aw_lua_dofile,
+    loads_aw_lua,
     APPLY_COLORS_FN,
     HYPRIDLE_HEADER,
     HYPRIDLE_START,
@@ -168,6 +172,14 @@ class TestGenerateHyprlua:
         # Other binds are unaffected
         assert any("-- Pins" in l for l in bind_lines)
         assert any("-- Dashboard" in l for l in bind_lines)
+
+    def test_screenshot_keybinds(self):
+        """Print shoots a screen, SHIFT+Print a region, with no menu to wait for."""
+        conf = generate_hyprlua()
+        script = shlex.quote(str(SCRIPTS_DIR / "screenshot.sh"))
+        assert f'hl.bind("Print", hl.dsp.exec_cmd("AW_SCREENSHOT_DELAY=0 {script} p"))' in conf
+        assert (f'hl.bind("SHIFT + Print", hl.dsp.exec_cmd("AW_SCREENSHOT_DELAY=0 {script} s"))'
+                in conf)
 
     def test_border_colors_come_from_reapplicable_function(self):
         """Wallpaper changes re-run APPLY_COLORS_FN over IPC instead of a full
@@ -533,6 +545,15 @@ class TestApplyAndRestart:
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
         assert hypr_path.read_text().count("dofile(") == 1
+
+    def test_appended_dofile_has_no_user_name_under_home(self, tmp_path):
+        line = aw_lua_dofile(tmp_path / ".config/aw-shell/config/hypr/aw-shell.lua", home=tmp_path)
+        assert line == 'dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")'
+        assert loads_aw_lua(line)
+
+    def test_appended_dofile_outside_home_is_absolute(self, tmp_path):
+        path = tmp_path / "elsewhere/aw-shell/config/hypr/aw-shell.lua"
+        assert aw_lua_dofile(path, home=tmp_path / "home") == f'dofile("{path}")'
 
     @pytest.mark.parametrize("line", [
         'dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")',

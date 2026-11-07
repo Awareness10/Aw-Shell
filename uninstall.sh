@@ -48,7 +48,7 @@ _filter_file() {
 
 remove_hyprland_lines() {
   if [[ -f "$HYPR_LUA" ]]; then
-    _filter_file "$HYPR_LUA" awk '!/^[[:space:]]*dofile\(".*\/aw-shell\/config\/hypr\/aw-shell\.lua"\)[[:space:]]*$/'
+    _filter_file "$HYPR_LUA" awk '!/^[[:space:]]*dofile\(.*\/aw-shell\/config\/hypr\/aw-shell\.lua"\)[[:space:]]*$/'
   fi
   # hyprland.conf from before Hyprland's Lua config: "# Aw-Shell" + source line
   if [[ -f "$HYPR_CONF" ]]; then

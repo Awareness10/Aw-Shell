@@ -112,6 +112,8 @@ KEYBIND_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
         ("Audio Mixer", "prefix_mixer", "suffix_mixer"),
         ("Emoji Picker", "prefix_emoji", "suffix_emoji"),
         ("Power Menu", "prefix_power", "suffix_power"),
+        ("Screenshot", "prefix_screenshot", "suffix_screenshot"),
+        ("Screenshot Region", "prefix_screenshot_region", "suffix_screenshot_region"),
     ]),
 ]
 
