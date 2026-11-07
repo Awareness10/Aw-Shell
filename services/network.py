@@ -6,6 +6,8 @@ from fabric.utils import bulk_connect, exec_shell_command_async
 from gi.repository import Gio
 from loguru import logger
 
+from utils.wifi import wifi_level
+
 try:
     gi.require_version("NM", "1.0")
     from gi.repository import NM
@@ -41,6 +43,7 @@ class Wifi(Service):
                     "access-point-added": lambda *args: self.emit("changed"),
                     "access-point-removed": lambda *args: self.emit("changed"),
                     "state-changed": lambda *args: self.ap_update(),
+                    "notify::bitrate": lambda *args: self.ap_update(),
                 },
             )
             self._activate_ap()
@@ -51,6 +54,8 @@ class Wifi(Service):
             "enabled",
             "internet",
             "strength",
+            "bitrate",
+            "level",
             "frequency",
             "access-points",
             "ssid",
@@ -101,6 +106,15 @@ class Wifi(Service):
     @Property(int, "readable")
     def strength(self):
         return self._ap.get_strength() if self._ap else -1
+
+    @Property(int, "readable")
+    def bitrate(self):
+        """Link speed in Mbit/s (0 if unknown)."""
+        return self._device.get_bitrate() // 1000 if self._device else 0
+
+    @Property(int, "readable")
+    def level(self):
+        return wifi_level(self.bitrate, self.strength)
 
     @Property(str, "readable")
     def icon_name(self):

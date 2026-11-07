@@ -74,3 +74,18 @@ if "gi" not in sys.modules:
     sys.modules["gi.repository.Gtk"] = _mock_gtk
     sys.modules["gi.repository.GLib"] = _mock_glib
     sys.modules["gi.repository.Vte"] = _mock_vte
+
+
+# ── The default terminal ──
+# Found among the terminals installed where the tests run; pinned to the
+# fallback so settings tests don't depend on them (tests/test_terminal.py
+# covers the detection itself)
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _default_terminal(monkeypatch):
+    import config.terminal
+
+    monkeypatch.setattr(config.terminal, "default_terminal_command",
+                        lambda: config.terminal.FALLBACK)

@@ -644,16 +644,8 @@ class NetworkApplet(Button):
 
         elif self.network_client and self.network_client.wifi_device:
             if self.network_client.wifi_device.ssid != "Disconnected":
-                strength = self.network_client.wifi_device.strength
-
-                if strength >= 75:
-                    self.wifi_label.set_markup(icons.wifi_3)
-                elif strength >= 50:
-                    self.wifi_label.set_markup(icons.wifi_2)
-                elif strength >= 25:
-                    self.wifi_label.set_markup(icons.wifi_1)
-                else:
-                    self.wifi_label.set_markup(icons.wifi_0)
+                level = self.network_client.wifi_device.level
+                self.wifi_label.set_markup((icons.wifi_0, icons.wifi_1, icons.wifi_2, icons.wifi_3)[level])
 
                 tooltip_base = self.network_client.wifi_device.ssid
                 tooltip_vertical = f"SSID: {self.network_client.wifi_device.ssid}\nUpload: {upload_str}\nDownload: {download_str}"

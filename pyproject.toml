@@ -1,6 +1,6 @@
 [project]
 name = "aw-shell"
-version = "1.2.16"
+version = "1.2.17.dev0"
 description = "A hackable desktop shell for Hyprland, powered by Fabric and PySide6"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -39,7 +39,7 @@ constraint-dependencies = ["certifi>=2026.10.19"]
 
 [tool.uv.sources]
 glaze = { git = "https://github.com/awareness10/glaze" }
-fabric = { git = "https://github.com/awareness10/fabric" }
+fabric = { git = "https://github.com/Fabric-Development/fabric" }
 
 [dependency-groups]
 dev = [

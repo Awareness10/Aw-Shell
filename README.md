@@ -70,8 +70,9 @@
 Requirements:
 - Hyprland 0.56.2 or newer
 - [uwsm](https://github.com/Vladimir-csp/uwsm): the installer and the generated Hyprland config launch the shell with `uwsm app`
-- `pacman` with access to the AUR; the installer uses `paru` or `yay` and installs `yay-bin` if neither is present. fabric-cli only exists in the AUR. Gray (fabric's system tray library) has no working package, so the installer builds it into `~/.local/lib/aw-shell`
+- `pacman` with access to the AUR; the installer installs `base-devel` and `git` if missing, uses `paru` or `yay`, and installs `yay-bin` if neither is present. fabric-cli only exists in the AUR. Gray (fabric's system tray library) has no working package, so the installer builds it into `~/.local/lib/aw-shell`
 - systemd
+- About 4 GB of free RAM (or swap) while the installer builds the AUR packages; building `awww-git` alone peaks near 4 GB
 
 > [!NOTE]
 > The installer enables NetworkManager if it is not already enabled, and disables `iwd` if it is running.
@@ -99,17 +100,30 @@ curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.s
 
 It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose another folder) and starts the shell, which opens its settings the first time. From a clone of the repository, `./install.sh --dev` runs Aw-Shell from that clone instead.
 
+#### Shell colors (optional)
+
+[matuwrap](https://github.com/Awareness10/matuwrap) can color your bash prompt and [fastfetch](https://github.com/fastfetch-cli/fastfetch) with Aw-Shell's palette, following the wallpaper. The installer sets it up only if you ask: run from a terminal, it asks once (the default is no), or pass `--shell-colors`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.sh | bash -s -- --shell-colors
+```
+
+It installs `fastfetch`, plus `rust` unless you already have `cargo` (matuwrap has a Rust module), installs matuwrap with `uv tool install` unless `wrp` is already there, and runs `wrp install bash`. That **edits `~/.bashrc`** (after backing it up) to source `~/.config/matuwrap/scripts/matuwrap`. Run `source ~/.bashrc` to see it. For your own fastfetch logo instead of Arch's, export `MW_FF_LOGO` (a text file) or `MW_FF_IMAGE` (an image, in kitty, ghostty or WezTerm) in `~/.bashrc`, before matuwrap's line; `ff-toggle` switches between them. See [matuwrap's README](https://github.com/Awareness10/matuwrap#shell-integration) for the details. If a step fails, the installer warns and installs Aw-Shell anyway. Once it is set up the installer stops asking, and the in-app updater never asks.
+
+To undo it, remove the `source ~/.config/matuwrap/scripts/matuwrap` line from `~/.bashrc` and run `uv tool uninstall matuwrap`.
+
 ### Manual Installation
 
 1. Install [uv](https://docs.astral.sh/uv/):
     ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    sudo pacman -S uv
     ```
 
 2. Install system dependencies (Arch Linux):
     - [fabric-cli](https://github.com/Fabric-Development/fabric-cli)
     - [Gray](https://github.com/Fabric-Development/gray): its AUR package can't install, so build it into `~/.local/lib/aw-shell`, where Aw-Shell looks for it: `source install.sh && build_gray` (needs `meson` and `vala`)
     - [Matugen](https://github.com/InioX/matugen)
+    - `cinnamon-desktop`: its Cvc typelib is what fabric's audio service uses; the shell won't start without it
     - `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
     - `bluez-utils` `gobject-introspection` `gpu-screen-recorder` `headsetcontrol`
     - `hypridle` `hyprlock` `hyprpicker` `hyprshot` `hyprsunset`
@@ -118,6 +132,7 @@ It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose 
     - `power-profiles-daemon` `swappy` `tesseract` `tesseract-data-eng`
     - `tesseract-data-spa` `tmux` `upower` `uwsm`
     - `webp-pixbuf-loader` `wl-clipboard`
+    - A terminal; the installer adds `kitty` if you have none. Aw-Shell uses `$TERMINAL`, `xdg-terminal-exec` or the first one it knows of: kitty, foot, alacritty, ghostty, wezterm, konsole, gnome-terminal, ptyxis, xfce4-terminal. Settings > Terminal changes it
 
 3. Clone, install Python deps, and run (any folder works; `~/.config/aw-shell` is for your settings):
     ```bash
@@ -268,7 +283,7 @@ Aw-Shell started from Ax-Shell, which is now deprecated upstream, and has since 
 **New & rewritten**
 - **Bluetooth** — rewritten on BlueZ D-Bus and `bluetoothctl`
 - **Updater** — fresh version checks via the GitHub API, changelog grouped by version with one row per change
-- **Peripherals** — headset battery (via `headsetcontrol`) and Logitech mouse battery in the control panel
+- **Peripherals** — headset battery (via `headsetcontrol`) and mouse battery (any mouse UPower sees, e.g. Bluetooth; Logitech read directly so it shows the right level while charging) in the control panel
 - **Screen recorder indicator**, weather widget, and tooltips throughout
 - **Fixes** — Wi-Fi no longer creates duplicate profiles, wallpaper thumbnails refresh when files change, metrics work without UPower, overview handles close confirmations
 

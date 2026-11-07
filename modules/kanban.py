@@ -51,9 +51,11 @@ class InlineEditor(Gtk.Box):
         cancel_btn.get_style_context().add_class("flat")
         
 
+        # EXTERNAL: the text's width doesn't size the board (the notch grew
+        # with every word); NEVER: it grows taller instead, the column scrolls
         sw = ScrolledWindow(name="scrolled-window", propagate_height=False, propagate_width=False)
-        sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        sw.set_min_content_height(50)
+        sw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
+        self.text_view.set_size_request(-1, 50)
         sw.add(self.text_view)
 
         self.button_box = Box(children=[confirm_btn, cancel_btn], spacing=4)
@@ -111,7 +113,7 @@ class KanbanNote(Gtk.EventBox):
 
     def setup_ui(self):
         self.box = Gtk.Box(name="kanban-note", spacing=4)
-        self.label = Gtk.Label(label=self.text)
+        self.label = Gtk.Label(label=self.text, xalign=0)
         self.label.set_line_wrap(True)
 
         self.label.set_line_wrap_mode(Gtk.WrapMode.WORD)
@@ -182,6 +184,14 @@ class KanbanNote(Gtk.EventBox):
 
         GLib.timeout_add(50, lambda: (editor.text_view.grab_focus(), False))
 
+def kanban_row(child):
+    # A row that takes focus on click steals it from the editor's text
+    # (GtkListBox focuses the row on release, even after a click in the text)
+    row = Gtk.ListBoxRow(name="kanban-row", focus_on_click=False)
+    row.add(child)
+    return row
+
+
 class KanbanColumn(Gtk.Frame):
     __gsignals__ = {
         'changed': (GObject.SignalFlags.RUN_LAST, None, ()),
@@ -228,8 +238,7 @@ class KanbanColumn(Gtk.Frame):
 
     def on_add_clicked(self, button):
         editor = InlineEditor()
-        row = Gtk.ListBoxRow(name="kanban-row")
-        row.add(editor)
+        row = kanban_row(editor)
         self.listbox.add(row)
         self.listbox.show_all()
         editor.text_view.grab_focus()
@@ -257,8 +266,7 @@ class KanbanColumn(Gtk.Frame):
     def add_note(self, text, suppress_signal=False):
         note = KanbanNote(text)
         note.connect('changed', lambda x: self.emit('changed'))
-        row = Gtk.ListBoxRow(name="kanban-row")
-        row.add(note)
+        row = kanban_row(note)
         row.connect('destroy', lambda x: self.emit('changed'))
         self.listbox.add(row)
         self.listbox.show_all()
@@ -284,8 +292,7 @@ class KanbanColumn(Gtk.Frame):
             row = self.listbox.get_row_at_y(y)
             new_note = KanbanNote(text)
             new_note.connect('changed', lambda x: self.emit('changed'))
-            new_row = Gtk.ListBoxRow(name="kanban-row")
-            new_row.add(new_note)
+            new_row = kanban_row(new_note)
             new_row.connect('destroy', lambda x: self.emit('changed'))
             
             if row:

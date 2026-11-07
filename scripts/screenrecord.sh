@@ -1,5 +1,6 @@
 #!/bin/bash
 # Toggle gpu-screen-recorder: stops a running recording, otherwise starts one
+# on monitor $1 (the toolbox's), or on the focused monitor
 
 if [ -z "$XDG_VIDEOS_DIR" ]; then
   XDG_VIDEOS_DIR="$HOME/Videos"
@@ -38,8 +39,19 @@ fi
 
 # Direct capture needs gsr to find the monitor's DRM card, which fails on
 # some multi-GPU setups; the desktop portal works everywhere
-if gpu-screen-recorder --list-capture-options 2>/dev/null | grep -qvx "portal"; then
-  CAPTURE=(-w screen)
+OPTIONS=$(gpu-screen-recorder --list-capture-options 2>/dev/null)
+if printf '%s\n' "$OPTIONS" | grep -qvx "portal"; then
+  # `-w screen` is the first monitor found, not the one in use
+  MONITORS=$(printf '%s\n' "$OPTIONS" | grep '|' | cut -d'|' -f1)
+  MONITOR="$1"
+  if ! printf '%s\n' "$MONITORS" | grep -qxF -- "$MONITOR"; then
+    MONITOR=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.focused) | .name')
+  fi
+  if printf '%s\n' "$MONITORS" | grep -qxF -- "$MONITOR"; then
+    CAPTURE=(-w "$MONITOR")
+  else
+    CAPTURE=(-w screen)
+  fi
 else
   CAPTURE=(-w portal -restore-portal-session yes)
 fi

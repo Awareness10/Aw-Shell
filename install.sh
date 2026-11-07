@@ -3,6 +3,10 @@
 # with AW_SHELL_DIR), or with --dev runs it from the current repo. Settings
 # live in ~/.config/aw-shell; older versions kept the code there too, and this
 # moves such an install (see `main.py --migrate`).
+#
+# --shell-colors also colors bash's prompt and fastfetch with Aw-Shell's
+# palette (matuwrap; edits ~/.bashrc). Run from a terminal without it, the
+# script asks, defaulting to no. Piped: curl ... | bash -s -- --shell-colors
 
 set -euo pipefail
 
@@ -15,11 +19,21 @@ FONT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
 # it). Same commit as packaging/aur/PKGBUILD and tests_gtk/Dockerfile.
 GRAY_COMMIT=d5a8452c39b074ef6da25be95305a22203cf230e
 GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"
+# The first start's output, to show why it failed
+SHELL_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell/shell.log"
 DEV_MODE=false
+# yes, no, or ask (only with a terminal to answer on)
+SHELL_COLORS=ask
+MATUWRAP_URL="https://github.com/Awareness10/matuwrap"
+MATUWRAP_SCRIPT="$HOME/.config/matuwrap/scripts/matuwrap"
+# Terminals Aw-Shell knows how to run commands in (config/terminal.py); with
+# none of them, nor $TERMINAL or xdg-terminal-exec, kitty is installed
+TERMINALS=(kitty foot alacritty ghostty wezterm konsole gnome-terminal ptyxis xfce4-terminal)
 PACKAGES=(
   awww-git
   brightnessctl
   cava
+  cinnamon-desktop  # Cvc typelib for fabric.audio; the shell won't start without it
   cliphist
   ddcutil
   fabric-cli-git
@@ -33,6 +47,7 @@ PACKAGES=(
   hyprshot
   hyprsunset
   imagemagick
+  jq
   libdbusmenu-gtk3
   libnotify
   matugen-bin
@@ -51,6 +66,7 @@ PACKAGES=(
   tmux
   ttf-nerd-fonts-symbols-mono
   upower
+  uv
   vala
   uwsm
   webp-pixbuf-loader
@@ -74,6 +90,16 @@ move_old_clone() {
   mkdir -p "$(dirname "$new")"
   mv "$old" "$new"
   log "Moved the old install from $old to $new"
+}
+
+# A minimal Arch install has neither, but makepkg (yay-bin, AUR packages) and
+# get_source need them
+install_build_tools() {
+  if pacman -T base-devel git >/dev/null; then
+    return 0
+  fi
+  log "Installing base-devel and git..."
+  sudo pacman -S --needed --noconfirm base-devel git
 }
 
 ensure_aur_helper() {
@@ -107,9 +133,48 @@ get_source() {
   fi
 }
 
+# The shell runs the user's terminal (config/terminal.py finds it the same way)
+has_terminal() {
+  if [[ -n "${TERMINAL:-}" ]] && command -v "$TERMINAL" &>/dev/null; then
+    return 0
+  fi
+  if command -v xdg-terminal-exec &>/dev/null && xdg-terminal-exec --print-id &>/dev/null; then
+    return 0
+  fi
+  local terminal
+  for terminal in "${TERMINALS[@]}"; do
+    command -v "$terminal" &>/dev/null && return 0
+  done
+  return 1
+}
+
 install_packages() {
+  if ! has_terminal; then
+    log "No terminal found; kitty will be installed"
+    PACKAGES+=(kitty)
+  fi
   log "Installing required packages..."
+  # One failed package shouldn't stop the rest; check_packages lists it
   $aur_helper -Syy --needed --devel --noconfirm "${PACKAGES[@]}" || true
+  check_packages
+}
+
+# Warns instead of stopping: most packages are for a single feature, and a
+# missing one the shell needs shows up when it starts. The plain package
+# counts for an AUR -git/-bin one (e.g. matugen for matugen-bin)
+check_packages() {
+  local pkg missing=()
+  for pkg in "${PACKAGES[@]}"; do
+    local plain="${pkg%-git}"
+    plain="${plain%-bin}"
+    if ! pacman -Q "$pkg" &>/dev/null && ! pacman -Q "$plain" &>/dev/null; then
+      missing+=("$pkg")
+    fi
+  done
+  if (( ${#missing[@]} )); then
+    echo "WARNING: these packages didn't install: ${missing[*]}" >&2
+    echo "Install them by hand (e.g. $aur_helper -S ${missing[*]}); see the output above for why." >&2
+  fi
 }
 
 build_gray() {
@@ -137,8 +202,9 @@ build_gray() {
 }
 
 install_python_deps() {
+  # uv comes with the packages; this is for when its install failed
   if ! command -v uv &>/dev/null; then
-    log "Installing uv..."
+    log "Installing uv from astral.sh..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
   fi
@@ -175,9 +241,85 @@ start_shell() {
   hyprctl reload >/dev/null 2>&1 || true
   log "Starting Aw-Shell..."
   killall aw-shell 2>/dev/null || true
+  mkdir -p "$(dirname "$SHELL_LOG")"
   # Opens the settings window on its own the first time (no config yet)
-  uwsm app -- "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/main.py" >/dev/null 2>&1 &
+  uwsm app -- "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/main.py" >"$SHELL_LOG" 2>&1 &
   disown
+}
+
+# Whether the shell is still up a few seconds after starting: it is called
+# aw-shell once its imports have loaded, and runs main.py until then
+shell_running() {
+  sleep "${1:-5}"
+  pgrep -x aw-shell >/dev/null || pgrep -f -- "$INSTALL_DIR/main.py" >/dev/null
+}
+
+parse_args() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --dev) DEV_MODE=true ;;
+      --shell-colors) SHELL_COLORS=yes ;;
+      *)
+        echo "Unknown option: $arg (options: --dev, --shell-colors)" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+# Someone is there to answer: output goes to a terminal (not the in-app
+# updater's log) and /dev/tty opens. `curl ... | bash` reads the script from
+# stdin, so the answer has to come from /dev/tty
+can_prompt() {
+  [[ -t 1 ]] && { : </dev/tty; } 2>/dev/null
+}
+
+# Asked once, up front, so the rest can run unattended. No answer means no;
+# not asked again once matuwrap's shell script is installed
+ask_shell_colors() {
+  [[ "$SHELL_COLORS" == ask ]] || return 0
+  SHELL_COLORS=no
+  if [[ -e "$MATUWRAP_SCRIPT" ]] || ! can_prompt; then
+    return 0
+  fi
+  local reply=""
+  printf "Color bash's prompt and fastfetch with Aw-Shell's palette? This edits ~/.bashrc and builds matuwrap with Rust. [y/N] " >/dev/tty
+  read -r reply </dev/tty || true
+  if [[ "$reply" == [yY]* ]]; then
+    SHELL_COLORS=yes
+  fi
+}
+
+# Steps for setup_shell_colors; returns at the first that fails
+install_shell_colors() {
+  local packages=(fastfetch)
+  # matuwrap has a Rust module; rustup users already have cargo
+  command -v cargo &>/dev/null || packages+=(rust)
+  sudo pacman -S --needed --noconfirm "${packages[@]}" || return 1
+  # Never replace an existing install (e.g. a development one)
+  if ! command -v wrp &>/dev/null; then
+    log "Installing matuwrap..."
+    uv tool install "git+$MATUWRAP_URL" || return 1
+    local bin
+    bin="$(uv tool dir --bin)" || return 1
+    export PATH="$bin:$PATH"
+  fi
+  # Writes matuwrap's shell script and sources it from ~/.bashrc (backed up);
+  # a second run changes nothing
+  wrp install bash || return 1
+}
+
+setup_shell_colors() {
+  [[ "$SHELL_COLORS" == yes ]] || return 0
+  log "Setting up shell colors (matuwrap)..."
+  if ! install_shell_colors; then
+    echo "WARNING: shell colors weren't set up (see above); Aw-Shell itself is fine. Retry with --shell-colors" >&2
+    return 0
+  fi
+  log "Shell colors are set up; reload with: source ~/.bashrc"
+  log "Custom fastfetch logo: export MW_FF_LOGO=<file.txt> or MW_FF_IMAGE=<image> in ~/.bashrc,"
+  log "  before matuwrap's source line; ff-toggle switches between text and image"
 }
 
 main() {
@@ -185,15 +327,17 @@ main() {
     echo "Please do not run this script as root."
     exit 1
   fi
-  if [[ "${1:-}" == "--dev" ]]; then
-    DEV_MODE=true
+  parse_args "$@"
+  if $DEV_MODE; then
     INSTALL_DIR="$PWD"
     if [[ ! -d "$INSTALL_DIR/.git" || ! -f "$INSTALL_DIR/main.py" ]]; then
       echo "Dev mode must be run from inside the Aw-Shell repository."
       exit 1
     fi
   fi
+  ask_shell_colors
 
+  install_build_tools
   ensure_aur_helper
   move_old_clone
   get_source
@@ -202,7 +346,16 @@ main() {
   install_python_deps
   install_fonts
   setup_network
+  setup_shell_colors
   start_shell
+  if ! shell_running; then
+    # Not an error exit: the code is installed, and the in-app updater would
+    # call the whole update failed
+    echo "WARNING: Aw-Shell stopped right after starting. The end of $SHELL_LOG:" >&2
+    tail -n 20 "$SHELL_LOG" >&2 || true
+    log "Installed, but Aw-Shell isn't running. Code: $INSTALL_DIR, settings: $OLD_DIR"
+    return 0
+  fi
   log "Installation complete. Code: $INSTALL_DIR, settings: $OLD_DIR"
 }
 

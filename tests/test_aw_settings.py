@@ -446,6 +446,23 @@ class TestFileDialogs:
 # _reload_widgets
 # =========================================================================
 
+class TestTerminal:
+
+    def test_first_run_shows_the_detected_terminal(self, qapp, tmp_path, monkeypatch):
+        import config.terminal
+        from config.settings_utils import load_bind_vars
+
+        monkeypatch.setattr(config.terminal, "default_terminal_command", lambda: "foot")
+        with patch("config.settings_utils.CONFIG_FILE", tmp_path / "config.json"):
+            load_bind_vars()  # as open_config() does before showing the window
+        with patch("config.settings.aw_settings.get_available_monitors", return_value=[]):
+            win = AwShellSettings()
+        try:
+            assert win.terminal_entry.text() == "foot"
+        finally:
+            win.close()
+
+
 class TestReloadWidgets:
 
     def test_reload_restores_defaults(self, settings):

@@ -17,6 +17,8 @@ gi.require_version('Gtk', '3.0')
 import modules.icons as icons
 from services.network import NetworkClient
 
+WIFI_ICONS = (icons.wifi_0, icons.wifi_1, icons.wifi_2, icons.wifi_3)
+
 
 def add_hover_cursor(widget):
     widget.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
@@ -161,15 +163,7 @@ class NetworkButton(Box):
                 self.network_ssid.set_label(wifi.ssid)
 
                 if wifi.strength > 0:
-                    strength = wifi.strength
-                    if strength < 25:
-                        self.network_icon.set_markup(icons.wifi_0)
-                    elif strength < 50:
-                        self.network_icon.set_markup(icons.wifi_1)
-                    elif strength < 75:
-                        self.network_icon.set_markup(icons.wifi_2)
-                    else:
-                        self.network_icon.set_markup(icons.wifi_3)
+                    self.network_icon.set_markup(WIFI_ICONS[wifi.level])
             else:
                 self.network_ssid.set_label("Enabled")
                 self._start_animation()
@@ -191,15 +185,7 @@ class NetworkButton(Box):
                 self.network_icon.set_markup(icons.wifi_off)
             elif wifi.state == "activated" and wifi.ssid != "Disconnected" and wifi.strength > 0:
                 self._stop_animation()
-                strength = wifi.strength
-                if strength < 25:
-                    self.network_icon.set_markup(icons.wifi_0)
-                elif strength < 50:
-                    self.network_icon.set_markup(icons.wifi_1)
-                elif strength < 75:
-                    self.network_icon.set_markup(icons.wifi_2)
-                else:
-                    self.network_icon.set_markup(icons.wifi_3)
+                self.network_icon.set_markup(WIFI_ICONS[wifi.level])
             else:
                 self._start_animation()
 

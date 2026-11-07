@@ -474,7 +474,7 @@ class Dock(Window):
 
         clients = self.get_clients()
         current_ws = self.get_workspace()
-        ws_clients = [w for w in clients if w["workspace"]["id"] == current_ws]
+        ws_clients = [w for w in clients if w["workspace"].get("id") == current_ws]
 
         if self.always_show:
             if not self.dock_revealer.get_reveal_child():

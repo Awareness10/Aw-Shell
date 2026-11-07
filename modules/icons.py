@@ -68,6 +68,7 @@ alert: str = "&#xea06;"
 bat_charging: str = "&#xeeca;"
 bat_discharging: str = "&#xf0a1;"
 bat_low: str = "&#xff1d;"
+bolt: str = "&#xea38;"
 bat_full: str = "&#xea38;"
 
 
