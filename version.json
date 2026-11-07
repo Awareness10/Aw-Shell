@@ -1,7 +1,24 @@
 {
-  "version": "1.2.16",
+  "version": "1.2.17",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.17",
+      "changes": [
+        "<b>fix:</b> The shell starts again with a special workspace (scratchpad) open on Hyprland 0.57",
+        "<b>fix:</b> The screen recorder records the screen it was started from",
+        "<b>fix:</b> Kanban: the notch no longer grows while typing a to-do, typing keeps working after clicking the editor, and notes are left-aligned",
+        "<b>fix:</b> Close, delete and alert icons are visible again; their dim red/yellow colors were black (change the wallpaper or colors once to apply)",
+        "<b>fix:</b> Notifications without an icon no longer have an empty gap before the text",
+        "<b>fix:</b> The lock screen loads on hyprlock 0.9",
+        "<b>fix:</b> The installer works on a minimal Arch, warns about packages that didn't install and shows why the shell didn't start",
+        "<b>feat:</b> Mouse battery in the controls for any UPower mouse, and Logitech mice over HID++",
+        "<b>feat:</b> Settings default to your own terminal instead of kitty",
+        "<b>feat:</b> The installer can set up shell colors with matuwrap (opt-in)",
+        "<b>update:</b> The WiFi icon shows the link speed instead of the signal strength",
+        "<b>update:</b> Fabric and other dependencies updated; jq is now needed for screen recording"
+      ]
+    },
     {
       "version": "1.2.16",
       "changes": [
@@ -206,7 +223,17 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> The toolbox's Game Mode button works again on Hyprland 0.57",
-    "<b>fix:</b> Hyprland no longer adds its own open/close animation on top of the shell's (press Apply in Settings once to get it)"
+    "<b>fix:</b> The shell starts again with a special workspace (scratchpad) open on Hyprland 0.57",
+    "<b>fix:</b> The screen recorder records the screen it was started from",
+    "<b>fix:</b> Kanban: the notch no longer grows while typing a to-do, typing keeps working after clicking the editor, and notes are left-aligned",
+    "<b>fix:</b> Close, delete and alert icons are visible again; their dim red/yellow colors were black (change the wallpaper or colors once to apply)",
+    "<b>fix:</b> Notifications without an icon no longer have an empty gap before the text",
+    "<b>fix:</b> The lock screen loads on hyprlock 0.9",
+    "<b>fix:</b> The installer works on a minimal Arch, warns about packages that didn't install and shows why the shell didn't start",
+    "<b>feat:</b> Mouse battery in the controls for any UPower mouse, and Logitech mice over HID++",
+    "<b>feat:</b> Settings default to your own terminal instead of kitty",
+    "<b>feat:</b> The installer can set up shell colors with matuwrap (opt-in)",
+    "<b>update:</b> The WiFi icon shows the link speed instead of the signal strength",
+    "<b>update:</b> Fabric and other dependencies updated; jq is now needed for screen recording"
   ]
 }
