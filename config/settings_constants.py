@@ -88,6 +88,7 @@ DEFAULTS = {
     "bar_date_time_visible": True,
     "bar_button_power_visible": True,
     "corners_visible": True,
+    "gtk_theming": False,
     "bar_metrics_disks": ["/"],
     "metrics_visible": {
         "cpu": True,

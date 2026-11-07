@@ -254,6 +254,8 @@ def ensure_matugen_config(generate: bool = True):
             f"{APP_NAME}-colors-json": {
                 "input_path": f"{MATUGEN_TEMPLATES}/colors.json",
                 "output_path": f"{str(AW_CONFIG_DIR)}/colors.json",
+                # GTK apps follow it too, when the gtk_theming setting is on
+                "post_hook": f"fabric-cli exec {APP_NAME} 'app.apply_gtk_theme()' &",
             },
             f"{APP_NAME}": {
                 "input_path": f"{MATUGEN_TEMPLATES}/{APP_NAME}.css",

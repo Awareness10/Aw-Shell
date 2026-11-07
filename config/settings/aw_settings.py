@@ -363,6 +363,9 @@ class AwShellSettings(FramelessMainWindow):
         # Date & Time Section
         self._build_datetime_section(layout)
 
+        # GTK apps in the shell's colors
+        self._build_gtk_section(layout)
+
         # Layout Options Section
         self._build_layout_section(layout)
 
@@ -452,6 +455,22 @@ class AwShellSettings(FramelessMainWindow):
         self.datetime_12h_cb = QCheckBox("Use 12-Hour Clock")
         self.datetime_12h_cb.setChecked(get_bind_var("datetime_12h_format", False))
         section_layout.addWidget(self.datetime_12h_cb)
+
+        layout.addWidget(section)
+
+    def _build_gtk_section(self, layout: QVBoxLayout) -> None:
+        section = SettingsSection("GTK Apps")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
+
+        self.gtk_theming_cb = QCheckBox("Use Wallpaper Colors in GTK Apps")
+        self.gtk_theming_cb.setChecked(get_bind_var("gtk_theming", False))
+        self.gtk_theming_cb.setToolTip(
+            "Writes ~/.config/gtk-3.0/gtk.css and gtk-4.0/gtk.css (a file already there is "
+            "backed up and restored when turned off). OLED black, with the wallpaper's accents. "
+            "GTK 3 apps need the adw-gtk3 theme; apps pick up new colors when reopened"
+        )
+        section_layout.addWidget(self.gtk_theming_cb)
 
         layout.addWidget(section)
 
@@ -961,6 +980,7 @@ class AwShellSettings(FramelessMainWindow):
         settings["panel_position"] = self.panel_position_combo.currentText()
         settings["notif_pos"] = self.notif_pos_combo.currentText()
         settings["corners_visible"] = self.corners_cb.isChecked()
+        settings["gtk_theming"] = self.gtk_theming_cb.isChecked()
 
         # Component visibility
         for name, cb in self.component_switches.items():
@@ -1076,6 +1096,7 @@ class AwShellSettings(FramelessMainWindow):
         self.panel_position_combo.setCurrentText(str(get_bind_var("panel_position", "Center")))
         self.notif_pos_combo.setCurrentText(str(get_bind_var("notif_pos", "Top")))
         self.corners_cb.setChecked(get_bind_var("corners_visible", True))
+        self.gtk_theming_cb.setChecked(get_bind_var("gtk_theming", False))
 
         # Component switches
         for name, cb in self.component_switches.items():

@@ -64,6 +64,7 @@ BAR_POSITION = _get_config_var("bar_position")
 VERTICAL = BAR_POSITION in ["Left", "Right"]
 CENTERED_BAR = _get_config_var("centered_bar")
 DATETIME_12H_FORMAT = _get_config_var("datetime_12h_format")
+GTK_THEMING = _get_config_var("gtk_theming")
 # Not saved yet (first run): the terminal found on this system
 TERMINAL_COMMAND = (config["terminal_command"] if "terminal_command" in config
                     else default_terminal_command())
