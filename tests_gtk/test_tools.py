@@ -25,7 +25,10 @@ def run(monkeypatch):
 
 @pytest.fixture
 def toolbox(run, run_pending):
-    widget = tools.Toolbox(notch=MagicMock(name="notch"))
+    notch = MagicMock(name="notch", monitor_id=1)
+    notch.monitor_manager.get_monitor_by_id.side_effect = (
+        lambda i: {"id": 1, "name": "DP-3"} if i == 1 else None)
+    widget = tools.Toolbox(notch=notch)
     run_pending()
     yield widget
     widget.destroy()
@@ -50,12 +53,18 @@ def _key(state=0):
     ("btn_gamemode", f"bash {SCRIPTS}/gamemode.sh"),
     ("btn_pomodoro", f"bash -c 'nohup bash {SCRIPTS}/pomodoro.sh > /dev/null 2>&1 & disown'"),
     ("btn_screenrecord",
-     f"bash -c 'nohup bash {SCRIPTS}/screenrecord.sh > /dev/null 2>&1 & disown'"),
+     f"bash -c 'nohup bash {SCRIPTS}/screenrecord.sh DP-3 > /dev/null 2>&1 & disown'"),
 ])
 def test_click_runs_script_and_closes(toolbox, run, button, command):
     getattr(toolbox, button).clicked()
     assert run == [command]
     toolbox.notch.close_notch.assert_called_once_with()
+
+
+def test_screenrecord_without_a_monitor_manager_uses_the_focused_monitor(toolbox, run):
+    toolbox.notch.monitor_manager = None
+    toolbox.btn_screenrecord.clicked()
+    assert run == [f"bash -c 'nohup bash {SCRIPTS}/screenrecord.sh > /dev/null 2>&1 & disown'"]
 
 
 @pytest.mark.parametrize("button, mode", [

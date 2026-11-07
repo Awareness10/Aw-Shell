@@ -47,6 +47,7 @@ PACKAGES=(
   hyprshot
   hyprsunset
   imagemagick
+  jq
   libdbusmenu-gtk3
   libnotify
   matugen-bin

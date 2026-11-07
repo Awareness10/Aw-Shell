@@ -31,7 +31,7 @@ depends=(
   # Programs the shell runs
   'hyprland' 'uwsm' 'fabric-cli' 'matugen' 'awww' 'cliphist' 'wl-clipboard'
   'libnotify' 'brightnessctl' 'imagemagick' 'hypridle' 'hyprlock' 'upower'
-  'networkmanager'
+  'networkmanager' 'jq'
   # Fonts the styles use
   'ttf-nerd-fonts-symbols-mono' 'noto-fonts-emoji'
 )

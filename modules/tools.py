@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import psutil
 from fabric.hyprland.service import Hyprland
@@ -137,10 +138,12 @@ class ToolsStatusMonitor:
         return False
 
 
-def toggle_screenrecord() -> None:
-    """Start or stop a recording, then pick up the new state promptly."""
+def toggle_screenrecord(monitor: str | None = None) -> None:
+    """Start or stop a recording, then pick up the new state promptly. A new
+    one records `monitor` (a connector name), else the focused monitor."""
+    args = f" {monitor}" if monitor and re.fullmatch(r"[\w.-]+", monitor) else ""
     exec_shell_command_async(
-        f"bash -c 'nohup bash {SCREENRECORD_SCRIPT} > /dev/null 2>&1 & disown'"
+        f"bash -c 'nohup bash {SCREENRECORD_SCRIPT}{args} > /dev/null 2>&1 & disown'"
     )
     monitor = ToolsStatusMonitor.get()
     for delay in (300, 1500):
@@ -413,7 +416,9 @@ class Toolbox(Box):
         return False
 
     def screenrecord(self, *args):
-        toggle_screenrecord()
+        manager = self.notch.monitor_manager
+        monitor = manager and manager.get_monitor_by_id(self.notch.monitor_id)
+        toggle_screenrecord(monitor["name"] if monitor else None)
         self.close_menu()
 
     def pomodoro(self, *args):
