@@ -11,4 +11,5 @@ echo "==> Building the Arch test image ($image)"
 docker build -t "$image" "$repo/packaging/aur" -f "$repo/packaging/aur/test/Dockerfile"
 
 echo "==> Running in container"
-docker run --rm -v "$repo:/src:ro" "$image" bash /src/packaging/aur/test/run.sh
+# -t: makepkg and pacman only color their output on a terminal
+docker run --rm -t -v "$repo:/src:ro" "$image" bash /src/packaging/aur/test/run.sh

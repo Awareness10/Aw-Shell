@@ -24,4 +24,6 @@ RUN yay -Scc --noconfirm >/dev/null 2>&1 || true
 # capabilities can't run in a rootless container, and headless sway needs none
 USER root
 RUN setcap -r /usr/bin/sway
+# Colored pacman output in the test run (scripts/test-aur.sh gives it a tty)
+RUN sed -i 's/^#Color$/Color/' /etc/pacman.conf
 USER builder
