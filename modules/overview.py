@@ -448,7 +448,7 @@ class Overview(Box):
         
         # Filter clients to only show those in this monitor's workspace range
         for client in json.loads(connection.send_command("j/clients").reply.decode()):
-            workspace_id = client["workspace"]["id"]
+            workspace_id = client["workspace"].get("id", 0)  # none on special workspaces
             if workspace_id > 0 and self.workspace_start <= workspace_id <= self.workspace_end:
                 btn = HyprlandWindowButton(
                     window=self,
