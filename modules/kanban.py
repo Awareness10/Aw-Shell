@@ -51,9 +51,11 @@ class InlineEditor(Gtk.Box):
         cancel_btn.get_style_context().add_class("flat")
         
 
+        # EXTERNAL: the text's width doesn't size the board (the notch grew
+        # with every word); NEVER: it grows taller instead, the column scrolls
         sw = ScrolledWindow(name="scrolled-window", propagate_height=False, propagate_width=False)
-        sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        sw.set_min_content_height(50)
+        sw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
+        self.text_view.set_size_request(-1, 50)
         sw.add(self.text_view)
 
         self.button_box = Box(children=[confirm_btn, cancel_btn], spacing=4)
