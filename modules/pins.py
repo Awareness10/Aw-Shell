@@ -21,6 +21,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 import modules.icons as icons
+from utils.portal import pick_file
 
 SAVE_FILE = str(PINS_FILE)
 
@@ -289,9 +290,7 @@ class Cell(Gtk.EventBox):
             if uris:
                 try:
                     filepath, _ = GLib.filename_from_uri(uris[0])
-                    self.content = filepath
-                    self.content_type = 'file'
-                    self.update_display()
+                    self.pin_file(filepath)
                 except Exception as e:
                     print("Error getting file from URI:", e)
         drag_context.finish(True, False, time)
@@ -347,20 +346,29 @@ class Cell(Gtk.EventBox):
                     self.clear_cell()
         return True
 
+    def pin_file(self, filepath):
+        self.content = filepath
+        self.content_type = 'file'
+        self.update_display()
+        # Follow it if it's moved or deleted
+        self.app.add_monitor_for_path(os.path.dirname(filepath))
+
     def select_file(self):
-        dialog = Gtk.FileChooserDialog(
-            title="Select File",
-            parent=self.get_toplevel(),
-            action=Gtk.FileChooserAction.OPEN
-        )
-        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                           Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-        if dialog.run() == Gtk.ResponseType.OK:
-            filepath = dialog.get_filename()
-            self.content = filepath
-            self.content_type = 'file'
-            self.update_display()
-        dialog.destroy()
+        # The picker is a normal window: it would open under the notch (an
+        # overlay layer), and the open notch holds the keyboard. Close it
+        # while picking, then come back to Pins
+        notch = self.get_toplevel()
+        if hasattr(notch, "close_notch"):
+            notch.close_notch()
+
+        def on_picked(filepath):
+            if filepath and self.content is None:
+                self.pin_file(filepath)
+            # open_notch toggles: skip it if the user reopened the notch meanwhile
+            if hasattr(notch, "open_notch") and not getattr(notch, "_is_notch_open", False):
+                notch.open_notch("pins")
+
+        pick_file("Pin a File", on_picked)
 
     def clear_cell(self):
 
@@ -478,9 +486,7 @@ class Pins(Gtk.Box):
                     filepath, _ = GLib.filename_from_uri(uri)
                     for cell in self.cells:
                         if cell.content is None:
-                            cell.content = filepath
-                            cell.content_type = 'file'
-                            cell.update_display()
+                            cell.pin_file(filepath)
                             break
                 except Exception as e:
                     print("Error getting file from URI:", e)

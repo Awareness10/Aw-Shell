@@ -140,3 +140,55 @@ def test_ctrl_click_on_url_only_copies(sandbox, board):
     assert _clipboard().wait_for_text() == "https://example.com"
     pump_until(lambda: False, timeout=0.3)  # give a wrongly spawned xdg-open time to log
     assert sandbox.commands()[before:] == []
+
+
+class _FakeNotch(Gtk.Window):
+    """Stands in for the notch, the pins board's toplevel."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls = []
+
+    def close_notch(self):
+        self.calls.append("close")
+
+    def open_notch(self, name):
+        self.calls.append(f"open {name}")
+
+
+@pytest.fixture
+def picker(monkeypatch):
+    """The portal picker; answer() delivers the user's choice."""
+    pending = []
+    monkeypatch.setattr(pins, "pick_file", lambda title, on_done: pending.append(on_done))
+
+    def answer(path):
+        pending.pop()(path)
+
+    answer.pending = pending
+    return answer
+
+
+def test_click_on_empty_cell_picks_a_file_aside_from_the_notch(board, picker, save_file, tmp_path):
+    document = tmp_path / "picked.txt"
+    document.write_text("hi")
+    widget = board()
+    notch = _FakeNotch()
+    notch.add(widget)
+    cell = widget.cells[0]
+    _press(cell, 1)
+    # The picker opens under the overlay notch, so the notch steps aside
+    assert notch.calls == ["close"] and len(picker.pending) == 1
+    picker(str(document))
+    assert (cell.content, cell.content_type) == (str(document), "file")
+    assert json.loads(save_file.read_text())[0]["content"] == str(document)
+    assert notch.calls == ["close", "open pins"]
+    notch.remove(widget)
+    notch.destroy()
+
+
+def test_cancelled_pick_leaves_cell_empty(board, picker):
+    cell = board().cells[0]
+    _press(cell, 1)
+    picker(None)
+    assert cell.content is None

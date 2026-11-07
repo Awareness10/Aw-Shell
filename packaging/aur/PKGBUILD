@@ -56,6 +56,7 @@ optdepends=(
   'network-manager-applet: network settings'
   'nm-connection-editor: network settings'
   'webp-pixbuf-loader: WebP wallpapers'
+  'xdg-desktop-portal-gtk: file picker for Pins'
 )
 source=("Aw-Shell-$_commit.tar.gz::$url/archive/$_commit.tar.gz"
         "fabric-$_fabric_commit.tar.gz::https://github.com/Fabric-Development/fabric/archive/$_fabric_commit.tar.gz"

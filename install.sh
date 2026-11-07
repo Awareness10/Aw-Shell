@@ -71,6 +71,7 @@ PACKAGES=(
   uwsm
   webp-pixbuf-loader
   wl-clipboard
+  xdg-desktop-portal-gtk  # file picker (Pins); GTK apps in the shell's colors
 )
 
 log() { echo "==> $*"; }
