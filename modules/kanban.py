@@ -113,7 +113,7 @@ class KanbanNote(Gtk.EventBox):
 
     def setup_ui(self):
         self.box = Gtk.Box(name="kanban-note", spacing=4)
-        self.label = Gtk.Label(label=self.text)
+        self.label = Gtk.Label(label=self.text, xalign=0)
         self.label.set_line_wrap(True)
 
         self.label.set_line_wrap_mode(Gtk.WrapMode.WORD)

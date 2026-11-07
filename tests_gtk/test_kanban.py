@@ -198,3 +198,13 @@ def test_clicking_the_editor_keeps_typing_in_it(notch):
     assert window.get_focus() is editor.text_view
     _click(window, editor.text_view, 20, 10)
     assert window.get_focus() is editor.text_view
+
+
+def test_note_text_is_left_aligned(notch):
+    """Wrapped lines are narrower than the label, which centered them."""
+    window, kanban = notch
+    kanban.columns[0].add_note("Fix the issue with screenrecorder not recording from the screen")
+    _settle()
+    label = kanban.columns[0].listbox.get_children()[0].get_children()[0].label
+    assert label.get_layout().get_line_count() > 1
+    assert label.get_layout_offsets().x == label.get_allocation().x
