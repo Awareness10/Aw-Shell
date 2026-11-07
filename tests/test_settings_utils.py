@@ -391,6 +391,10 @@ class TestGetAvailableMonitors:
 # apply_and_restart
 # =========================================================================
 
+def _dofile_lines(path):
+    return sum(line.lstrip("- ").startswith("dofile") for line in path.read_text().splitlines())
+
+
 class TestApplyAndRestart:
 
     @pytest.fixture
@@ -529,6 +533,42 @@ class TestApplyAndRestart:
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
         assert hypr_path.read_text().count("dofile(") == 1
+
+    @pytest.mark.parametrize("line", [
+        'dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")',
+        "dofile('/home/someone/.config/aw-shell/config/hypr/aw-shell.lua')",
+        '  dofile( "/other/home/.config/aw-shell/config/hypr/aw-shell.lua" )  -- shell',
+    ])
+    def test_no_duplicate_append_for_other_spellings(self, ar_env, line):
+        """Regression: a second dofile doubled every shell bind, so a toggle
+        bind (SUPER+W) opened and closed the launcher at once."""
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", True)
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
+        hypr_path.parent.mkdir(parents=True, exist_ok=True)
+        hypr_path.write_text(f"-- config\n{line}\n")
+        mock_popen = MagicMock()
+        mock_popen.return_value.wait.return_value = None
+        with self._patches(aw_config_dir, config_dir, config_file):
+            with patch("config.settings_utils.subprocess.run"):
+                with patch("config.settings_utils.subprocess.Popen", mock_popen):
+                    apply_and_restart()
+        assert _dofile_lines(hypr_path) == 1
+
+    def test_commented_out_dofile_still_appends(self, ar_env):
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", True)
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
+        hypr_path.parent.mkdir(parents=True, exist_ok=True)
+        hypr_path.write_text(f'-- dofile("{aw_config_dir}/hypr/aw-shell.lua")\n')
+        mock_popen = MagicMock()
+        mock_popen.return_value.wait.return_value = None
+        with self._patches(aw_config_dir, config_dir, config_file):
+            with patch("config.settings_utils.subprocess.run"):
+                with patch("config.settings_utils.subprocess.Popen", mock_popen):
+                    apply_and_restart()
+        # the commented-out line, plus the appended one
+        assert _dofile_lines(hypr_path) == 2
 
     def test_creates_hyprland_conf_if_missing(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env

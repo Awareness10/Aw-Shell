@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -99,6 +100,20 @@ def get_available_monitors() -> list:
     return [{"id": 0, "name": "default"}]
 
 
+# A dofile() of aw-shell.lua, however the path is written (a literal, or
+# os.getenv("HOME") .. "..."); not one that's commented out
+_AW_LUA_DOFILE = re.compile(
+    rf"""^[ \t]*dofile\b.*/{re.escape(APP_NAME)}/config/hypr/{re.escape(APP_NAME)}\.lua["']""",
+    re.MULTILINE,
+)
+
+
+def loads_aw_lua(hyprland_lua: str) -> bool:
+    """Whether hyprland.lua already loads aw-shell.lua. A second load doubles
+    every shell bind, and toggle binds then cancel themselves out."""
+    return bool(_AW_LUA_DOFILE.search(hyprland_lua))
+
+
 def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) -> None:
     """Save settings, generate hyprconf, and restart Aw-Shell."""
     save_bind_vars()
@@ -136,7 +151,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
         try:
             needs_append = True
             if hypr_path.exists():
-                if dofile_string in hypr_path.read_text(encoding="utf-8"):
+                if loads_aw_lua(hypr_path.read_text(encoding="utf-8")):
                     needs_append = False
             else:
                 hypr_path.parent.mkdir(parents=True, exist_ok=True)
