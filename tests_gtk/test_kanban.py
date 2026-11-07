@@ -164,3 +164,37 @@ def test_confirming_a_todo_keeps_the_notch_size(notch):
     _settle()
     assert window.get_size().width == typed_width == width
     assert kanban.columns[0].get_notes() == [(TEXT * 2).strip()]
+
+
+
+def _click(window, widget, x, y):
+    """Button 1 press + release at (x, y) in widget, on the GdkWindow there
+    (the headless compositor has no pointer, so events go straight to GTK)."""
+    from gi.repository import Gdk, Gtk
+
+    x, y = widget.translate_coordinates(window, x, y)
+    target = window.get_window()
+    while child := next((c for c in reversed(target.get_children()) if c.is_visible()
+                         and 0 <= x - c.get_position()[0] < c.get_width()
+                         and 0 <= y - c.get_position()[1] < c.get_height()), None):
+        target, x, y = child, x - child.get_position()[0], y - child.get_position()[1]
+    for kind in (Gdk.EventType.BUTTON_PRESS, Gdk.EventType.BUTTON_RELEASE):
+        event = Gdk.Event.new(kind)
+        event.button.window = target
+        event.button.x, event.button.y = float(x), float(y)
+        event.button.button = 1
+        event.set_device(Gdk.Display.get_default().get_default_seat().get_pointer())
+        Gtk.main_do_event(event)
+    _settle()
+
+
+def test_clicking_the_editor_keeps_typing_in_it(notch):
+    """A click below the buttons, or in the text, focused the list row
+    instead (GtkListBox's focus on click), and typing stopped."""
+    window, kanban = notch
+    editor = _new_todo(kanban)
+    buttons = editor.button_box.get_allocation()
+    _click(window, editor.button_box, buttons.width // 2, buttons.height + 6)
+    assert window.get_focus() is editor.text_view
+    _click(window, editor.text_view, 20, 10)
+    assert window.get_focus() is editor.text_view

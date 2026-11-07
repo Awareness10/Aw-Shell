@@ -184,6 +184,14 @@ class KanbanNote(Gtk.EventBox):
 
         GLib.timeout_add(50, lambda: (editor.text_view.grab_focus(), False))
 
+def kanban_row(child):
+    # A row that takes focus on click steals it from the editor's text
+    # (GtkListBox focuses the row on release, even after a click in the text)
+    row = Gtk.ListBoxRow(name="kanban-row", focus_on_click=False)
+    row.add(child)
+    return row
+
+
 class KanbanColumn(Gtk.Frame):
     __gsignals__ = {
         'changed': (GObject.SignalFlags.RUN_LAST, None, ()),
@@ -230,8 +238,7 @@ class KanbanColumn(Gtk.Frame):
 
     def on_add_clicked(self, button):
         editor = InlineEditor()
-        row = Gtk.ListBoxRow(name="kanban-row")
-        row.add(editor)
+        row = kanban_row(editor)
         self.listbox.add(row)
         self.listbox.show_all()
         editor.text_view.grab_focus()
@@ -259,8 +266,7 @@ class KanbanColumn(Gtk.Frame):
     def add_note(self, text, suppress_signal=False):
         note = KanbanNote(text)
         note.connect('changed', lambda x: self.emit('changed'))
-        row = Gtk.ListBoxRow(name="kanban-row")
-        row.add(note)
+        row = kanban_row(note)
         row.connect('destroy', lambda x: self.emit('changed'))
         self.listbox.add(row)
         self.listbox.show_all()
@@ -286,8 +292,7 @@ class KanbanColumn(Gtk.Frame):
             row = self.listbox.get_row_at_y(y)
             new_note = KanbanNote(text)
             new_note.connect('changed', lambda x: self.emit('changed'))
-            new_row = Gtk.ListBoxRow(name="kanban-row")
-            new_row.add(new_note)
+            new_row = kanban_row(new_note)
             new_row.connect('destroy', lambda x: self.emit('changed'))
             
             if row:
