@@ -118,10 +118,16 @@ KEYBIND_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
 ]
 
 
+def plain_text(text: str) -> str:
+    """Text for a button or group box title, shown as written: Qt reads '&'
+    as a shortcut marker and underlines the character after it."""
+    return text.replace("&", "&&")
+
+
 class SettingsSection(QGroupBox):
     """Styled section group box."""
     def __init__(self, title: str, parent=None):
-        super().__init__(title, parent)
+        super().__init__(plain_text(title), parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
 
@@ -450,7 +456,7 @@ class AwShellSettings(FramelessMainWindow):
             self.face_image.setPixmap(pixmap)
 
     def _build_datetime_section(self, layout: QVBoxLayout) -> None:
-        section = SettingsSection("Date && Time")
+        section = SettingsSection("Date & Time")
         section_layout = QVBoxLayout(section)
         section_layout.setSpacing(8)
 
@@ -647,7 +653,7 @@ class AwShellSettings(FramelessMainWindow):
                 row = idx - rows_per_col
                 col = 1
 
-            cb = QCheckBox(display)
+            cb = QCheckBox(plain_text(display))
             cb.setChecked(get_bind_var(f"bar_{name}_visible", True))
             grid.addWidget(cb, row, col)
             self.component_switches[name] = cb
@@ -711,7 +717,7 @@ class AwShellSettings(FramelessMainWindow):
 
         for mon in monitors:
             name = mon.get("name", f'monitor-{mon.get("id", 0)}')
-            cb = QCheckBox(name)
+            cb = QCheckBox(plain_text(name))
             cb.setChecked(name in current_selection)  # [] = all monitors, shown unchecked
             section_layout.addWidget(cb)
             self.monitor_checkboxes[name] = cb
@@ -838,12 +844,12 @@ class AwShellSettings(FramelessMainWindow):
         metrics_small_vis = get_bind_var("metrics_small_visible", {})
 
         for i, (key, label) in enumerate(METRIC_NAMES.items()):
-            cb = QCheckBox(label)
+            cb = QCheckBox(plain_text(label))
             cb.setChecked(metrics_vis.get(key, True))
             grid.addWidget(cb, i + 1, 0)
             self.metrics_switches[key] = cb
 
-            cb_small = QCheckBox(label)
+            cb_small = QCheckBox(plain_text(label))
             cb_small.setChecked(metrics_small_vis.get(key, True))
             grid.addWidget(cb_small, i + 1, 1)
             self.metrics_small_switches[key] = cb_small
