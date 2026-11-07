@@ -1,6 +1,7 @@
 """Pins: saved to ~/.local/share/aw-shell/pins.json, and clicks open, copy or clear a pin."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 from conftest import pump_until
@@ -26,8 +27,17 @@ def save_file(sandbox):
     path.unlink(missing_ok=True)
 
 
+def _restart_store():
+    """Drop the shell's PinStore, as a restart would; the next board loads
+    a new one from the save file."""
+    if pins._store is not None:
+        pins._store.stop()
+    pins._store = None
+
+
 @pytest.fixture
 def board(save_file, run_pending):
+    _restart_store()
     boards = []
 
     def make():
@@ -38,14 +48,13 @@ def board(save_file, run_pending):
 
     yield make
     for widget in boards:
-        widget.observer.stop()
         widget.destroy()
     run_pending()
+    _restart_store()
 
 
 def _pin(cell, content, content_type):
-    cell.content, cell.content_type = content, content_type
-    cell.update_display()
+    cell.store.set(cell.index, content, content_type)
 
 
 def _press(cell, button, double=False, state=0):
@@ -84,6 +93,7 @@ def test_pins_saved_and_reloaded(board, save_file, tmp_path):
     assert saved[2] == {"content_type": "text", "content": "remember the milk"}
     assert saved[1] == {"content_type": None, "content": None}
 
+    _restart_store()
     second = board()
     assert (second.cells[0].content, second.cells[0].content_type) == (str(document), "file")
     assert second.cells[2].content == "remember the milk"
@@ -192,3 +202,62 @@ def test_cancelled_pick_leaves_cell_empty(board, picker):
     _press(cell, 1)
     picker(None)
     assert cell.content is None
+
+
+def test_a_pin_shows_on_every_monitors_board(board, tmp_path):
+    """One board per monitor: a pin added on one appears on the others."""
+    document = tmp_path / "shared.txt"
+    document.write_text("hi")
+    first, second = board(), board()
+    _pin(first.cells[0], str(document), "file")
+    assert (second.cells[0].content, second.cells[0].content_type) == (str(document), "file")
+
+
+def test_boards_dont_overwrite_each_others_pins(board, save_file):
+    """Regression: each board saved its own copy, dropping the other's pins."""
+    first, second = board(), board()
+    _pin(first.cells[0], "from the first monitor", "text")
+    _pin(second.cells[1], "from the second monitor", "text")
+    saved = json.loads(save_file.read_text())
+    assert [saved[0]["content"], saved[1]["content"]] == [
+        "from the first monitor", "from the second monitor",
+    ]
+    assert first.cells[1].content == "from the second monitor"
+
+
+def test_clearing_a_pin_clears_it_everywhere(board, save_file):
+    first, second = board(), board()
+    _pin(first.cells[0], "temporary", "text")
+    _press(second.cells[0], 3)
+    assert first.cells[0].content is None
+    assert json.loads(save_file.read_text())[0]["content"] is None
+
+
+def test_deleted_file_is_unpinned_on_every_board(board, tmp_path):
+    document = tmp_path / "gone.txt"
+    document.write_text("hi")
+    first, second = board(), board()
+    _pin(first.cells[0], str(document), "file")
+    first.store.on_file_event(SimpleNamespace(event_type="deleted", src_path=str(document)))
+    assert first.cells[0].content is None and second.cells[0].content is None
+
+
+def test_moved_file_stays_pinned_at_its_new_path(board, save_file, tmp_path):
+    old, new = tmp_path / "old.txt", tmp_path / "new.txt"
+    old.write_text("hi")
+    widget = board()
+    _pin(widget.cells[0], str(old), "file")
+    old.rename(new)
+    widget.store.on_file_event(
+        SimpleNamespace(event_type="moved", src_path=str(old), dest_path=str(new))
+    )
+    assert widget.cells[0].content == str(new)
+    assert json.loads(save_file.read_text())[0]["content"] == str(new)
+
+
+def test_a_closed_board_stops_listening(board, run_pending):
+    first, second = board(), board()
+    second.destroy()
+    run_pending()
+    _pin(first.cells[0], "still works", "text")
+    assert first.cells[0].content == "still works"

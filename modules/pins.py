@@ -16,7 +16,7 @@ import cairo
 from fabric.widgets.box import Box
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
-from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, GObject, Gtk
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -24,6 +24,7 @@ import modules.icons as icons
 from utils.portal import pick_file
 
 SAVE_FILE = str(PINS_FILE)
+SLOTS = 30  # 6 rows of 5, or 10 of 3 in a side panel
 
 icon_size = 80
 if data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]:
@@ -94,42 +95,113 @@ def download_favicon(url, callback):
 
     GLib.Thread.new("favicon-download", do_download, None)
 
-class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, app):
-        self.app = app
+class _FileEvents(FileSystemEventHandler):
+    """Watchdog runs this on its own thread; the store handles it on GTK's."""
+
+    def __init__(self, store):
+        self.store = store
 
     def on_any_event(self, event):
-        if event.is_directory:
+        if not event.is_directory and event.event_type in ("deleted", "moved"):
+            GLib.idle_add(self.store.on_file_event, event)
+
+
+class PinStore(GObject.Object):
+    """The pins, one set for the whole shell: every monitor's board shows and
+    edits the same slots. Saved to SAVE_FILE; pinned files are followed when
+    moved and unpinned when deleted. "changed" says which slot changed."""
+
+    __gsignals__ = {"changed": (GObject.SignalFlags.RUN_FIRST, None, (int,))}
+
+    def __init__(self):
+        super().__init__()
+        self.slots = [(None, None)] * SLOTS  # (content, content_type)
+        self._watched_dirs = set()
+        self._observer = Observer()
+        self._load()
+        for content, content_type in self.slots:
+            if content_type == 'file' and content:
+                self._watch(content)
+        self._observer.start()
+
+    def get(self, index):
+        return self.slots[index]
+
+    def first_empty(self):
+        return next((i for i, (content, _) in enumerate(self.slots) if content is None), None)
+
+    def set(self, index, content, content_type):
+        if self.slots[index] == (content, content_type):
             return
+        self.slots[index] = (content, content_type)
+        if content_type == 'file' and content:
+            self._watch(content)
+        self._save()
+        self.emit("changed", index)
 
-        for cell in self.app.cells:
-            if cell.content_type == 'file' and cell.content:
-                try:
-                    cell_real = os.path.realpath(cell.content)
-                    src_real = os.path.realpath(event.src_path)
-                    dest_real = os.path.realpath(getattr(event, 'dest_path', ''))
-                    if cell_real == src_real or (dest_real and cell_real == dest_real):
-                        GLib.idle_add(self.handle_file_event, cell, event)
-                except Exception:
-                    pass
+    def clear(self, index):
+        self.set(index, None, None)
 
-    def handle_file_event(self, cell, event):
-        if event.event_type == 'deleted':
-            cell.clear_cell()
-            self.app.save_state()
-        elif event.event_type == 'moved':
-            if hasattr(event, 'dest_path') and os.path.exists(event.dest_path):
-                cell.content = event.dest_path
-                cell.update_display()
-                self.app.save_state()
-                self.app.add_monitor_for_path(os.path.dirname(event.dest_path))
+    def on_file_event(self, event):
+        for index, (content, content_type) in enumerate(self.slots):
+            if content_type != 'file' or not content:
+                continue
+            if os.path.realpath(content) != os.path.realpath(event.src_path):
+                continue
+            if event.event_type == 'deleted':
+                self.clear(index)
+            elif os.path.exists(event.dest_path):  # moved
+                self.set(index, event.dest_path, 'file')
+
+    def stop(self):
+        self._observer.stop()
+        self._observer.join()
+
+    def _watch(self, filepath):
+        folder = os.path.dirname(filepath)
+        if folder not in self._watched_dirs and os.path.isdir(folder):
+            self._observer.schedule(_FileEvents(self), folder, recursive=False)
+            self._watched_dirs.add(folder)
+
+    def _load(self):
+        if not os.path.exists(SAVE_FILE):
+            return
+        try:
+            with open(SAVE_FILE, 'r') as f:
+                state = json.load(f)
+            for index, cell_data in enumerate(state[:SLOTS]):
+                self.slots[index] = (cell_data.get('content'), cell_data.get('content_type'))
+        except Exception as e:
+            print("Error loading pins:", e)
+
+    def _save(self):
+        state = [{'content_type': kind, 'content': content} for content, kind in self.slots]
+        try:
+            ensure_dir(PINS_FILE.parent)
+            with open(SAVE_FILE, 'w') as f:
+                json.dump(state, f)
+        except Exception as e:
+            print("Error saving pins:", e)
+
+
+_store = None
+
+
+def get_store():
+    """The shell's one PinStore, created on first use."""
+    global _store
+    if _store is None:
+        _store = PinStore()
+    return _store
+
 
 class Cell(Gtk.EventBox):
-    def __init__(self, app, content=None, content_type=None):
+    """One slot of the store, shown on one board."""
+
+    def __init__(self, store, index):
         super().__init__(name="pin-cell")
-        self.app = app
-        self.content = content
-        self.content_type = content_type
+        self.store = store
+        self.index = index
         self.box = Box(name="pin-cell-box", orientation="v", spacing=4)
         self.add(self.box)
         
@@ -152,6 +224,14 @@ class Cell(Gtk.EventBox):
         self.connect("drag-begin", self.on_drag_begin)
 
         self.update_display()
+
+    @property
+    def content(self):
+        return self.store.get(self.index)[0]
+
+    @property
+    def content_type(self):
+        return self.store.get(self.index)[1]
 
     def update_display(self):
 
@@ -200,8 +280,6 @@ class Cell(Gtk.EventBox):
                     label = Label(name="pin-text", label=self.content.split('\n')[0], justification="center", ellipsization="end", line_wrap="word-char")
                     self.box.pack_start(label, True, True, 0)
         self.box.show_all()
-        if not self.app.loading_state:
-            self.app.save_state()
     
     def update_favicon(self, container, icon_widget, favicon_path):
         """Update the icon with the downloaded favicon or keep the default."""
@@ -290,7 +368,7 @@ class Cell(Gtk.EventBox):
             if uris:
                 try:
                     filepath, _ = GLib.filename_from_uri(uris[0])
-                    self.pin_file(filepath)
+                    self.store.set(self.index, filepath, 'file')
                 except Exception as e:
                     print("Error getting file from URI:", e)
         drag_context.finish(True, False, time)
@@ -318,9 +396,7 @@ class Cell(Gtk.EventBox):
                 clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
                 text = clipboard.wait_for_text()
                 if text:
-                    self.content = text
-                    self.content_type = 'text'
-                    self.update_display()
+                    self.store.set(self.index, text, 'text')
         else:
             if self.content_type == 'file':
                 if event.button == 1 and event.type == Gdk.EventType._2BUTTON_PRESS:
@@ -346,13 +422,6 @@ class Cell(Gtk.EventBox):
                     self.clear_cell()
         return True
 
-    def pin_file(self, filepath):
-        self.content = filepath
-        self.content_type = 'file'
-        self.update_display()
-        # Follow it if it's moved or deleted
-        self.app.add_monitor_for_path(os.path.dirname(filepath))
-
     def select_file(self):
         # The picker is a normal window: it would open under the notch (an
         # overlay layer), and the open notch holds the keyboard. Close it
@@ -363,7 +432,7 @@ class Cell(Gtk.EventBox):
 
         def on_picked(filepath):
             if filepath and self.content is None:
-                self.pin_file(filepath)
+                self.store.set(self.index, filepath, 'file')
             # open_notch toggles: skip it if the user reopened the notch meanwhile
             if hasattr(notch, "open_notch") and not getattr(notch, "_is_notch_open", False):
                 notch.open_notch("pins")
@@ -371,40 +440,20 @@ class Cell(Gtk.EventBox):
         pick_file("Pin a File", on_picked)
 
     def clear_cell(self):
-
-        if self.favicon_temp_path and os.path.exists(self.favicon_temp_path):
-            try:
-                os.remove(self.favicon_temp_path)
-                self.favicon_temp_path = None
-            except Exception as e:
-                print(f"Error removing temp favicon: {e}")
-        
-        self.content = None
-        self.content_type = None
-        self.update_display()
+        # Every board's update_display removes its own favicon
+        self.store.clear(self.index)
 
 class Pins(Gtk.Box):
+    """A board of the shared pins; each monitor's dashboard has one."""
+
     def __init__(self, **kwargs):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-
-        self.loading_state = True
-        self.monitored_paths = set()
-        self.observer = Observer()
-        self.event_handler = FileChangeHandler(self)
-
+        self.store = get_store()
         self.cells = []
-
 
         grid = Gtk.Grid(row_spacing=8, column_spacing=8, name="pin-grid")
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
-
-
-
-
-
-
-
 
         scrolled_window = ScrolledWindow(child=grid, name="scrolled-window", style_classes="pins", propagate_width=False, propagate_height=False)
         scrolled_window.set_hexpand(True)
@@ -413,93 +462,33 @@ class Pins(Gtk.Box):
         scrolled_window.set_valign(Gtk.Align.FILL)
         self.pack_start(scrolled_window, True, True, 0)
 
+        side_panel = data.PANEL_THEME == "Panel" and (
+            data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]
+        )
+        columns = 3 if side_panel else 5
+        for index in range(SLOTS):
+            cell = Cell(self.store, index)
+            self.cells.append(cell)
+            grid.attach(cell, index % columns, index // columns, 1, 1)
 
-        if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]):
-            for row in range(10):
-                for col in range(3):
-                    cell = Cell(self)
-                    self.cells.append(cell)
-                    grid.attach(cell, col, row, 1, 1)
-        else:
-            for row in range(6):
-                for col in range(5):
-                    cell = Cell(self)
-                    self.cells.append(cell)
-                    grid.attach(cell, col, row, 1, 1)
-
-        self.load_state()
-        self.loading_state = False
-        self.start_file_monitoring()
+        handler = self.store.connect("changed", self.on_slot_changed)
+        self.connect("destroy", lambda *_: self.store.disconnect(handler))
 
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
         self.connect("drag-data-received", self.on_drag_data_received)
 
-    def start_file_monitoring(self):
-        for cell in self.cells:
-            if cell.content_type == 'file' and cell.content:
-                dir_path = os.path.dirname(cell.content)
-                if os.path.exists(dir_path) and dir_path not in self.monitored_paths:
-                    self.observer.schedule(self.event_handler, dir_path, recursive=False)
-                    self.monitored_paths.add(dir_path)
-        self.observer.start()
-
-    def add_monitor_for_path(self, path):
-        if path not in self.monitored_paths and os.path.exists(path):
-            self.observer.schedule(self.event_handler, path, recursive=False)
-            self.monitored_paths.add(path)
-
-    def save_state(self):
-        state = []
-        for cell in self.cells:
-            state.append({
-                'content_type': cell.content_type,
-                'content': cell.content
-            })
-        try:
-            ensure_dir(PINS_FILE.parent)
-            with open(SAVE_FILE, 'w') as f:
-                json.dump(state, f)
-        except Exception as e:
-            print("Error saving state:", e)
-
-    def load_state(self):
-        if not os.path.exists(SAVE_FILE):
-            return
-        try:
-            with open(SAVE_FILE, 'r') as f:
-                state = json.load(f)
-            for i, cell_data in enumerate(state):
-                if i < len(self.cells):
-                    content = cell_data.get('content')
-                    content_type = cell_data.get('content_type')
-                    self.cells[i].content = content
-                    self.cells[i].content_type = content_type
-                    self.cells[i].update_display()
-        except Exception as e:
-            print("Error loading state:", e)
+    def on_slot_changed(self, _store, index):
+        self.cells[index].update_display()
 
     def on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
         if data.get_length() >= 0:
-            uris = data.get_uris()
-            for uri in uris:
+            for uri in data.get_uris():
+                index = self.store.first_empty()
+                if index is None:
+                    break
                 try:
                     filepath, _ = GLib.filename_from_uri(uri)
-                    for cell in self.cells:
-                        if cell.content is None:
-                            cell.pin_file(filepath)
-                            break
+                    self.store.set(index, filepath, 'file')
                 except Exception as e:
                     print("Error getting file from URI:", e)
         drag_context.finish(True, False, time)
-
-    def stop_monitoring(self):
-
-        for cell in self.cells:
-            if hasattr(cell, 'favicon_temp_path') and cell.favicon_temp_path and os.path.exists(cell.favicon_temp_path):
-                try:
-                    os.remove(cell.favicon_temp_path)
-                except Exception:
-                    pass
-                    
-        self.observer.stop()
-        self.observer.join()
