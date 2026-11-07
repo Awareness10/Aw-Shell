@@ -43,3 +43,12 @@ def test_default_colors_ship_with_the_code():
     text = paths.DEFAULT_CSS_COLORS.read_text()
     assert ":vars {" in text and "--primary:" in text
     assert "{{" not in text  # fully rendered template
+
+
+def test_dim_colors_are_not_black():
+    """matugen 4's set_lightness is absolute, so `set_lightness: -10` made every
+    -dim color #000000 (invisible close/delete icons); they darken with lighten."""
+    template = (paths.MATUGEN_TEMPLATES / "aw-shell.css").read_text()
+    assert "set_lightness" not in template
+    dims = [line for line in paths.DEFAULT_CSS_COLORS.read_text().splitlines() if "-dim:" in line]
+    assert dims and not [line for line in dims if "#000000" in line]
