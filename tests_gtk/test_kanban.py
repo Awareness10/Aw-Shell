@@ -16,10 +16,19 @@ def state_file(sandbox):
     path.unlink(missing_ok=True)
 
 
+def _restart_store():
+    """Drop the shell's KanbanStore, as a restart would; the next board loads
+    a new one from the state file."""
+    import modules.kanban as kanban
+
+    kanban._store = None
+
+
 @pytest.fixture
 def board(state_file, run_pending):
     from modules.kanban import Kanban
 
+    _restart_store()
     boards = []
 
     def make():
@@ -32,6 +41,7 @@ def board(state_file, run_pending):
     for kanban in boards:
         kanban.destroy()
     run_pending()
+    _restart_store()
 
 
 def _notes(kanban):
@@ -47,6 +57,7 @@ def test_notes_saved_and_reloaded(board, state_file):
 
     saved = json.loads(state_file.read_text())
     assert [c["notes"] for c in saved["columns"]] == [["write tests", "fix bugs"], [], ["ruff"]]
+    _restart_store()
     assert _notes(board()) == {"To Do": ["write tests", "fix bugs"], "In Progress": [],
                                "Done": ["ruff"]}
 
@@ -208,3 +219,56 @@ def test_note_text_is_left_aligned(notch):
     label = kanban.columns[0].listbox.get_children()[0].get_children()[0].label
     assert label.get_layout().get_line_count() > 1
     assert label.get_layout_offsets().x == label.get_allocation().x
+
+
+def _shown(column):
+    """The note texts a column's rows show."""
+    return [row.get_children()[0].label.get_text() for row in column.listbox.get_children()]
+
+
+def test_every_monitors_board_shows_the_same_notes(board, state_file):
+    """One board per monitor: a note added, edited or deleted on one shows on all."""
+    first, second = board(), board()
+    first.columns[0].add_note("from the first monitor")
+    second.columns[2].add_note("from the second monitor")
+    for kanban in (first, second):
+        assert _shown(kanban.columns[0]) == ["from the first monitor"]
+        assert _shown(kanban.columns[2]) == ["from the second monitor"]
+    saved = json.loads(state_file.read_text())
+    assert [c["notes"] for c in saved["columns"]] == [
+        ["from the first monitor"], [], ["from the second monitor"],
+    ]
+
+    note = second.columns[0].listbox.get_children()[0].get_children()[0]
+    note.on_delete_clicked(note.delete_btn)
+    assert _shown(first.columns[0]) == []
+
+
+@pytest.mark.parametrize("source, target, expected", [
+    (("To Do", 0), ("Done", 0), {"To Do": ["b", "c"], "Done": ["a"]}),
+    (("To Do", 0), ("To Do", 3), {"To Do": ["b", "c", "a"], "Done": []}),  # dropped at the end
+    (("To Do", 2), ("To Do", 0), {"To Do": ["c", "a", "b"], "Done": []}),
+    (("To Do", 1), ("To Do", 2), {"To Do": ["a", "b", "c"], "Done": []}),  # right below itself
+])
+def test_moving_a_note(board, source, target, expected):
+    kanban = board()
+    for text in "abc":
+        kanban.columns[0].add_note(text)
+    kanban.store.move(*source, *target)
+    assert {t: kanban.store.notes(t) for t in ("To Do", "Done")} == expected
+    assert _shown(kanban.columns[0]) == expected["To Do"]
+
+
+def test_dropping_a_note_on_the_other_monitors_board_moves_it(board, run_pending, monkeypatch):
+    from types import SimpleNamespace
+
+    import modules.kanban as kanban_module
+
+    first, second = board(), board()
+    first.columns[0].add_note("drag me")
+    monkeypatch.setattr(kanban_module, "_dragged", ("To Do", 0))  # set by drag-begin
+    target = second.columns[1]
+    target.on_drag_data_received(target.listbox, None, 0, 0,
+                                 SimpleNamespace(get_text=lambda: "drag me"), 0, 0)
+    run_pending()
+    assert _shown(first.columns[0]) == [] and _shown(first.columns[1]) == ["drag me"]

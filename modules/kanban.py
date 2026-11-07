@@ -98,13 +98,101 @@ class InlineEditor(Gtk.Box):
                 return True
         return False
 
-class KanbanNote(Gtk.EventBox):
-    __gsignals__ = {
-        'changed': (GObject.SignalFlags.RUN_LAST, None, ()),
-    }
+COLUMNS = ("To Do", "In Progress", "Done")
 
-    def __init__(self, text):
+
+class KanbanStore(GObject.Object):
+    """The notes, one set for the whole shell: every monitor's board shows
+    and edits the same columns. Saved to KANBAN_FILE; "changed" names the
+    column that changed."""
+
+    __gsignals__ = {"changed": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
+
+    def __init__(self):
         super().__init__()
+        self.columns = {title: [] for title in COLUMNS}
+        self._load()
+
+    def notes(self, title):
+        return list(self.columns[title])
+
+    def add(self, title, text):
+        self.insert(title, len(self.columns[title]), text)
+
+    def insert(self, title, index, text):
+        self.columns[title].insert(index, text)
+        self._changed(title)
+
+    def edit(self, title, index, text):
+        if self.columns[title][index] != text:
+            self.columns[title][index] = text
+            self._changed(title)
+
+    def remove(self, title, index):
+        del self.columns[title][index]
+        self._changed(title)
+
+    def move(self, source, source_index, target, target_index):
+        """Move a note; target_index is where it's dropped, before the move."""
+        if source == target and target_index in (source_index, source_index + 1):
+            return  # dropped where it was
+        text = self.columns[source].pop(source_index)
+        if source == target and target_index > source_index:
+            target_index -= 1
+        self.columns[target].insert(target_index, text)
+        self._save()
+        self.emit("changed", source)
+        if target != source:
+            self.emit("changed", target)
+
+    def _changed(self, title):
+        self._save()
+        self.emit("changed", title)
+
+    def _load(self):
+        try:
+            with open(KANBAN_FILE, "r") as f:
+                state = json.load(f)
+            for col_data in state["columns"]:
+                if col_data["title"] in self.columns:
+                    self.columns[col_data["title"]] = list(col_data["notes"])
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"Error loading kanban: {e}")
+
+    def _save(self):
+        state = {"columns": [{"title": t, "notes": n} for t, n in self.columns.items()]}
+        try:
+            ensure_dir(KANBAN_FILE.parent)
+            with open(KANBAN_FILE, "w") as f:
+                json.dump(state, f, indent=2)
+        except Exception as e:
+            print(f"Error saving kanban: {e}")
+
+
+_store = None
+
+
+def get_store():
+    """The shell's one KanbanStore, created on first use."""
+    global _store
+    if _store is None:
+        _store = KanbanStore()
+    return _store
+
+
+# The note being dragged, as (column title, index): drops move it in the store
+_dragged = None
+
+
+class KanbanNote(Gtk.EventBox):
+    """One note of a column, shown on one board."""
+
+    def __init__(self, column, index, text):
+        super().__init__()
+        self.column = column
+        self.index = index
         self.text = text
 
         self.setup_ui()
@@ -135,9 +223,8 @@ class KanbanNote(Gtk.EventBox):
             Gdk.DragAction.MOVE
         )
         self.connect("drag-data-get", self.on_drag_data_get)
-        self.connect("drag-data-delete", self.on_drag_data_delete)
-
         self.connect("drag-begin", self.on_drag_begin)
+        self.connect("drag-end", self.on_drag_end)
 
     def on_button_press(self, widget, event):
         if event.type != Gdk.EventType._2BUTTON_PRESS:
@@ -146,37 +233,36 @@ class KanbanNote(Gtk.EventBox):
         return False
 
     def on_drag_begin(self, widget, context):
+        global _dragged
+        _dragged = (self.column.title, self.index)
         surface = createSurfaceFromWidget(self)
         Gtk.drag_set_icon_surface(context, surface)
+
+    def on_drag_end(self, widget, context):
+        global _dragged
+        _dragged = None
 
     def on_drag_data_get(self, widget, drag_context, data, info, time):
         data.set_text(self.label.get_text(), -1)
 
-    def on_drag_data_delete(self, widget, drag_context):
-        self.get_parent().destroy()
-
     def on_delete_clicked(self, button):
-        self.get_parent().destroy()
-
+        self.column.store.remove(self.column.title, self.index)
 
     def start_edit(self):
         row = self.get_parent()
         editor = InlineEditor(self.label.get_text())
-        
-        def on_confirmed(editor, text):
-            self.label.set_text(text)
-            row.remove(editor)
-            row.add(self)
-            row.show_all()
-            self.emit('changed')
 
-        def on_canceled(editor):
+        def close_editor():
             row.remove(editor)
             row.add(self)
             row.show_all()
+
+        def on_confirmed(editor, text):
+            close_editor()
+            self.column.store.edit(self.column.title, self.index, text)
 
         editor.connect('confirmed', on_confirmed)
-        editor.connect('canceled', on_canceled)
+        editor.connect('canceled', lambda editor: close_editor())
         
         row.remove(self)
         row.add(editor)
@@ -193,17 +279,17 @@ def kanban_row(child):
 
 
 class KanbanColumn(Gtk.Frame):
-    __gsignals__ = {
-        'changed': (GObject.SignalFlags.RUN_LAST, None, ()),
-    }
+    """One column of the store, shown on one board."""
 
-    def __init__(self, title):
+    def __init__(self, store, title):
         super().__init__(name="kanban-column")
+        self.store = store
         self.title = title
         self.setup_ui()
         self.setup_dnd()
         self.set_hexpand(True)
         self.set_vexpand(True)
+        self.show_notes()
 
     def setup_ui(self):
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -236,6 +322,17 @@ class KanbanColumn(Gtk.Frame):
         self.listbox.connect("drag-motion", self.on_drag_motion)
         self.listbox.connect("drag-leave", self.on_drag_leave)
 
+    def show_notes(self):
+        """Rebuild the rows from the store, keeping the scroll position."""
+        adjustment = self.scroller.get_vadjustment()
+        scrolled = adjustment.get_value()
+        for row in self.listbox.get_children():
+            row.destroy()
+        for index, text in enumerate(self.store.notes(self.title)):
+            self.listbox.add(kanban_row(KanbanNote(self, index, text)))
+        self.listbox.show_all()
+        GLib.idle_add(lambda: adjustment.set_value(scrolled) and False)
+
     def on_add_clicked(self, button):
         editor = InlineEditor()
         row = kanban_row(editor)
@@ -243,66 +340,39 @@ class KanbanColumn(Gtk.Frame):
         self.listbox.show_all()
         editor.text_view.grab_focus()
 
-        def on_confirmed(editor, text):
-            note = KanbanNote(text)
-            note.connect('changed', lambda x: self.emit('changed'))
-            row.remove(editor)
-            row.add(note)
-            self.listbox.show_all()
-            self.emit('changed')
-
-        def on_canceled(editor):
-            row.destroy()
-
         def scroll_to_bottom():
             adj = self.scroller.get_vadjustment()
             adj.set_value(adj.get_upper())
 
-        editor.connect('confirmed', on_confirmed)
-        editor.connect('canceled', on_canceled)
+        # The store's change rebuilds the column, editor row included
+        editor.connect('confirmed', lambda editor, text: self.store.add(self.title, text))
+        editor.connect('canceled', lambda editor: row.destroy())
 
         GLib.idle_add(scroll_to_bottom) # ensure this is called after row is loaded
 
-    def add_note(self, text, suppress_signal=False):
-        note = KanbanNote(text)
-        note.connect('changed', lambda x: self.emit('changed'))
-        row = kanban_row(note)
-        row.connect('destroy', lambda x: self.emit('changed'))
-        self.listbox.add(row)
-        self.listbox.show_all()
-        if not suppress_signal:
-            self.emit('changed')
+    def add_note(self, text):
+        self.store.add(self.title, text)
 
     def get_notes(self):
-        return [
-            row.get_children()[0].label.get_text()
-            for row in self.listbox.get_children()
-            if isinstance(row.get_children()[0], KanbanNote)
-        ]
-
-    def clear_notes(self, suppress_signal=False):
-        for row in self.listbox.get_children():
-            row.destroy()
-        if not suppress_signal:
-            self.emit('changed')
+        return self.store.notes(self.title)
 
     def on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
         text = data.get_text()
-        if text:
-            row = self.listbox.get_row_at_y(y)
-            new_note = KanbanNote(text)
-            new_note.connect('changed', lambda x: self.emit('changed'))
-            new_row = kanban_row(new_note)
-            new_row.connect('destroy', lambda x: self.emit('changed'))
-            
-            if row:
-                self.listbox.insert(new_row, row.get_index())
+        if not text:
+            return
+        row = self.listbox.get_row_at_y(y)
+        index = row.get_index() if row else len(self.store.notes(self.title))
+        source = _dragged
+
+        # After the drop finishes: the move rebuilds the dragged note's column
+        def drop():
+            if source:
+                self.store.move(*source, self.title, index)
             else:
-                self.listbox.add(new_row)
-            
-            self.listbox.show_all()
-            drag_context.finish(True, False, time)
-            self.emit('changed')
+                self.store.insert(self.title, index, text)
+            return False
+
+        GLib.idle_add(drop)
 
     def on_drag_motion(self, widget, drag_context, x, y, time):
         Gdk.drag_status(drag_context, Gdk.DragAction.MOVE, time)
@@ -312,20 +382,19 @@ class KanbanColumn(Gtk.Frame):
         widget.get_parent().get_parent().drag_unhighlight()
 
 class Kanban(Gtk.Box):
+    """A board of the shared notes; each monitor's dashboard has one."""
+
     STATE_FILE = KANBAN_FILE
 
     def __init__(self):
         super().__init__(name="kanban")
+        self.store = get_store()
         
         self.grid = Gtk.Grid(column_spacing=4, column_homogeneous=True, row_spacing=4, row_homogeneous=True)
         self.grid.set_vexpand(True)
         self.add(self.grid)
         
-        self.columns = [
-            KanbanColumn("To Do"),
-            KanbanColumn("In Progress"),
-            KanbanColumn("Done")
-        ]
+        self.columns = [KanbanColumn(self.store, title) for title in COLUMNS]
 
         vertical_mode = True if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]) else False
         
@@ -334,37 +403,12 @@ class Kanban(Gtk.Box):
                 self.grid.attach(column, i, 0, 1, 1)
             else:
                 self.grid.attach(column, 0, i, 1, 1)
-            column.connect('changed', lambda x: self.save_state())
-        
-        self.load_state()
+
+        handler = self.store.connect("changed", self.on_column_changed)
+        self.connect("destroy", lambda *_: self.store.disconnect(handler))
         self.show_all()
 
-    def save_state(self):
-        state = {
-            "columns": [
-                {"title": col.title, "notes": col.get_notes()}
-                for col in self.columns
-            ]
-        }
-        try:
-            ensure_dir(self.STATE_FILE.parent)
-            with open(self.STATE_FILE, "w") as f:
-                json.dump(state, f, indent=2)
-        except Exception as e:
-            print(f"Error saving state: {e}")
-
-    def load_state(self):
-        try:
-            with open(self.STATE_FILE, "r") as f:
-                state = json.load(f)
-                for col_data in state["columns"]:
-                    for column in self.columns:
-                        if column.title == col_data["title"]:
-                            column.clear_notes(suppress_signal=True)
-                            for note_text in col_data["notes"]:
-                                column.add_note(note_text, suppress_signal=True)
-                            break
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            print(f"Error loading state: {e}")
+    def on_column_changed(self, _store, title):
+        for column in self.columns:
+            if column.title == title:
+                column.show_notes()
