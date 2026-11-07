@@ -39,7 +39,7 @@ constraint-dependencies = ["certifi>=2026.10.19"]
 
 [tool.uv.sources]
 glaze = { git = "https://github.com/awareness10/glaze" }
-fabric = { git = "https://github.com/awareness10/fabric" }
+fabric = { git = "https://github.com/Fabric-Development/fabric" }
 
 [dependency-groups]
 dev = [
