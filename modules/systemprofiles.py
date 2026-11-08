@@ -67,6 +67,13 @@ class Systemprofiles(Box):
             )
             children.append(self.bat_perf)
 
+        # Without profiles (a VM, or no working powerprofilesctl) there's
+        # nothing to show, not even the empty background
+        self.has_profiles = bool(children)
+        if not self.has_profiles:
+            self.set_no_show_all(True)
+            self.set_visible(False)
+
         # Group the mode buttons into a container.
         if children:
             self.add(
@@ -83,6 +90,11 @@ class Systemprofiles(Box):
             self.hide_timer = None
             self.hover_counter = 0
         # self.set_power_mode("balanced")
+
+    def set_visible(self, visible: bool) -> None:
+        """Stays hidden without profiles, even when enabled in the settings
+        (the bar sets each component's visibility from them)."""
+        super().set_visible(visible and getattr(self, "has_profiles", True))
 
     def get_current_power_mode(self):
         try:

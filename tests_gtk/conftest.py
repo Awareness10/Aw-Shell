@@ -54,7 +54,15 @@ STUBBED_COMMANDS = [
     "hyprsunset", "hyprpicker", "hyprshot", "hyprlock", "hypridle",
     "matugen", "awww", "swww", "nvtop", "play", "cava",
     "grim", "slurp", "wf-recorder", "gpu-screen-recorder", "tmux",
+    "powerprofilesctl",
 ]
+# What a stub prints besides logging its call, as the real command would
+STUB_OUTPUT = {
+    # The profiles a laptop has (Systemprofiles hides itself without any)
+    "powerprofilesctl": 'case "$1" in'
+                        ' list) printf "  performance:\\n* balanced:\\n  power-saver:\\n";;'
+                        ' get) echo balanced;; esac',
+}
 
 
 class Sandbox:
@@ -111,7 +119,8 @@ class Sandbox:
         log = self.runtime / "commands.log"
         for name in STUBBED_COMMANDS:
             path = self.bin / name
-            path.write_text(f'#!/bin/sh\necho "{name} $*" >> "{log}"\n')
+            output = STUB_OUTPUT.get(name, "")
+            path.write_text(f'#!/bin/sh\necho "{name} $*" >> "{log}"\n{output}\n')
             path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
     def _start_dbus(self):
