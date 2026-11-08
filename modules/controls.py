@@ -131,6 +131,31 @@ class MicSlider(BaseAudioSlider):
         return "notify::microphone"
 
 
+def when_brightness_ready(owner, add) -> None:
+    """Calls add() to put brightness controls in owner: now when there's a
+    backend, or once a DDC/CI monitor turns up in the background (ddcutil
+    takes about a second; see Brightness.detecting)."""
+    brightness = Brightness.get_initial()
+    if brightness.screen_brightness != -1:
+        add()
+        return
+    if not brightness.detecting:
+        return
+
+    def on_ready(*_):
+        brightness.disconnect(handler)
+        if brightness.screen_brightness != -1:
+            add()
+
+    handler = brightness.connect("ready", on_ready)
+
+    def on_destroy(*_):
+        if brightness.handler_is_connected(handler):
+            brightness.disconnect(handler)
+
+    owner.connect("destroy", on_destroy)
+
+
 class BrightnessSlider(Scale, DebouncedValueMixin):
     def __init__(self, **kwargs):
         super().__init__(
@@ -884,13 +909,15 @@ class ControlSliders(Box):
             spacing=8,
             **kwargs,
         )
-        brightness = Brightness.get_initial()
-
-        if brightness.screen_brightness != -1:
+        def add_brightness_row():
             brightness_row = Box(orientation="h", spacing=0, h_expand=True, h_align="fill")
             brightness_row.add(BrightnessIcon())
             brightness_row.add(BrightnessSlider())
             self.add(brightness_row)
+            self.reorder_child(brightness_row, 0)
+            brightness_row.show_all()
+
+        when_brightness_ready(self, add_brightness_row)
 
         volume_row = Box(orientation="h", spacing=0, h_expand=True, h_align="fill")
         volume_row.add(VolumeIcon())
@@ -907,11 +934,7 @@ class ControlSliders(Box):
 
 class ControlSmall(Box):
     def __init__(self, **kwargs):
-        brightness = Brightness.get_initial()
-        children = []
-        if brightness.screen_brightness != -1:
-            children.append(BrightnessSmall())
-        children.extend([VolumeSmall(), MicSmall(), MouseBattery(), HeadsetBattery()])
+        children = [VolumeSmall(), MicSmall(), MouseBattery(), HeadsetBattery()]
         super().__init__(
             name="control-small",
             orientation="h" if not data.VERTICAL else "v",
@@ -919,4 +942,12 @@ class ControlSmall(Box):
             children=children,
             **kwargs,
         )
+
+        def add_brightness():
+            small = BrightnessSmall()
+            self.add(small)
+            self.reorder_child(small, 0)
+            small.show_all()
+
+        when_brightness_ready(self, add_brightness)
         self.show_all()

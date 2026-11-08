@@ -444,12 +444,14 @@ class Cell(Gtk.EventBox):
         self.store.clear(self.index)
 
 class Pins(Gtk.Box):
-    """A board of the shared pins; each monitor's dashboard has one."""
+    """A board of the shared pins; each monitor's dashboard has one. Its cells
+    are built the first time it's shown (or used): most starts never open the
+    Pins tab, and 30 cells on each monitor slowed every start."""
 
     def __init__(self, **kwargs):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.store = get_store()
-        self.cells = []
+        self._cells = None
 
         grid = Gtk.Grid(row_spacing=8, column_spacing=8, name="pin-grid")
         grid.set_column_homogeneous(True)
@@ -465,11 +467,9 @@ class Pins(Gtk.Box):
         side_panel = data.PANEL_THEME == "Panel" and (
             data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]
         )
-        columns = 3 if side_panel else 5
-        for index in range(SLOTS):
-            cell = Cell(self.store, index)
-            self.cells.append(cell)
-            grid.attach(cell, index % columns, index // columns, 1, 1)
+        self._grid = grid
+        self._columns = 3 if side_panel else 5
+        self.connect("map", lambda *_: self._build_cells())
 
         handler = self.store.connect("changed", self.on_slot_changed)
         self.connect("destroy", lambda *_: self.store.disconnect(handler))
@@ -477,8 +477,24 @@ class Pins(Gtk.Box):
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
         self.connect("drag-data-received", self.on_drag_data_received)
 
+    @property
+    def cells(self):
+        self._build_cells()
+        return self._cells
+
+    def _build_cells(self):
+        if self._cells is not None:
+            return
+        self._cells = []
+        for index in range(SLOTS):
+            cell = Cell(self.store, index)
+            self._cells.append(cell)
+            self._grid.attach(cell, index % self._columns, index // self._columns, 1, 1)
+        self._grid.show_all()
+
     def on_slot_changed(self, _store, index):
-        self.cells[index].update_display()
+        if self._cells is not None:  # unbuilt cells read the store when built
+            self._cells[index].update_display()
 
     def on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
         if data.get_length() >= 0:

@@ -1,4 +1,5 @@
 import math
+import os
 from typing import Literal
 
 import cairo
@@ -7,7 +8,52 @@ from fabric.core.service import Property
 from fabric.widgets.widget import Widget
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, GdkPixbuf, Gtk  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
+
+# The player's cover is the wallpaper (often 5K), shown at most ~200 px wide:
+# decoded once for every monitor's player, and no bigger than needed (JPEG
+# decodes at 1/2 to 1/8 size, ~20 ms for a 5K wallpaper instead of ~140 ms)
+SOURCE_SIDE = 512
+_loaded: dict = {}  # path -> (mtime, pixbuf), for the last file loaded
+
+
+def _decode(path: str) -> GdkPixbuf.Pixbuf:
+    """The image, shortest side at least SOURCE_SIDE (when it's that big).
+    GdkPixbuf decodes the whole image even when asked for a smaller size, so
+    Pillow does it, with GdkPixbuf for formats Pillow can't read."""
+    try:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            image.draft("RGB", (SOURCE_SIDE, SOURCE_SIDE))
+            has_alpha = image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info
+            image = image.convert("RGBA" if has_alpha else "RGB")
+            factor = min(image.size) // SOURCE_SIDE
+            if factor > 1:  # formats without draft, e.g. PNG
+                image = image.reduce(factor)
+            width, height = image.size
+            channels = 4 if has_alpha else 3
+            return GdkPixbuf.Pixbuf.new_from_bytes(
+                GLib.Bytes.new(image.tobytes()), GdkPixbuf.Colorspace.RGB,
+                has_alpha, 8, width, height, width * channels,
+            )
+    except Exception:
+        return GdkPixbuf.Pixbuf.new_from_file(path)
+
+
+def load_pixbuf(path: str) -> GdkPixbuf.Pixbuf:
+    """The image at path, no bigger than needed; shared while unchanged."""
+    try:
+        mtime = os.stat(path).st_mtime_ns
+    except OSError:
+        mtime = None
+    cached = _loaded.get(path)
+    if cached and mtime is not None and cached[0] == mtime:
+        return cached[1]
+    pixbuf = _decode(path)
+    _loaded.clear()
+    _loaded[path] = (mtime, pixbuf)
+    return pixbuf
 
 
 class CircleImage(Gtk.DrawingArea, Widget):
@@ -60,7 +106,7 @@ class CircleImage(Gtk.DrawingArea, Widget):
         self._orig_image: GdkPixbuf.Pixbuf | None = None  # Original image for reprocessing
         self._image: GdkPixbuf.Pixbuf | None = None
         if image_file:
-            pix = GdkPixbuf.Pixbuf.new_from_file(image_file)
+            pix = load_pixbuf(image_file)
             self._orig_image = pix
             self._image = self._process_image(pix)
         elif pixbuf:
@@ -99,7 +145,7 @@ class CircleImage(Gtk.DrawingArea, Widget):
     def set_image_from_file(self, new_image_file: str):
         if not new_image_file:
             return
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file(new_image_file)
+        pixbuf = load_pixbuf(new_image_file)
         self._orig_image = pixbuf
         self._image = self._process_image(pixbuf)
         self.queue_draw()

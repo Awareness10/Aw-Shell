@@ -261,3 +261,22 @@ def test_a_closed_board_stops_listening(board, run_pending):
     run_pending()
     _pin(first.cells[0], "still works", "text")
     assert first.cells[0].content == "still works"
+
+
+def test_cells_built_when_first_shown(board):
+    """30 cells per monitor took ~0.06 s of every start; most starts never
+    open the Pins tab."""
+    from gi.repository import Gtk
+
+    widget = board()
+    assert widget._cells is None
+    host = Gtk.OffscreenWindow()
+    host.add(widget)
+    host.show_all()
+    assert widget._cells is not None and len(widget._cells) == pins.SLOTS
+    host.remove(widget)
+    host.destroy()
+
+
+def test_cells_built_on_first_use(board):
+    assert len(board().cells) == pins.SLOTS

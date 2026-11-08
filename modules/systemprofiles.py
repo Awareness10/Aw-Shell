@@ -1,9 +1,11 @@
 import subprocess
+import threading
 
 from fabric.utils.helpers import exec_shell_command_async
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.label import Label
+from gi.repository import GLib
 
 import config.data as data
 import modules.icons as icons
@@ -23,20 +25,45 @@ class Systemprofiles(Box):
         self.bat_save = None
         self.bat_balanced = None
         self.bat_perf = None
+        self.current_mode = "balanced"
 
-        children = []
+        # powerprofilesctl is a Python script (~50 ms a run): asked in the
+        # background, and hidden until it answers with profiles. Without any
+        # (a VM, or no working powerprofilesctl) there's nothing to show, not
+        # even the empty background
+        self.has_profiles = False
+        self.loading = True
+        self._wanted_visible = True
+        self.set_no_show_all(True)
+        super().set_visible(False)
+        self._destroyed = False
+        self.connect("destroy", lambda *_: setattr(self, "_destroyed", True))
+        threading.Thread(target=self._load_profiles, name="powerprofiles", daemon=True).start()
 
+    @staticmethod
+    def _powerprofilesctl(*args) -> str:
         try:
-            result = subprocess.run(
-                ["powerprofilesctl", "list"],
+            return subprocess.run(
+                ["powerprofilesctl", *args],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 check=True,
-            )
-            available_profiles = result.stdout
+            ).stdout
         except (subprocess.CalledProcessError, FileNotFoundError):
-            available_profiles = ""
+            return ""
+
+    def _load_profiles(self):
+        """In a thread: the available profiles, and the current one."""
+        available = self._powerprofilesctl("list")
+        current = self._powerprofilesctl("get").strip() if available else ""
+        GLib.idle_add(self._build_buttons, available, current)
+
+    def _build_buttons(self, available_profiles: str, current: str) -> bool:
+        self.loading = False
+        if self._destroyed:
+            return False
+        children = []
 
         if "power-saver" in available_profiles:
             self.bat_save = Button(
@@ -67,65 +94,34 @@ class Systemprofiles(Box):
             )
             children.append(self.bat_perf)
 
-        # Without profiles (a VM, or no working powerprofilesctl) there's
-        # nothing to show, not even the empty background
-        self.has_profiles = bool(children)
-        if not self.has_profiles:
-            self.set_no_show_all(True)
-            self.set_visible(False)
+        if not children:
+            return False
 
         # Group the mode buttons into a container.
-        if children:
-            self.add(
-                Box(
-                    name="power-mode-switcher",
-                    orientation="h" if not data.VERTICAL else "v",
-                    spacing=4,
-                    children=children,
-                )
+        self.add(
+            Box(
+                name="power-mode-switcher",
+                orientation="h" if not data.VERTICAL else "v",
+                spacing=4,
+                children=children,
             )
-
-        if data.BAR_COMPONENTS_VISIBILITY.get("sysprofiles", False):
-            self.get_current_power_mode()
-            self.hide_timer = None
-            self.hover_counter = 0
-        # self.set_power_mode("balanced")
+        )
+        self.has_profiles = True
+        self.current_mode = current if current in ("power-saver", "balanced", "performance") \
+            else "balanced"
+        self.update_button_styles()
+        self.set_no_show_all(False)
+        self.set_visible(self._wanted_visible)
+        if self._wanted_visible:
+            self.show_all()
+        return False
 
     def set_visible(self, visible: bool) -> None:
         """Stays hidden without profiles, even when enabled in the settings
-        (the bar sets each component's visibility from them)."""
+        (the bar sets each component's visibility from them); shown as
+        asked once they've loaded."""
+        self._wanted_visible = visible
         super().set_visible(visible and getattr(self, "has_profiles", True))
-
-    def get_current_power_mode(self):
-        try:
-            # Run the command to get the current power mode
-            result = subprocess.run(
-                ["powerprofilesctl", "get"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,
-            )
-
-            # Get the output and strip unnecessary whitespace
-            output = result.stdout.strip()
-
-            # Validate the output
-            if output in ["power-saver", "balanced", "performance"]:
-                self.current_mode = output
-            else:
-                self.current_mode = "balanced"
-
-            # Update button styles based on the current mode
-            self.update_button_styles()
-
-        except subprocess.CalledProcessError as err:
-            print(f"Command failed: {err}")
-            self.current_mode = "balanced"
-
-        except Exception as err:
-            print(f"Error retrieving current power mode: {err}")
-            self.current_mode = "balanced"
 
     def set_power_mode(self, mode):
         """

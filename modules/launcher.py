@@ -25,7 +25,6 @@ from gi.repository import Gdk, GLib
 import config.data as data
 import modules.icons as icons
 import utils.apps as apps
-import utils.calculator as calculator
 from config.paths import (
     APP_DIR,
     CALC_HISTORY,
@@ -34,7 +33,6 @@ from config.paths import (
     self_updatable,
 )
 from modules.dock import Dock
-from utils.conversion import Conversion
 
 tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"
 # The shell's own interpreter: a bare `python` is the system one, which
@@ -60,7 +58,7 @@ class AppLauncher(Box):
         self._all_apps = get_desktop_applications()
 
 
-        self.converter = Conversion()
+        self._converter = None  # see converter
         self.calc_history_path = str(CALC_HISTORY)
         if os.path.exists(self.calc_history_path):
             with open(self.calc_history_path, "r") as f:
@@ -491,10 +489,23 @@ class AppLauncher(Box):
         with open(self.conversion_history_path, "w") as f:
             json.dump(self.conversion_history, f)
 
+    @property
+    def converter(self):
+        """The unit converter, made on first use: utils.conversion imports
+        requests (~40 ms), which most starts never need."""
+        if self._converter is None:
+            from utils.conversion import Conversion
+
+            self._converter = Conversion()
+        return self._converter
+
     def evaluate_calculator_expression(self, text: str):
         expr = text.lstrip("=").strip()
         if not expr:
             return
+        # Loaded here, not with the shell: it imports numpy (~40 ms)
+        import utils.calculator as calculator
+
         result_str = calculator.evaluate(expr)
         self.calc_history.insert(0, f"{text} => {result_str}")
         self.save_calc_history()

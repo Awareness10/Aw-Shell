@@ -54,7 +54,7 @@ STUBBED_COMMANDS = [
     "hyprsunset", "hyprpicker", "hyprshot", "hyprlock", "hypridle",
     "matugen", "awww", "swww", "nvtop", "play", "cava",
     "grim", "slurp", "wf-recorder", "gpu-screen-recorder", "tmux",
-    "powerprofilesctl",
+    "powerprofilesctl", "ddcutil",
 ]
 # What a stub prints besides logging its call, as the real command would
 STUB_OUTPUT = {
