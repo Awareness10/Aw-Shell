@@ -210,6 +210,18 @@ class TestGenerateHyprlua:
         assert all("/usr/bin/aw-shell" in line for line in launch_lines), launch_lines
         assert ".venv" not in conf
 
+    def test_shell_launched_by_uwsm_app_not_from_its_output(self):
+        """`uwsm-app $(launch)` ran the shell inside the substitution (outside
+        uwsm), then, once it exited, ran whatever it had printed, e.g.
+        "Aw-Shell is up to date." -> 'Command not found: "Aw-Shell"'."""
+        from config.paths import launch_command
+        launch = shlex.join(launch_command())
+        conf = generate_hyprlua()
+        assert "uwsm-app $(" not in conf
+        assert conf.count(f"uwsm-app -- {launch}") == 2  # reload, autostart
+        # uwsm-app hands only the command to its daemon, not the environment
+        assert f"uwsm-app -- env GTK_DEBUG=interactive {launch}" in conf
+
     def test_bundled_files_referenced_from_app_dir(self):
         from config.paths import APP_DIR
         conf = generate_hyprlua()

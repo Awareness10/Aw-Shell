@@ -428,7 +428,7 @@ def generate_hyprlua() -> str:
 
     bind_lines = [
         bind("prefix_restart", "suffix_restart",
-             f'hl.dsp.exec_cmd({lua_str(f"killall {APP_NAME}; uwsm-app $({launch})")})',
+             f'hl.dsp.exec_cmd({lua_str(f"killall {APP_NAME}; uwsm-app -- {launch}")})',
              f"Reload {APP_NAME_CAP}"),
         bind("prefix_axmsg", "suffix_axmsg", "hl.dsp.exec_cmd(axMessage)", "Message"),
     ]
@@ -436,7 +436,7 @@ def generate_hyprlua() -> str:
     bind_lines.append(
         bind("prefix_restart_inspector", "suffix_restart_inspector",
              'hl.dsp.exec_cmd('
-             f'{lua_str(f"killall {APP_NAME}; uwsm-app $(GTK_DEBUG=interactive {launch})")})',
+             f'{lua_str(f"killall {APP_NAME}; uwsm-app -- env GTK_DEBUG=interactive {launch}")})',
              "Restart with inspector")
     )
     # No delay: unlike the toolbox, there's no menu to wait for
@@ -537,7 +537,7 @@ hl.animation({{ leaf = "workspaces", enabled = true, speed = 2.5, bezier = "myBe
 
 -- Autostart
 hl.on("hyprland.start", function()
-    hl.exec_cmd({lua_str(f"uwsm-app $({launch})")})
+    hl.exec_cmd({lua_str(f"uwsm-app -- {launch}")})
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
 end)
