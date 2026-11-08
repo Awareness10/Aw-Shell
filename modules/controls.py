@@ -204,14 +204,18 @@ class BrightnessSlider(Scale, DebouncedValueMixin):
 
 
 class BaseSmallControl(Box, DebouncedValueMixin):
+    # Open dial arc: reads as a knob you can scroll
+    START_ANGLE = 150
+    END_ANGLE = 390
+
     def __init__(self, name: str, progress_name: str, label_markup: str, **kwargs):
         super().__init__(name=name, **kwargs)
         self.progress_bar = CircularProgressBar(
             name=progress_name,
             size=28,
             line_width=2,
-            start_angle=150,
-            end_angle=390,
+            start_angle=self.START_ANGLE,
+            end_angle=self.END_ANGLE,
         )
         self.control_label = Label(name=f"{name}-label", markup=label_markup)
         self.control_button = Button(child=self.control_label)
@@ -405,6 +409,9 @@ class DeviceBattery(BaseSmallControl):
     (percentage, charging, model) or None to _show_reading."""
     LOW_THRESHOLD = 15
     POLL_INTERVAL_SECONDS = 30
+    # Closed ring from the top: reads as a gauge, not a knob
+    START_ANGLE = -90
+    END_ANGLE = 270
 
     def __init__(self, name: str, progress_name: str, icon: str, **kwargs):
         super().__init__(name, progress_name, icon, **kwargs)
@@ -934,7 +941,9 @@ class ControlSliders(Box):
 
 class ControlSmall(Box):
     def __init__(self, **kwargs):
-        children = [VolumeSmall(), MicSmall(), MouseBattery(), HeadsetBattery()]
+        batteries = [MouseBattery(), HeadsetBattery()]
+        divider = Box(name="control-small-divider", v_align="center", h_align="center")
+        children = [VolumeSmall(), MicSmall(), divider, *batteries]
         super().__init__(
             name="control-small",
             orientation="h" if not data.VERTICAL else "v",
@@ -951,3 +960,12 @@ class ControlSmall(Box):
 
         when_brightness_ready(self, add_brightness)
         self.show_all()
+
+        # The divider separates the knobs from the battery rings, so it only
+        # shows while at least one battery is visible
+        def sync_divider(*_):
+            divider.set_visible(any(b.get_visible() for b in batteries))
+
+        for battery in batteries:
+            battery.connect("notify::visible", sync_divider)
+        sync_divider()

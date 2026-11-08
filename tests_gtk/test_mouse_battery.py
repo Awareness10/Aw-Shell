@@ -77,3 +77,26 @@ def test_shows_a_mouse_that_appears_later(ring, hidpp):
     assert ring.get_tooltip_text() == "MX Anywhere: 55%"
     ring._finish_update(None)
     assert not ring.get_visible()
+
+
+def test_divider_follows_battery_visibility(sandbox):
+    from modules.controls import ControlSmall, DeviceBattery
+
+    small = ControlSmall()
+    try:
+        divider = next(c for c in small.get_children() if c.get_name() == "control-small-divider")
+        batteries = [c for c in small.get_children() if isinstance(c, DeviceBattery)]
+        for battery in batteries:
+            battery._show_reading(None)
+        assert not divider.get_visible()
+        batteries[0]._show_reading((55.0, False, "MX Anywhere"))
+        assert divider.get_visible()
+        batteries[0]._show_reading(None)
+        assert not divider.get_visible()
+    finally:
+        small.destroy()
+
+
+def test_battery_ring_is_closed_unlike_knobs(ring):
+    assert ring.progress_bar.end_angle - ring.progress_bar.start_angle == 360
+    assert controls.VolumeSmall.END_ANGLE - controls.VolumeSmall.START_ANGLE < 360
