@@ -6,7 +6,8 @@
 #
 # --shell-colors also colors bash's prompt and fastfetch with Aw-Shell's
 # palette (matuwrap; edits ~/.bashrc). Run from a terminal without it, the
-# script asks, defaulting to no. Piped: curl ... | bash -s -- --shell-colors
+# script asks, defaulting to no; --no-shell-colors never asks (the in-app
+# updater). Piped: curl ... | bash -s -- --shell-colors
 
 set -euo pipefail
 
@@ -282,16 +283,17 @@ parse_args() {
     case "$arg" in
       --dev) DEV_MODE=true ;;
       --shell-colors) SHELL_COLORS=yes ;;
+      --no-shell-colors) SHELL_COLORS=no ;;  # never ask (the in-app updater)
       *)
-        echo "Unknown option: $arg (options: --dev, --shell-colors)" >&2
+        echo "Unknown option: $arg (options: --dev, --shell-colors, --no-shell-colors)" >&2
         exit 1
         ;;
     esac
   done
 }
 
-# Someone is there to answer: output goes to a terminal (not the in-app
-# updater's log) and /dev/tty opens. `curl ... | bash` reads the script from
+# Someone is there to answer: output goes to a terminal and /dev/tty opens
+# (the in-app updater passes --no-shell-colors). `curl ... | bash` reads the script from
 # stdin, so the answer has to come from /dev/tty
 can_prompt() {
   [[ -t 1 ]] && { : </dev/tty; } 2>/dev/null

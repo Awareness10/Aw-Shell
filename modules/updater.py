@@ -618,7 +618,7 @@ class UpdaterWindow(FramelessMainWindow):
             cmd = (
                 "curl -fsSL "
                 "https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.sh "
-                "| bash"
+                "| bash -s -- --no-shell-colors"  # an update doesn't ask
             )
         else:
             cmd = (

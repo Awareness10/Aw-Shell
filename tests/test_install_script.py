@@ -309,6 +309,15 @@ def test_no_shell_colors_without_the_flag_or_a_terminal(home):
     assert _calls(calls) == []
 
 
+def test_no_shell_colors_flag_never_asks(home):
+    """The in-app updater runs install.sh in a terminal, where it would ask."""
+    result = _run(home, "parse_args --no-shell-colors; can_prompt() { return 0; }; "
+                        "ask_shell_colors; echo SHELL_COLORS=$SHELL_COLORS")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "SHELL_COLORS=no"
+    assert "[y/N]" not in result.stdout + result.stderr
+
+
 def test_shell_colors_flag_runs_the_steps_in_order(home):
     calls = _shell_colors_stubs(home)
     result = _no_tty(home, STEPS.format(args="--shell-colors"))

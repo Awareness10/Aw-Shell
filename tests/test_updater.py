@@ -360,6 +360,7 @@ class TestPackageUpdateInTerminal:
         argv = popen.call_args.args[0]
         assert argv[:4] == ["kitty", "-e", "bash", "-c"]
         assert "install.sh" in argv[4] and "| bash" in argv[4]
+        assert "| bash -s -- --no-shell-colors" in argv[4]  # an update doesn't ask
         assert "read" in argv[4]  # stays open so the result can be read
         assert popen.call_args.kwargs["start_new_session"] is True
         close.assert_called_once()
