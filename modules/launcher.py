@@ -10,7 +10,6 @@ from pathlib import Path
 from fabric.utils import (
     DesktopApp,
     exec_shell_command_async,
-    get_desktop_applications,
     idle_add,
     remove_handler,
 )
@@ -55,7 +54,7 @@ class AppLauncher(Box):
         self.selected_index = -1
 
         self._arranger_handler: int = 0
-        self._all_apps = get_desktop_applications()
+        self._all_apps = apps.desktop_apps()
 
 
         self._converter = None  # see converter
@@ -140,7 +139,7 @@ class AppLauncher(Box):
         self.notch.close_notch()
 
     def open_launcher(self):
-        self._all_apps = get_desktop_applications()
+        self._all_apps = apps.desktop_apps()
         self.arrange_viewport()
         
 
@@ -160,7 +159,7 @@ class AppLauncher(Box):
         """Make sure the launcher is initialized with apps list before opening"""
         if not hasattr(self, '_initialized'):
 
-            self._all_apps = get_desktop_applications()
+            self._all_apps = apps.desktop_apps()
             self._initialized = True
             return True
         return False

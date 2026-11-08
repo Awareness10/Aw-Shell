@@ -128,3 +128,43 @@ def rank_apps(apps, query: str) -> list:
     scored = [(score, app) for score, app in scored if score > 0]
     scored.sort(key=lambda x: (-x[0], (x[1].display_name or "").casefold()))
     return [app for _, app in scored]
+
+
+# One scan of the desktop apps for the whole shell: the dock, launcher, notch
+# and overview on every monitor used to scan on their own, and the dock again
+# on every window opening or closing
+_shared = {"apps": None, "identifiers": None, "monitor": None}
+
+
+def desktop_apps() -> list:
+    """Every visible desktop app, scanned once and shared; scanned again
+    after apps are installed, removed or changed."""
+    if _shared["apps"] is None:
+        from fabric.utils import helpers
+
+        _watch_app_changes()
+        _shared["apps"] = helpers.get_desktop_applications()
+        _shared["identifiers"] = None
+    return _shared["apps"]
+
+
+def app_identifiers() -> dict:
+    """build_identifier_map(desktop_apps()), shared the same way."""
+    shared_apps = desktop_apps()
+    if _shared["identifiers"] is None:
+        _shared["identifiers"] = build_identifier_map(shared_apps)
+    return _shared["identifiers"]
+
+
+def _forget(*_args) -> None:
+    _shared["apps"] = _shared["identifiers"] = None
+
+
+def _watch_app_changes() -> None:
+    """Gio's monitor of the .desktop files, kept alive here."""
+    if _shared["monitor"] is None:
+        from gi.repository import Gio
+
+        monitor = Gio.AppInfoMonitor.get()
+        monitor.connect("changed", _forget)
+        _shared["monitor"] = monitor

@@ -9,7 +9,6 @@ from fabric.utils import (
     idle_add,
     remove_handler,
 )
-from fabric.utils.helpers import get_desktop_applications
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.eventbox import EventBox
@@ -31,7 +30,7 @@ def read_config():
             config_data = json.load(file)
             
         if "pinned_apps" in config_data and config_data["pinned_apps"] and isinstance(config_data["pinned_apps"][0], str):
-            all_apps = get_desktop_applications()
+            all_apps = apps.desktop_apps()
             app_map = {app.name: app for app in all_apps if app.name}
             
             old_pinned = config_data["pinned_apps"]
@@ -151,8 +150,8 @@ class Dock(Window):
         self.icon_resolver = IconResolver() 
         self.pinned = self.config.get("pinned_apps", [])
         self.app_map = {}
-        self._all_apps = get_desktop_applications()
-        self.app_identifiers = self._build_app_identifiers_map()
+        self._all_apps = apps.desktop_apps()
+        self.app_identifiers = apps.app_identifiers()
         
         self.hide_id = None
         self._arranger_handler = None
@@ -304,9 +303,6 @@ class Dock(Window):
         
         GLib.timeout_add_seconds(2, self.check_config_change)
             
-    def _build_app_identifiers_map(self):
-        return apps.build_identifier_map(self._all_apps)
-
     def _normalize_window_class(self, class_name):
         return apps.normalize_window_class(class_name)
 
@@ -366,9 +362,9 @@ class Dock(Window):
         return apps.find_app_by_key(key_value, self.app_identifiers, self._all_apps)
 
     def update_app_map(self):
-        self._all_apps = get_desktop_applications()
+        self._all_apps = apps.desktop_apps()
         self.app_map = {app.name: app for app in self._all_apps if app.name}
-        self.app_identifiers = self._build_app_identifiers_map()
+        self.app_identifiers = apps.app_identifiers()
 
     def create_button(self, app_identifier, instances):
         desktop_app = self.find_app(app_identifier)
