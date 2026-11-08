@@ -88,8 +88,8 @@ main() {
   git -C "$work/aur" commit -q -m "Update to $version-1"
   git -C "$work/aur" push -q origin HEAD:master
   echo "==> Published aw-shell $version-1 to the AUR"
-  if grep -q "isn't on the AUR yet" "$REPO/README.md"; then
-    echo "Reminder: remove the 'Coming soon' note from the README's AUR section"
+  if ! grep -q "^### AUR" "$REPO/README.md"; then
+    echo "Reminder: add an AUR section to the README's installation (removed until the first publish)"
   fi
 
   cp "$work/PKGBUILD" "$PKGBUILD"

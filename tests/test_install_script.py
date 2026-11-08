@@ -138,6 +138,19 @@ def test_installs_a_font_for_the_player_kaomoji(home):
     assert "adobe-source-han-sans-jp-fonts" in result.stdout.split()
 
 
+def test_readme_lists_every_package(home):
+    """The README's manual installation lists what install.sh installs."""
+    import re
+
+    readme = (SCRIPT.parent / "README.md").read_text()
+    section = readme[readme.index("2. Install system dependencies"):readme.index("3. Clone")]
+    listed = {re.sub(r"-(git|bin)$", "", name.lower())
+              for name in re.findall(r"`([\w.+-]+)`|\[([\w-]+)\]\(http", section) for name in name if name}
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    packages = {re.sub(r"-(git|bin)$", "", p) for p in result.stdout.split()} - {"uv"}  # its own step
+    assert packages - listed == set()
+
+
 def test_first_start_output_goes_to_a_log(home):
     """A shell that crashes on start must leave its traceback somewhere."""
     install = home / "inst"

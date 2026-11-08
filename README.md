@@ -25,7 +25,6 @@
 - [Screenshots](#screenshots)
 - [Installation](#installation)
   - [Supported systems](#supported-systems)
-  - [AUR](#aur)
   - [Install script](#install-script)
   - [Manual Installation](#manual-installation)
   - [Where Aw-Shell keeps its files](#where-aw-shell-keeps-its-files)
@@ -77,17 +76,6 @@ Requirements:
 > [!NOTE]
 > The installer enables NetworkManager if it is not already enabled, and disables `iwd` if it is running.
 
-### AUR
-
-> [!NOTE]
-> Coming soon: the `aw-shell` package isn't on the AUR yet. Until it is, use the install script below.
-
-```bash
-paru -S aw-shell    # or: yay -S aw-shell
-```
-
-Then run `uwsm app -- aw-shell` once. Its settings window opens; applying it adds Aw-Shell to your `hyprland.lua`, so it starts with Hyprland from then on. Updates come with your AUR helper, and `pacman -R aw-shell` removes it while keeping your settings.
-
 ### Install script
 
 > [!TIP]
@@ -98,7 +86,7 @@ Then run `uwsm app -- aw-shell` once. Its settings window opens; applying it add
 curl -fsSL https://raw.githubusercontent.com/Awareness10/Aw-Shell/main/install.sh | bash
 ```
 
-It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose another folder) and starts the shell, which opens its settings the first time. From a clone of the repository, `./install.sh --dev` runs Aw-Shell from that clone instead.
+It installs the code into `~/.local/src/aw-shell` (set `AW_SHELL_DIR` to choose another folder) and starts the shell, which opens its settings the first time. Its packages are installed as part of a full system upgrade (`-Syu`), so it asks for your sudo password; if a package fails to install or upgrade, it warns at the end and installs Aw-Shell anyway. The in-app updater runs this same script in your terminal. From a clone of the repository, `./install.sh --dev` runs Aw-Shell from that clone instead.
 
 #### Shell colors (optional)
 
@@ -124,14 +112,14 @@ To undo it, remove the `source ~/.config/matuwrap/scripts/matuwrap` line from `~
     - [Gray](https://github.com/Fabric-Development/gray): its AUR package can't install, so build it into `~/.local/lib/aw-shell`, where Aw-Shell looks for it: `source install.sh && build_gray` (needs `meson` and `vala`)
     - [Matugen](https://github.com/InioX/matugen)
     - `cinnamon-desktop`: its Cvc typelib is what fabric's audio service uses; the shell won't start without it
-    - `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
+    - `adobe-source-han-sans-jp-fonts` `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
     - `bluez-utils` `gobject-introspection` `gpu-screen-recorder` `headsetcontrol`
     - `hypridle` `hyprlock` `hyprpicker` `hyprshot` `hyprsunset`
-    - `imagemagick` `libnotify` `networkmanager` `network-manager-applet`
+    - `imagemagick` `jq` `libdbusmenu-gtk3` `libnotify` `networkmanager` `network-manager-applet`
     - `nm-connection-editor` `noto-fonts-emoji` `nvtop` `playerctl`
-    - `power-profiles-daemon` `swappy` `tesseract` `tesseract-data-eng`
-    - `tesseract-data-spa` `tmux` `upower` `uwsm`
-    - `webp-pixbuf-loader` `wl-clipboard`
+    - `power-profiles-daemon` `python-gobject` `swappy` `tesseract` `tesseract-data-eng`
+    - `tesseract-data-spa` `tmux` `ttf-nerd-fonts-symbols-mono` `upower` `uwsm`
+    - `webp-pixbuf-loader` `wl-clipboard` `xdg-desktop-portal-gtk`
     - A terminal; the installer adds `kitty` if you have none. Aw-Shell uses `$TERMINAL`, `xdg-terminal-exec` or the first one it knows of: kitty, foot, alacritty, ghostty, wezterm, konsole, gnome-terminal, ptyxis, xfce4-terminal. Settings > Terminal changes it
 
 3. Clone, install Python deps, and run (any folder works; `~/.config/aw-shell` is for your settings):
