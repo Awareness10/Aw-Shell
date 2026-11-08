@@ -191,6 +191,34 @@ def test_quiet_when_every_package_installed(home):
     assert result.stderr == ""
 
 
+@pytest.mark.parametrize("ok", [True, False])
+def test_warns_when_the_aur_helper_fails(home, ok):
+    """A failed run (e.g. a wrong sudo password) can leave every package
+    installed but none upgraded, which check_packages can't see. Warned at
+    once and again at the end, as later steps scroll the first one away."""
+    _fake_bin(home, yay=f"exit {0 if ok else 3}", pacman="exit 0", foot="exit 0")
+    (home / "bin" / "bash").symlink_to("/bin/bash")
+    result = _run(home, "aur_helper=yay; install_packages; echo later steps; warn_if_packages_failed",
+                  PATH=str(home / "bin"))
+    assert result.returncode == 0, result.stderr  # the rest still installs
+    if ok:
+        assert result.stderr == ""
+    else:
+        assert "yay failed (exit code 3)" in result.stderr
+        assert result.stderr.count("WARNING") == 2
+
+
+def test_packages_install_as_part_of_a_full_upgrade(home):
+    """-Syy alone (no -u) is a partial upgrade, which can break shared
+    libraries; --devel with -u would rebuild every -git package."""
+    calls = home / "calls"
+    _fake_bin(home, yay=f'echo "$*" >> "{calls}"', pacman="exit 0", foot="exit 0")
+    (home / "bin" / "bash").symlink_to("/bin/bash")
+    result = _run(home, "aur_helper=yay; install_packages", PATH=str(home / "bin"))
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split()[:3] == ["-Syu", "--needed", "--noconfirm"]
+
+
 def test_terminal_list_matches_the_shell():
     from config.terminal import TERMINALS
     result = _run(Path("/nonexistent"), 'printf "%s\\n" "${TERMINALS[@]}"')

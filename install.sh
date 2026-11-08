@@ -24,6 +24,8 @@ SHELL_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell/shell.log"
 DEV_MODE=false
 # yes, no, or ask (only with a terminal to answer on)
 SHELL_COLORS=ask
+# Why installing packages failed, for warn_if_packages_failed
+PACKAGES_FAILED=""
 MATUWRAP_URL="https://github.com/Awareness10/matuwrap"
 MATUWRAP_SCRIPT="$HOME/.config/matuwrap/scripts/matuwrap"
 # Terminals Aw-Shell knows how to run commands in (config/terminal.py); with
@@ -154,10 +156,25 @@ install_packages() {
     log "No terminal found; kitty will be installed"
     PACKAGES+=(kitty)
   fi
-  log "Installing required packages..."
-  # One failed package shouldn't stop the rest; check_packages lists it
-  $aur_helper -Syy --needed --devel --noconfirm "${PACKAGES[@]}" || true
+  log "Upgrading the system and installing required packages..."
+  # -Syu: refreshing the package lists without upgrading (-Syy) is a partial
+  # upgrade, which can break shared libraries. One failed package shouldn't stop the rest; check_packages lists missing
+  # ones, but a failed run (e.g. a wrong sudo password) can also leave them
+  # installed and just not upgraded
+  local status=0
+  $aur_helper -Syu --needed --noconfirm "${PACKAGES[@]}" || status=$?
+  if (( status )); then
+    PACKAGES_FAILED="$aur_helper failed (exit code $status)"
+    echo "WARNING: $PACKAGES_FAILED: packages may be missing or not upgraded; see its output above." >&2
+  fi
   check_packages
+}
+
+# Repeats install_packages' warning at the end, as later steps scroll it away
+warn_if_packages_failed() {
+  if [[ -n "$PACKAGES_FAILED" ]]; then
+    echo "WARNING: $PACKAGES_FAILED earlier, so packages may be missing or not upgraded. Scroll up for why, then run the update again." >&2
+  fi
 }
 
 # Warns instead of stopping: most packages are for a single feature, and a
@@ -351,6 +368,7 @@ main() {
   setup_network
   setup_shell_colors
   start_shell
+  warn_if_packages_failed
   if ! shell_running; then
     # Not an error exit: the code is installed, and the in-app updater would
     # call the whole update failed
