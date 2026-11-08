@@ -1,6 +1,7 @@
 import json
 import logging
 import subprocess
+import threading
 import time
 
 import dbus
@@ -47,6 +48,12 @@ class MetricsProvider:
 
         self._gpu_update_running = False
         self._gpu_update_counter = 0
+
+        # Which GPUs there are: asked once, in the background, while the rest
+        # of the shell is built (see when_gpu_info)
+        self._gpu_info = None
+        self._gpu_info_callbacks = []
+        threading.Thread(target=self._load_gpu_info, name="nvtop-info", daemon=True).start()
 
         GLib.timeout_add_seconds(2, self._update)
 
@@ -100,7 +107,7 @@ class MetricsProvider:
             error_message = "nvtop command not found."
             logger.warning(error_message)
         except subprocess.CalledProcessError as e:
-            error_message = f"nvtop failed with exit code {e.returncode}: {e.stderr.strip()}"
+            error_message = f"nvtop failed with exit code {e.returncode}"  # stderr isn't captured
             logger.error(error_message)
         except subprocess.TimeoutExpired:
             error_message = "nvtop command timed out."
@@ -150,7 +157,28 @@ class MetricsProvider:
     def get_battery(self):
         return (self.bat_percent, self.bat_charging, self.bat_time)
 
-    def get_gpu_info(self):
+    def when_gpu_info(self, callback):
+        """Calls callback(gpus) with the GPUs nvtop reports: at once if known,
+        else from the main loop when it answers. nvtop takes ~0.2 s with an
+        NVIDIA card, so it is asked once, when the provider is made, and every
+        metrics widget (bar and dashboard, on each monitor) shares the answer
+        instead of waiting for it."""
+        if self._gpu_info is not None:
+            callback(self._gpu_info)
+        else:
+            self._gpu_info_callbacks.append(callback)
+
+    def _load_gpu_info(self):
+        GLib.idle_add(self._gpu_info_loaded, self._query_gpu_info())
+
+    def _gpu_info_loaded(self, gpus):
+        self._gpu_info = gpus
+        callbacks, self._gpu_info_callbacks = self._gpu_info_callbacks, []
+        for callback in callbacks:
+            callback(gpus)
+        return False
+
+    def _query_gpu_info(self):
         try:
             result = subprocess.check_output(["nvtop", "-s"], text=True, timeout=5)
             return json.loads(result)
@@ -176,6 +204,14 @@ def _repeat_while_alive(widget, source_id: int) -> None:
     """Stop a periodic update when its widget is destroyed (bars go away with
     their monitor); it would keep writing to dead widgets."""
     widget.connect("destroy", lambda *_: GLib.source_remove(source_id))
+
+
+def _when_gpu_info_while_alive(widget, add_gpus) -> None:
+    """shared_provider.when_gpu_info, skipped if the widget is destroyed
+    before nvtop answers."""
+    alive = [True]
+    widget.connect("destroy", lambda *_: alive.__setitem__(0, False))
+    shared_provider.when_gpu_info(lambda gpus: alive[0] and add_gpus(gpus))
 
 
 class SingularMetric:
@@ -221,32 +257,38 @@ class Metrics(Box):
         disks = [SingularMetric("disk", f"DISK ({path})" if len(data.BAR_METRICS_DISKS) != 1 else "DISK", icons.disk)
                  for path in data.BAR_METRICS_DISKS] if visible.get('disk', True) else []
 
-        gpu_info = shared_provider.get_gpu_info()
-        gpus = [SingularMetric("gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
-                for v in gpu_info] if visible.get('gpu', True) else []
-
         self.cpu = SingularMetric("cpu", "CPU", icons.cpu) if visible.get('cpu', True) else None
         self.ram = SingularMetric("ram", "RAM", icons.memory) if visible.get('ram', True) else None
         self.disk = disks
-        self.gpu = gpus
+        self.gpu = []
 
         self.scales = []
         if self.disk: self.scales.extend([v.box for v in self.disk])
         if self.ram: self.scales.append(self.ram.box)
         if self.cpu: self.scales.append(self.cpu.box)
-        if self.gpu: self.scales.extend([v.box for v in self.gpu])
 
         if self.cpu: self.cpu.usage.set_sensitive(False)
         if self.ram: self.ram.usage.set_sensitive(False)
         for disk in self.disk:
             disk.usage.set_sensitive(False)
-        for gpu in self.gpu:
-            gpu.usage.set_sensitive(False)
 
         for x in self.scales:
             self.add(x)
 
+        if visible.get('gpu', True):
+            _when_gpu_info_while_alive(self, self._add_gpus)
+
         _repeat_while_alive(self, GLib.timeout_add_seconds(2, self.update_status))
+
+    def _add_gpus(self, gpu_info):
+        """GPU gauges go last, once nvtop has answered."""
+        self.gpu = [SingularMetric("gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
+                    for v in gpu_info]
+        for gpu in self.gpu:
+            gpu.usage.set_sensitive(False)
+            self.scales.append(gpu.box)
+            self.add(gpu.box)
+            gpu.box.show_all()
 
     def update_status(self):
         cpu, mem, disks, gpus = shared_provider.get_metrics()
@@ -317,14 +359,11 @@ class MetricsSmall(Button):
         disks = [SingularMetricSmall("disk", f"DISK ({path})" if len(data.BAR_METRICS_DISKS) != 1 else "DISK", icons.disk)
                  for path in data.BAR_METRICS_DISKS] if visible.get('disk', True) else []
 
-        gpu_info = shared_provider.get_gpu_info()
-        gpus = [SingularMetricSmall("gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
-                for v in gpu_info] if visible.get('gpu', True) else []
-
         self.cpu = SingularMetricSmall("cpu", "CPU", icons.cpu) if visible.get('cpu', True) else None
         self.ram = SingularMetricSmall("ram", "RAM", icons.memory) if visible.get('ram', True) else None
         self.disk = disks
-        self.gpu = gpus
+        self.gpu = []
+        self.main_box = main_box
 
         for disk in self.disk:
             main_box.add(disk.box)
@@ -334,19 +373,30 @@ class MetricsSmall(Button):
             main_box.add(Box(name="metrics-sep"))
         if self.cpu:
             main_box.add(self.cpu.box)
-        for gpu in self.gpu:
-            main_box.add(Box(name="metrics-sep"))
-            main_box.add(gpu.box)
 
         self.add(main_box)
+
+        self.hide_timer = None
+        self.hover_counter = 0
+        if visible.get('gpu', True):
+            _when_gpu_info_while_alive(self, self._add_gpus)
 
         self.connect("enter-notify-event", self.on_mouse_enter)
         self.connect("leave-notify-event", self.on_mouse_leave)
 
         _repeat_while_alive(self, GLib.timeout_add_seconds(2, self.update_metrics))
 
-        self.hide_timer = None
-        self.hover_counter = 0
+    def _add_gpus(self, gpu_info):
+        """GPU gauges go last, once nvtop has answered."""
+        self.gpu = [SingularMetricSmall("gpu", f"GPU ({v['device_name']})" if len(gpu_info) != 1 else "GPU", icons.gpu)
+                    for v in gpu_info]
+        for gpu in self.gpu:
+            separator = Box(name="metrics-sep")
+            self.main_box.add(separator)
+            self.main_box.add(gpu.box)
+            separator.show_all()
+            gpu.box.show_all()
+            gpu.revealer.set_reveal_child(self.hover_counter > 0)
 
     def _format_percentage(self, value: int) -> str:
         """Formato natural del porcentaje sin forzar ancho fijo."""

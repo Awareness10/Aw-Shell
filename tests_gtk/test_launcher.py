@@ -49,7 +49,7 @@ def run(monkeypatch):
 
 @pytest.fixture
 def launcher(run, run_pending, monkeypatch, tmp_path):
-    monkeypatch.setattr(launcher_module, "get_desktop_applications",
+    monkeypatch.setattr(launcher_module.apps, "desktop_apps",
                         lambda: [FIREFOX, FILES, FILEZILLA])
     for app in (FIREFOX, FILES, FILEZILLA):
         app.launched = 0

@@ -34,5 +34,7 @@
   "inverse_on_surface": "{{colors.inverse_on_surface.default.hex}}",
   "inverse_primary": "{{colors.inverse_primary.default.hex}}",
   "shadow": "{{colors.shadow.default.hex}}",
-  "scrim": "{{colors.scrim.default.hex}}"
+  "scrim": "{{colors.scrim.default.hex}}",
+  "green": "{{colors.green.default.hex}}",
+  "yellow": "{{colors.yellow.default.hex}}"
 }

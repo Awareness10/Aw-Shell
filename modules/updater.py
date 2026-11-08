@@ -1,7 +1,7 @@
 """Aw-Shell Updater — PySide6 version.
 
-Checks for updates, displays a changelog window, and runs
-the update process via QProcess. No GTK dependencies.
+Checks for updates, displays a changelog window, and runs the update: a git
+pull via QProcess, or install.sh (which needs sudo) in the user's terminal.
 """
 
 import json
@@ -83,6 +83,19 @@ def get_snooze_file_path() -> str:
 def get_disable_file_path() -> str:
     """Return the path to the updater-disabled flag file."""
     return os.path.join(get_cache_dir(), UPDATER_DISABLE_FILE_NAME)
+
+
+def _terminal_command() -> str:
+    """The configured terminal, or the one found on this system when that one
+    isn't installed (as modules/tmux.py does). Imported here: config.data
+    loads gi, which the updater otherwise doesn't need."""
+    import config.data as data
+    from config.terminal import default_terminal_command
+
+    configured = data.TERMINAL_COMMAND
+    if configured and shutil.which(shlex.split(configured)[0]):
+        return configured
+    return default_terminal_command()
 
 
 def _curl(url: str, *extra: str) -> int:
@@ -481,23 +494,6 @@ class UpdaterWindow(FramelessMainWindow):
                 font-weight: bold;
                 color: {t.text_primary};
             }}
-            #updateButton {{
-                background-color: {t.accent};
-                color: {t.text_dark};
-                border: none;
-                border-radius: 6px;
-                padding: 6px 18px;
-            }}
-            #updateButton:hover {{
-                background-color: {t.accent_hover};
-            }}
-            #updateButton:pressed {{
-                background-color: {t.accent_pressed};
-            }}
-            #updateButton:disabled {{
-                background-color: {t.surface_variant};
-                color: {t.text_secondary};
-            }}
             #releaseBlock, #releaseBlockNew {{
                 border-left: 3px solid transparent;
                 border-radius: 0;
@@ -526,6 +522,7 @@ class UpdaterWindow(FramelessMainWindow):
             {tag_colors}
             #updaterLog {{
                 font-family: monospace;
+                color: {t.text_primary};
                 background-color: {t.bg_tertiary};
                 border: 1px solid {t.border};
                 border-radius: 4px;
@@ -621,7 +618,7 @@ class UpdaterWindow(FramelessMainWindow):
             cmd = (
                 "curl -fsSL "
                 "https://raw.githubusercontent.com/awareness10/Aw-Shell/main/install.sh "
-                "| bash"
+                "| bash -s -- --no-shell-colors"  # an update doesn't ask
             )
         else:
             cmd = (
@@ -634,11 +631,61 @@ class UpdaterWindow(FramelessMainWindow):
             )
         return cmd
 
-    def _on_update(self) -> None:
-        # Show log area and grow taller to make room for it
+    def _show_log(self) -> None:
+        """Show the log area, growing taller to make room for it."""
         self.log_area.setVisible(True)
         log_height = round(self.screen().availableGeometry().height() * LOG_HEIGHT_FRACTION)
         self.resize(self.width(), max(self.height(), log_height))
+
+    def _terminal_argv(self) -> list[str]:
+        """install.sh in the user's terminal, kept open at the end so its
+        result (and any package warnings) can be read."""
+        script = (
+            f"set -o pipefail; {self._update_command()}; status=$?; echo; "
+            'if [ "$status" -eq 0 ]; then echo "Update finished."; '
+            'else echo "Update failed (exit code $status)."; fi; '
+            'read -rp "Press Enter to close this window. " _'
+        )
+        return [*shlex.split(_terminal_command()), "bash", "-c", script]
+
+    def _update_in_terminal(self) -> None:
+        """install.sh runs sudo (yay, pacman), which needs a terminal to ask
+        for the password: the in-app log has none, so sudo either fails or
+        prompts unseen on the VT Hyprland was started from. install.sh
+        restarts the shell itself when it's done."""
+        argv = self._terminal_argv()
+        if self._preview:
+            self._show_log()
+            self.log_area.setPlainText(
+                f"Preview: nothing was run. Update would execute:\n\n{shlex.join(argv)}"
+            )
+            return
+        try:
+            subprocess.Popen(
+                argv,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as e:
+            t = get_current_theme()
+            self.status_label.setText(
+                f"Couldn't open a terminal ({e}). Set one in Settings, or run "
+                f"the update yourself: {self._update_command()}"
+            )
+            self.status_label.setWordWrap(True)
+            self.status_label.setStyleSheet(f"color: {t.danger}; font-weight: bold;")
+            self.status_label.setVisible(True)
+            return
+        self.close()
+
+    def _on_update(self) -> None:
+        if self._pkg_update:
+            self._update_in_terminal()
+            return
+
+        self._show_log()
         cmd = self._update_command()
 
         if self._preview:

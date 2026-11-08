@@ -123,3 +123,9 @@ def test_does_not_ship_development_scripts():
     for script in (REPO / "scripts").iterdir():
         if script.name.startswith(("test-", "aur-")):
             assert f"$app/scripts/{script.name}" in pkgbuild, script.name
+
+
+def test_installs_a_font_for_the_player_kaomoji(depends):
+    """The idle player shows ¯\\_(ツ)_/¯; noto-fonts has no katakana, and
+    without a Japanese font it renders as a box (install.sh has it too)."""
+    assert "adobe-source-han-sans-jp-fonts" in depends

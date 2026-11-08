@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 
 from fabric.core.service import Property, Service, Signal
@@ -38,6 +39,12 @@ class Brightness(Service):
         """Signal emitted when screen brightness changes (value: percentage from 0 to 100)."""
         pass
 
+    @Signal
+    def ready(self) -> None:
+        """Emitted when detecting DDC/CI monitors in the background is done,
+        found or not (see detecting)."""
+        pass
+
     def __init__(self, backend=None, **kwargs):
         """Initialize service with automatic backend detection."""
         super().__init__(**kwargs)
@@ -49,19 +56,55 @@ class Brightness(Service):
         self._last_raw = -1
         self._last_update_time = 0
         self._last_file_mtime = 0
+        self.ddcutil_bus = -1
+        # ddcutil talks to the monitors over I2C, which takes about a second:
+        # done in the background so the shell doesn't wait for it to start.
+        # Until "ready", there's no backend (screen_brightness is -1)
+        self.detecting = False
 
-        # Detect backend
         self.backend = self._detect_backend(backend)
-
         self.max_screen = self._read_max_brightness() or 100
 
-        if self.backend:
-            if self.backend == "ddcutil":
-                # Initialize brightness cache
-                GLib.timeout_add(100, lambda: self._update_brightness_cache())
-            else:
-                # Setup polling for brightness file
-                self._setup_polling()
+        if self.backend == "brightnessctl":
+            self._setup_polling()
+        elif self.backend is None and shutil.which("ddcutil"):
+            self.detecting = True
+            threading.Thread(
+                target=self._detect_ddcutil, name="ddcutil-detect", daemon=True
+            ).start()
+        elif self.backend is None:
+            self._warn_no_backend()
+
+    def _detect_ddcutil(self):
+        """In a thread: the monitor's I2C bus and brightness, or None."""
+        result = None
+        bus = self._detect_ddcutil_bus()
+        if bus != -1:
+            result = (bus, self._read_ddcutil(bus))
+        GLib.idle_add(self._finish_ddcutil_detection, result)
+
+    def _finish_ddcutil_detection(self, result):
+        """On the main loop: take the detected monitor as the backend."""
+        self.detecting = False
+        if result is None:
+            logger.debug("ddcutil is available but no DDC/CI capable monitors detected")
+            self._warn_no_backend()
+        else:
+            self.ddcutil_bus, reading = result
+            self.backend = "ddcutil"
+            logger.info(f"Using ddcutil backend with I2C bus: {self.ddcutil_bus}")
+            if reading:
+                current, self.max_screen = reading
+                self._last_raw = current
+                self._last_update_time = time.time()
+        self.emit("ready")
+        return False
+
+    @staticmethod
+    def _warn_no_backend():
+        logger.warning(
+            "No available backend for brightness control - no backlight devices or DDC/CI monitors found"
+        )
 
     def _setup_polling(self):
         """Setup periodic polling of brightness file."""
@@ -130,21 +173,8 @@ class Brightness(Service):
                     "brightnessctl is available but no backlight devices found in /sys/class/backlight/"
                 )
 
-        # Try ddcutil for external monitors (via DDC/CI protocol)
-        if shutil.which("ddcutil"):
-            bus = self._detect_ddcutil_bus()
-            if bus != -1:
-                self.ddcutil_bus = bus
-                logger.info(f"Using ddcutil backend with I2C bus: {bus}")
-                return "ddcutil"
-            else:
-                logger.debug(
-                    "ddcutil is available but no DDC/CI capable monitors detected"
-                )
-
-        logger.warning(
-            "No available backend for brightness control - no backlight devices or DDC/CI monitors found"
-        )
+        # ddcutil (external monitors, via DDC/CI) is slow to detect: done in
+        # the background, see __init__
         return None
 
     def _get_screen_device(self):
@@ -167,48 +197,39 @@ class Brightness(Service):
         except Exception:
             return -1
 
+    def _read_ddcutil(self, bus):
+        """The monitor's (current, max) brightness, or None."""
+        try:
+            process = subprocess.run(
+                ["ddcutil", "--bus", str(bus), *self.DDCUTIL_PARAMS.split(), "getvcp", "10"],
+                text=True,
+                capture_output=True,
+                timeout=2,
+            )
+            if process.returncode == 0:
+                match = re.search(
+                    r"current value\s*=\s*(\d+)\s*,\s*max value\s*=\s*(\d+)",
+                    process.stdout,
+                )
+                if match:
+                    return int(match.group(1)), int(match.group(2))
+        except Exception as e:
+            logger.error(f"Error executing ddcutil: {e}")
+        return None
+
     def _read_max_brightness(self):
         """Read maximum brightness value"""
-        if self.backend:
-            if self.backend == "ddcutil":
-                try:
-                    process = subprocess.run(
-                        [
-                            "ddcutil",
-                            "--bus",
-                            str(self.ddcutil_bus),
-                            *self.DDCUTIL_PARAMS.split(),
-                            "getvcp",
-                            "10",
-                        ],
-                        text=True,
-                        capture_output=True,
-                        timeout=2,
-                    )
-
-                    if process.returncode == 0:
-                        match = re.search(
-                            r"current value\s*=\s*(\d+)\s*,\s*max value\s*=\s*(\d+)",
-                            process.stdout,
-                        )
-                        if match:
-                            return int(match.group(2))
-                except Exception as e:
-                    logger.error(f"Error executing ddcutil: {e}")
-            else:
-                try:
-                    with open(
-                        f"/sys/class/backlight/{self._get_screen_device()}/max_brightness"
-                    ) as f:
-                        return int(f.readline().strip())
-                except Exception:
-                    return None
-
-    def _update_brightness_cache(self):
-        """Update brightness cache with current value."""
         if self.backend == "ddcutil":
-            self.screen_brightness  # This will update the cache
-        return False
+            reading = self._read_ddcutil(self.ddcutil_bus)
+            return reading[1] if reading else None
+        if self.backend:
+            try:
+                with open(
+                    f"/sys/class/backlight/{self._get_screen_device()}/max_brightness"
+                ) as f:
+                    return int(f.readline().strip())
+            except Exception:
+                return None
 
     @Property(int, "read-write")
     def screen_brightness(self):
@@ -239,35 +260,12 @@ class Brightness(Service):
             ):
                 return self._last_raw
 
-            try:
-                process = subprocess.run(
-                    [
-                        "ddcutil",
-                        "--bus",
-                        str(self.ddcutil_bus),
-                        *self.DDCUTIL_PARAMS.split(),
-                        "getvcp",
-                        "10",
-                    ],
-                    text=True,
-                    capture_output=True,
-                    timeout=2,
-                )
-
-                if process.returncode == 0:
-                    match = re.search(
-                        r"current value\s*=\s*(\d+)\s*,\s*max value\s*=\s*(\d+)",
-                        process.stdout,
-                    )
-                    if match:
-                        current = int(match.group(1))
-                        # For ddcutil, raw value IS the current value (0-100)
-                        self._last_raw = current
-                        self._last_update_time = time.time()
-                        return current
-            except Exception as e:
-                logger.error(f"Error executing ddcutil: {e}")
-
+            reading = self._read_ddcutil(self.ddcutil_bus)
+            if reading:
+                # For ddcutil, raw value IS the current value (0-100)
+                self._last_raw = reading[0]
+                self._last_update_time = time.time()
+                return reading[0]
             return self._last_raw if self._last_raw != -1 else -1
 
     @screen_brightness.setter

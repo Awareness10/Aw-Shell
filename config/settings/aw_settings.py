@@ -112,14 +112,22 @@ KEYBIND_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
         ("Audio Mixer", "prefix_mixer", "suffix_mixer"),
         ("Emoji Picker", "prefix_emoji", "suffix_emoji"),
         ("Power Menu", "prefix_power", "suffix_power"),
+        ("Screenshot", "prefix_screenshot", "suffix_screenshot"),
+        ("Screenshot Region", "prefix_screenshot_region", "suffix_screenshot_region"),
     ]),
 ]
+
+
+def plain_text(text: str) -> str:
+    """Text for a button or group box title, shown as written: Qt reads '&'
+    as a shortcut marker and underlines the character after it."""
+    return text.replace("&", "&&")
 
 
 class SettingsSection(QGroupBox):
     """Styled section group box."""
     def __init__(self, title: str, parent=None):
-        super().__init__(title, parent)
+        super().__init__(plain_text(title), parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
 
@@ -363,6 +371,9 @@ class AwShellSettings(FramelessMainWindow):
         # Date & Time Section
         self._build_datetime_section(layout)
 
+        # GTK apps in the shell's colors
+        self._build_gtk_section(layout)
+
         # Layout Options Section
         self._build_layout_section(layout)
 
@@ -445,13 +456,29 @@ class AwShellSettings(FramelessMainWindow):
             self.face_image.setPixmap(pixmap)
 
     def _build_datetime_section(self, layout: QVBoxLayout) -> None:
-        section = SettingsSection("Date && Time")
+        section = SettingsSection("Date & Time")
         section_layout = QVBoxLayout(section)
         section_layout.setSpacing(8)
 
         self.datetime_12h_cb = QCheckBox("Use 12-Hour Clock")
         self.datetime_12h_cb.setChecked(get_bind_var("datetime_12h_format", False))
         section_layout.addWidget(self.datetime_12h_cb)
+
+        layout.addWidget(section)
+
+    def _build_gtk_section(self, layout: QVBoxLayout) -> None:
+        section = SettingsSection("GTK Apps")
+        section_layout = QVBoxLayout(section)
+        section_layout.setSpacing(8)
+
+        self.gtk_theming_cb = QCheckBox("Use Wallpaper Colors in GTK Apps")
+        self.gtk_theming_cb.setChecked(get_bind_var("gtk_theming", False))
+        self.gtk_theming_cb.setToolTip(
+            "Writes ~/.config/gtk-3.0/gtk.css and gtk-4.0/gtk.css (a file already there is "
+            "backed up and restored when turned off). OLED black, with the wallpaper's accents. "
+            "GTK 3 apps need the adw-gtk3 theme; apps pick up new colors when reopened"
+        )
+        section_layout.addWidget(self.gtk_theming_cb)
 
         layout.addWidget(section)
 
@@ -626,7 +653,7 @@ class AwShellSettings(FramelessMainWindow):
                 row = idx - rows_per_col
                 col = 1
 
-            cb = QCheckBox(display)
+            cb = QCheckBox(plain_text(display))
             cb.setChecked(get_bind_var(f"bar_{name}_visible", True))
             grid.addWidget(cb, row, col)
             self.component_switches[name] = cb
@@ -690,7 +717,7 @@ class AwShellSettings(FramelessMainWindow):
 
         for mon in monitors:
             name = mon.get("name", f'monitor-{mon.get("id", 0)}')
-            cb = QCheckBox(name)
+            cb = QCheckBox(plain_text(name))
             cb.setChecked(name in current_selection)  # [] = all monitors, shown unchecked
             section_layout.addWidget(cb)
             self.monitor_checkboxes[name] = cb
@@ -817,12 +844,12 @@ class AwShellSettings(FramelessMainWindow):
         metrics_small_vis = get_bind_var("metrics_small_visible", {})
 
         for i, (key, label) in enumerate(METRIC_NAMES.items()):
-            cb = QCheckBox(label)
+            cb = QCheckBox(plain_text(label))
             cb.setChecked(metrics_vis.get(key, True))
             grid.addWidget(cb, i + 1, 0)
             self.metrics_switches[key] = cb
 
-            cb_small = QCheckBox(label)
+            cb_small = QCheckBox(plain_text(label))
             cb_small.setChecked(metrics_small_vis.get(key, True))
             grid.addWidget(cb_small, i + 1, 1)
             self.metrics_small_switches[key] = cb_small
@@ -961,6 +988,7 @@ class AwShellSettings(FramelessMainWindow):
         settings["panel_position"] = self.panel_position_combo.currentText()
         settings["notif_pos"] = self.notif_pos_combo.currentText()
         settings["corners_visible"] = self.corners_cb.isChecked()
+        settings["gtk_theming"] = self.gtk_theming_cb.isChecked()
 
         # Component visibility
         for name, cb in self.component_switches.items():
@@ -1076,6 +1104,7 @@ class AwShellSettings(FramelessMainWindow):
         self.panel_position_combo.setCurrentText(str(get_bind_var("panel_position", "Center")))
         self.notif_pos_combo.setCurrentText(str(get_bind_var("notif_pos", "Top")))
         self.corners_cb.setChecked(get_bind_var("corners_visible", True))
+        self.gtk_theming_cb.setChecked(get_bind_var("gtk_theming", False))
 
         # Component switches
         for name, cb in self.component_switches.items():

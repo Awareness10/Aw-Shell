@@ -1,6 +1,6 @@
 from fabric.audio.service import Audio
 from fabric.hyprland.widgets import HyprlandActiveWindow as ActiveWindow
-from fabric.utils.helpers import FormattedString, get_desktop_applications
+from fabric.utils.helpers import FormattedString
 from fabric.widgets.box import Box
 from fabric.widgets.centerbox import CenterBox
 from fabric.widgets.image import Image
@@ -158,8 +158,8 @@ class Notch(Window):
         self._forced_occlusion = False
 
         self.icon_resolver = IconResolver()
-        self._all_apps = get_desktop_applications()
-        self.app_identifiers = self._build_app_identifiers_map()
+        self._all_apps = apps.desktop_apps()
+        self.app_identifiers = apps.app_identifiers()
 
         self.dashboard = Dashboard(notch=self)
         self.nhistory = self.dashboard.widgets.notification_history
@@ -1097,9 +1097,6 @@ class Notch(Window):
             label.queue_resize()
 
             self.update_window_icon()
-
-    def _build_app_identifiers_map(self):
-        return apps.build_identifier_map(self._all_apps)
 
     def find_app(self, app_id: str):
         """Exact match on the identifier map (no substring fallback, unlike the dock)."""

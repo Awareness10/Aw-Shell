@@ -50,6 +50,10 @@ DEFAULTS = {
     "suffix_toggle": "B",
     "prefix_css": "SUPER SHIFT",
     "suffix_css": "B",
+    "prefix_screenshot": "",
+    "suffix_screenshot": "Print",
+    "prefix_screenshot_region": "SHIFT",
+    "suffix_screenshot_region": "Print",
     "wallpapers_dir": get_relative_path("../assets/wallpapers_example"),
     "prefix_restart_inspector": "SUPER CTRL ALT",
     "suffix_restart_inspector": "B",
@@ -88,6 +92,7 @@ DEFAULTS = {
     "bar_date_time_visible": True,
     "bar_button_power_visible": True,
     "corners_visible": True,
+    "gtk_theming": False,
     "bar_metrics_disks": ["/"],
     "metrics_visible": {
         "cpu": True,

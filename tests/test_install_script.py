@@ -125,6 +125,32 @@ def test_installs_the_cvc_typelib(home):
     assert "cinnamon-desktop" in result.stdout.split()
 
 
+def test_installs_python_gobject_for_powerprofilesctl(home):
+    """Only optional for power-profiles-daemon, but powerprofilesctl fails
+    without it and the bar then finds no power profiles."""
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    assert "python-gobject" in result.stdout.split()
+
+
+def test_installs_a_font_for_the_player_kaomoji(home):
+    """The idle player shows ¯\\_(ツ)_/¯, and noto-fonts has no katakana."""
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    assert "adobe-source-han-sans-jp-fonts" in result.stdout.split()
+
+
+def test_readme_lists_every_package(home):
+    """The README's manual installation lists what install.sh installs."""
+    import re
+
+    readme = (SCRIPT.parent / "README.md").read_text()
+    section = readme[readme.index("2. Install system dependencies"):readme.index("3. Clone")]
+    listed = {re.sub(r"-(git|bin)$", "", name.lower())
+              for name in re.findall(r"`([\w.+-]+)`|\[([\w-]+)\]\(http", section) for name in name if name}
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    packages = {re.sub(r"-(git|bin)$", "", p) for p in result.stdout.split()} - {"uv"}  # its own step
+    assert packages - listed == set()
+
+
 def test_first_start_output_goes_to_a_log(home):
     """A shell that crashes on start must leave its traceback somewhere."""
     install = home / "inst"
@@ -139,11 +165,33 @@ def test_first_start_output_goes_to_a_log(home):
     result = _run(home, "start_shell", PATH=path, AW_SHELL_DIR=str(install))
     assert result.returncode == 0, result.stderr
     log = home / ".local" / "state" / "aw-shell" / "shell.log"
-    for _ in range(50):  # the shell runs in the background (disowned)
+    for _ in range(50):  # the shell runs in the background (its own session)
         if "CvcImportError" in log.read_text():
             break
         time.sleep(0.05)
     assert "CvcImportError" in log.read_text()
+
+
+def test_shell_starts_in_its_own_session(home):
+    """The updater runs install.sh in a terminal; closing it hangs up the
+    terminal's session, which would kill a shell started in it."""
+    install = home / "inst"
+    (install / ".venv" / "bin").mkdir(parents=True)
+    (install / ".venv" / "bin" / "python").write_text("#!/bin/bash\nexit 0\n")
+    (install / ".venv" / "bin" / "python").chmod(0o755)
+    session = home / "session"
+    path = _fake_bin(
+        home, hyprctl="exit 0", killall="exit 1",
+        uwsm=f'echo "$$ $(ps -o sid= -p $$)" > "{session}"',
+    )
+    result = _run(home, "start_shell", PATH=path, AW_SHELL_DIR=str(install))
+    assert result.returncode == 0, result.stderr
+    for _ in range(50):
+        if session.exists() and session.read_text().strip():
+            break
+        time.sleep(0.05)
+    pid, sid = session.read_text().split()
+    assert pid == sid  # a session leader: no controlling terminal to lose
 
 
 @pytest.mark.parametrize("running", [True, False])
@@ -167,6 +215,34 @@ def test_quiet_when_every_package_installed(home):
     result = _run(home, "aur_helper=yay; check_packages", PATH=path)
     assert result.returncode == 0
     assert result.stderr == ""
+
+
+@pytest.mark.parametrize("ok", [True, False])
+def test_warns_when_the_aur_helper_fails(home, ok):
+    """A failed run (e.g. a wrong sudo password) can leave every package
+    installed but none upgraded, which check_packages can't see. Warned at
+    once and again at the end, as later steps scroll the first one away."""
+    _fake_bin(home, yay=f"exit {0 if ok else 3}", pacman="exit 0", foot="exit 0")
+    (home / "bin" / "bash").symlink_to("/bin/bash")
+    result = _run(home, "aur_helper=yay; install_packages; echo later steps; warn_if_packages_failed",
+                  PATH=str(home / "bin"))
+    assert result.returncode == 0, result.stderr  # the rest still installs
+    if ok:
+        assert result.stderr == ""
+    else:
+        assert "yay failed (exit code 3)" in result.stderr
+        assert result.stderr.count("WARNING") == 2
+
+
+def test_packages_install_as_part_of_a_full_upgrade(home):
+    """-Syy alone (no -u) is a partial upgrade, which can break shared
+    libraries; --devel with -u would rebuild every -git package."""
+    calls = home / "calls"
+    _fake_bin(home, yay=f'echo "$*" >> "{calls}"', pacman="exit 0", foot="exit 0")
+    (home / "bin" / "bash").symlink_to("/bin/bash")
+    result = _run(home, "aur_helper=yay; install_packages", PATH=str(home / "bin"))
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split()[:3] == ["-Syu", "--needed", "--noconfirm"]
 
 
 def test_terminal_list_matches_the_shell():
@@ -244,6 +320,15 @@ def test_no_shell_colors_without_the_flag_or_a_terminal(home):
     assert result.stdout.strip() == "SHELL_COLORS=no"  # never asked
     assert "[y/N]" not in result.stdout + result.stderr
     assert _calls(calls) == []
+
+
+def test_no_shell_colors_flag_never_asks(home):
+    """The in-app updater runs install.sh in a terminal, where it would ask."""
+    result = _run(home, "parse_args --no-shell-colors; can_prompt() { return 0; }; "
+                        "ask_shell_colors; echo SHELL_COLORS=$SHELL_COLORS")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "SHELL_COLORS=no"
+    assert "[y/N]" not in result.stdout + result.stderr
 
 
 def test_shell_colors_flag_runs_the_steps_in_order(home):

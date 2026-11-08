@@ -127,6 +127,18 @@ class TestWidgetConstruction:
         assert settings.close_btn is not None
         assert settings.apply_btn is not None
 
+    def test_no_label_shows_a_shortcut_underline(self, settings):
+        """Regression: Qt reads '&' as a shortcut marker and underlines the
+        next character, so "Date & Time" showed as "Date _Time"."""
+        from PySide6.QtGui import QKeySequence
+        from PySide6.QtWidgets import QAbstractButton, QGroupBox
+
+        texts = [w.text() for w in settings.findChildren(QAbstractButton)]
+        texts += [w.title() for w in settings.findChildren(QGroupBox)]
+        assert "Date && Time" in texts and "Panels && Widgets" in texts
+        marked = [t for t in texts if not QKeySequence.mnemonic(t).isEmpty()]
+        assert marked == []
+
     def test_keybind_entries_populated(self, settings):
         total_bindings = sum(len(bindings) for _, bindings in KEYBIND_SECTIONS)
         assert len(settings.keybind_entries) == total_bindings

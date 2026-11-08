@@ -323,10 +323,64 @@ class TestPreviewMode:
         assert f"setsid {shlex.join(launch_command())}" in cmd
         assert "'/opt/aw shell/aw-shell'" in cmd  # quoted for bash
 
+    def test_package_update_preview_names_the_terminal(self, window):
+        with patch("modules.updater._terminal_command", return_value="foot"), \
+             patch("modules.updater.subprocess.Popen") as popen:
+            window._on_update()
+        popen.assert_not_called()
+        assert window.log_area.toPlainText().startswith("Preview: nothing was run.")
+        assert "foot bash -c" in window.log_area.toPlainText()
+
     def test_title_marks_preview(self, window):
         from PySide6.QtWidgets import QLabel
         title = window.findChild(QLabel, "updaterTitle")
         assert "(preview)" in title.text()
+
+
+class TestPackageUpdateInTerminal:
+    """install.sh runs sudo (yay, pacman), so it runs in the user's terminal
+    where the password can be typed; the in-app log has no terminal and sudo
+    either fails or prompts unseen on the VT Hyprland was started from."""
+
+    @pytest.fixture
+    def window(self, qapp):
+        from modules.updater import UpdaterWindow
+        win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
+                            pkg_update=True, current_version="1.2.5")
+        yield win
+        win.close()
+
+    def test_runs_install_script_in_terminal_and_closes(self, window):
+        with patch("modules.updater._terminal_command", return_value="kitty -e"), \
+             patch("modules.updater.subprocess.Popen") as popen, \
+             patch("modules.updater.QProcess") as process, \
+             patch.object(window, "close") as close:
+            window._on_update()
+        process.assert_not_called()
+        argv = popen.call_args.args[0]
+        assert argv[:4] == ["kitty", "-e", "bash", "-c"]
+        assert "install.sh" in argv[4] and "| bash" in argv[4]
+        assert "| bash -s -- --no-shell-colors" in argv[4]  # an update doesn't ask
+        assert "read" in argv[4]  # stays open so the result can be read
+        assert popen.call_args.kwargs["start_new_session"] is True
+        close.assert_called_once()
+
+    def test_terminal_that_fails_to_start_reports_it(self, window):
+        with patch("modules.updater._terminal_command", return_value="nope -e"), \
+             patch("modules.updater.subprocess.Popen", side_effect=FileNotFoundError("nope")), \
+             patch.object(window, "close") as close:
+            window._on_update()
+        close.assert_not_called()
+        assert window.status_label.isVisibleTo(window)
+        assert "nope" in window.status_label.text()
+        assert window.update_btn.isEnabled()
+
+    def test_terminal_command_falls_back_when_configured_one_is_missing(self, monkeypatch):
+        import config.data
+        from modules.updater import _terminal_command
+        monkeypatch.setattr(config.data, "TERMINAL_COMMAND", "missing-term -e")
+        monkeypatch.setattr("modules.updater.shutil.which", lambda name: None)
+        assert _terminal_command() == "kitty -e"  # conftest pins the fallback
 
 
 class TestUpdaterWindow:

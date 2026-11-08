@@ -63,3 +63,91 @@ def test_destroyed_widgets_stop_updating(run_pending):
     while time.monotonic() < deadline:
         run_pending()
         time.sleep(0.05)
+
+
+def test_gpu_info_asked_once_in_the_background(sandbox, monkeypatch):
+    """nvtop takes ~0.2 s with an NVIDIA card; every metrics widget (bar and
+    dashboard, on each monitor) used to ask it again while the shell started,
+    and then waited for it."""
+    import time
+
+    from conftest import pump_until
+
+    import modules.metrics as metrics
+
+    calls = []
+    gpus = [{"device_name": "RTX", "gpu_util": "5%"}]
+
+    real = subprocess.check_output
+
+    def check_output(cmd, **kwargs):
+        if cmd[0] != "nvtop":  # check_output is shared by every module
+            return real(cmd, **kwargs)
+        calls.append(cmd)
+        time.sleep(0.3)
+        return '[{"device_name": "RTX", "gpu_util": "5%"}]'
+
+    monkeypatch.setattr(metrics.subprocess, "check_output", check_output)
+    start = time.monotonic()
+    provider = metrics.MetricsProvider()
+    answers = []
+    provider.when_gpu_info(answers.append)
+    provider.when_gpu_info(answers.append)
+    assert time.monotonic() - start < 0.1  # doesn't wait for nvtop
+    assert answers == []
+    assert pump_until(lambda: len(answers) == 2)
+    assert answers == [gpus, gpus]
+    provider.when_gpu_info(answers.append)  # known by now: answered at once
+    assert answers[-1] == gpus
+    assert calls == [["nvtop", "-s"]]
+
+
+def test_widgets_add_gpu_gauges_when_nvtop_answers(sandbox, monkeypatch):
+    import time
+
+    from conftest import pump_until
+
+    import modules.metrics as metrics
+
+    real = subprocess.check_output
+
+    def check_output(cmd, **kwargs):
+        if cmd[0] != "nvtop":  # check_output is shared by every module
+            return real(cmd, **kwargs)
+        time.sleep(0.3)
+        return '[{"device_name": "RTX", "gpu_util": "5%"}]'
+
+    monkeypatch.setattr(metrics.subprocess, "check_output", check_output)
+    monkeypatch.setattr(metrics, "shared_provider", metrics.MetricsProvider())
+    start = time.monotonic()
+    small, big = metrics.MetricsSmall(), metrics.Metrics()
+    assert time.monotonic() - start < 0.1
+    assert small.gpu == [] and big.gpu == []
+    assert pump_until(lambda: small.gpu and big.gpu)
+    assert len(small.gpu) == len(big.gpu) == 1
+    assert small.gpu[0].box.get_parent() is not None
+    assert big.gpu[0].box.get_parent() is big
+    small.destroy()
+    big.destroy()
+
+
+def test_failed_gpu_update_does_not_stop_later_ones(sandbox, monkeypatch):
+    """check_output doesn't capture stderr: reading it raised in the thread,
+    which never cleared _gpu_update_running, so GPU readings stopped for good."""
+    import subprocess
+
+    import modules.metrics as metrics
+
+    provider = metrics.MetricsProvider()
+
+    real = subprocess.check_output
+
+    def check_output(cmd, **kwargs):
+        if cmd[0] != "nvtop":  # check_output is shared by every module
+            return real(cmd, **kwargs)
+        raise subprocess.CalledProcessError(1, cmd)  # stderr is None
+
+    monkeypatch.setattr(metrics.subprocess, "check_output", check_output)
+    provider._gpu_update_running = True
+    provider._run_nvtop_in_thread()
+    assert provider._gpu_update_running is False

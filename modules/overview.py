@@ -4,7 +4,6 @@ import json
 import cairo
 import gi
 from fabric.hyprland.service import Hyprland
-from fabric.utils.helpers import get_desktop_applications
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.eventbox import EventBox
@@ -15,6 +14,7 @@ from loguru import logger
 
 import config.data as data
 import modules.icons as icons
+import utils.apps as apps
 
 # WIP icon resolver (app_id to guessing the icon name)
 from utils.icon_resolver import IconResolver
@@ -300,7 +300,7 @@ class Overview(Box):
         self.clients: dict[str, HyprlandWindowButton] = {}
         
         # Initialize app registry for better icon resolution
-        self._all_apps = get_desktop_applications()
+        self._all_apps = apps.desktop_apps()
         self.app_identifiers = self._build_app_identifiers_map()
         
         # Remove the window_class_aliases dictionary completely
@@ -407,7 +407,7 @@ class Overview(Box):
         return None
 
     def update(self, signal_update=False):
-        self._all_apps = get_desktop_applications()
+        self._all_apps = apps.desktop_apps()
         self.app_identifiers = self._build_app_identifiers_map()
         for client in self.clients.values():
             client.destroy()

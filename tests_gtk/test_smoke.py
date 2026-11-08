@@ -4,6 +4,7 @@ import importlib
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import pump_until
 from gi.repository import Gtk
 
 # Stand-ins for the parent a widget is normally built inside (Notch / Widgets)
@@ -75,6 +76,8 @@ def test_widget_builds_and_renders(entry, run_pending):
     module, cls, kwargs = entry
     widget = getattr(importlib.import_module(module), cls)(**kwargs)
     run_pending()
+    # Widgets that ask a slow command in the background first (Systemprofiles)
+    assert pump_until(lambda: not getattr(widget, "loading", False))
     shown = _show(widget)
     run_pending()
     assert widget.get_realized()
