@@ -132,6 +132,12 @@ def test_installs_python_gobject_for_powerprofilesctl(home):
     assert "python-gobject" in result.stdout.split()
 
 
+def test_installs_a_font_for_the_player_kaomoji(home):
+    """The idle player shows ¯\\_(ツ)_/¯, and noto-fonts has no katakana."""
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    assert "adobe-source-han-sans-jp-fonts" in result.stdout.split()
+
+
 def test_first_start_output_goes_to_a_log(home):
     """A shell that crashes on start must leave its traceback somewhere."""
     install = home / "inst"

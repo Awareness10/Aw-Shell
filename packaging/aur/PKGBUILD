@@ -32,8 +32,8 @@ depends=(
   'hyprland' 'uwsm' 'fabric-cli' 'matugen' 'awww' 'cliphist' 'wl-clipboard'
   'libnotify' 'brightnessctl' 'imagemagick' 'hypridle' 'hyprlock' 'upower'
   'networkmanager' 'jq'
-  # Fonts the styles use
-  'ttf-nerd-fonts-symbols-mono' 'noto-fonts-emoji'
+  # Fonts the styles use; Japanese for the player's ¯\_(ツ)_/¯ (noto-fonts has no katakana)
+  'ttf-nerd-fonts-symbols-mono' 'noto-fonts-emoji' 'adobe-source-han-sans-jp-fonts'
 )
 makedepends=('meson' 'vala' 'gobject-introspection')
 optdepends=(

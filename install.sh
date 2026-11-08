@@ -32,6 +32,7 @@ MATUWRAP_SCRIPT="$HOME/.config/matuwrap/scripts/matuwrap"
 # none of them, nor $TERMINAL or xdg-terminal-exec, kitty is installed
 TERMINALS=(kitty foot alacritty ghostty wezterm konsole gnome-terminal ptyxis xfce4-terminal)
 PACKAGES=(
+  adobe-source-han-sans-jp-fonts  # the player's ¯\_(ツ)_/¯: noto-fonts has no katakana
   awww-git
   brightnessctl
   cava
