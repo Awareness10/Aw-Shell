@@ -1,7 +1,23 @@
 {
-  "version": "1.2.17",
+  "version": "1.2.18",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.2.18",
+      "changes": [
+        "<b>perf:</b> The shell starts about 5 times faster (3.3 s to about 0.6 s with two monitors)",
+        "<b>fix:</b> The updater runs the update in your terminal, so it can ask for your sudo password instead of getting stuck; its log is readable again",
+        "<b>fix:</b> Reloading the shell no longer shows \"Command not found: Aw-Shell\" (press Apply in Settings once to get it)",
+        "<b>fix:</b> Shell keybinds no longer fire twice when hyprland.lua loads Aw-Shell's config through $HOME (SUPER+W closed the launcher right away; press Apply in Settings once)",
+        "<b>fix:</b> Pins and Kanban stay in sync between monitors, and Pins picks files with the system file picker",
+        "<b>fix:</b> No thin black stripe in the bar when there are no power modes",
+        "<b>fix:</b> GPU usage keeps updating after a failed reading",
+        "<b>fix:</b> Settings show \"&\" in labels instead of an underlined space",
+        "<b>feat:</b> Screenshot keybinds: Print picks a screen, Shift+Print selects an area (change them in Settings)",
+        "<b>feat:</b> GTK apps can follow the wallpaper colors (opt-in, in Settings)",
+        "<b>update:</b> The installer upgrades the whole system along with Aw-Shell's packages, warns when they fail, and adds python-gobject (power modes) and a Japanese font (the player's ¯\\_(ツ)_/¯)"
+      ]
+    },
     {
       "version": "1.2.17",
       "changes": [
@@ -223,17 +239,16 @@
     }
   ],
   "changelog": [
-    "<b>fix:</b> The shell starts again with a special workspace (scratchpad) open on Hyprland 0.57",
-    "<b>fix:</b> The screen recorder records the screen it was started from",
-    "<b>fix:</b> Kanban: the notch no longer grows while typing a to-do, typing keeps working after clicking the editor, and notes are left-aligned",
-    "<b>fix:</b> Close, delete and alert icons are visible again; their dim red/yellow colors were black (change the wallpaper or colors once to apply)",
-    "<b>fix:</b> Notifications without an icon no longer have an empty gap before the text",
-    "<b>fix:</b> The lock screen loads on hyprlock 0.9",
-    "<b>fix:</b> The installer works on a minimal Arch, warns about packages that didn't install and shows why the shell didn't start",
-    "<b>feat:</b> Mouse battery in the controls for any UPower mouse, and Logitech mice over HID++",
-    "<b>feat:</b> Settings default to your own terminal instead of kitty",
-    "<b>feat:</b> The installer can set up shell colors with matuwrap (opt-in)",
-    "<b>update:</b> The WiFi icon shows the link speed instead of the signal strength",
-    "<b>update:</b> Fabric and other dependencies updated; jq is now needed for screen recording"
+    "<b>perf:</b> The shell starts about 5 times faster (3.3 s to about 0.6 s with two monitors)",
+    "<b>fix:</b> The updater runs the update in your terminal, so it can ask for your sudo password instead of getting stuck; its log is readable again",
+    "<b>fix:</b> Reloading the shell no longer shows \"Command not found: Aw-Shell\" (press Apply in Settings once to get it)",
+    "<b>fix:</b> Shell keybinds no longer fire twice when hyprland.lua loads Aw-Shell's config through $HOME (SUPER+W closed the launcher right away; press Apply in Settings once)",
+    "<b>fix:</b> Pins and Kanban stay in sync between monitors, and Pins picks files with the system file picker",
+    "<b>fix:</b> No thin black stripe in the bar when there are no power modes",
+    "<b>fix:</b> GPU usage keeps updating after a failed reading",
+    "<b>fix:</b> Settings show \"&\" in labels instead of an underlined space",
+    "<b>feat:</b> Screenshot keybinds: Print picks a screen, Shift+Print selects an area (change them in Settings)",
+    "<b>feat:</b> GTK apps can follow the wallpaper colors (opt-in, in Settings)",
+    "<b>update:</b> The installer upgrades the whole system along with Aw-Shell's packages, warns when they fail, and adds python-gobject (power modes) and a Japanese font (the player's ¯\\_(ツ)_/¯)"
   ]
 }
