@@ -129,3 +129,25 @@ def test_widgets_add_gpu_gauges_when_nvtop_answers(sandbox, monkeypatch):
     assert big.gpu[0].box.get_parent() is big
     small.destroy()
     big.destroy()
+
+
+def test_failed_gpu_update_does_not_stop_later_ones(sandbox, monkeypatch):
+    """check_output doesn't capture stderr: reading it raised in the thread,
+    which never cleared _gpu_update_running, so GPU readings stopped for good."""
+    import subprocess
+
+    import modules.metrics as metrics
+
+    provider = metrics.MetricsProvider()
+
+    real = subprocess.check_output
+
+    def check_output(cmd, **kwargs):
+        if cmd[0] != "nvtop":  # check_output is shared by every module
+            return real(cmd, **kwargs)
+        raise subprocess.CalledProcessError(1, cmd)  # stderr is None
+
+    monkeypatch.setattr(metrics.subprocess, "check_output", check_output)
+    provider._gpu_update_running = True
+    provider._run_nvtop_in_thread()
+    assert provider._gpu_update_running is False

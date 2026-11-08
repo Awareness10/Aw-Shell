@@ -107,7 +107,7 @@ class MetricsProvider:
             error_message = "nvtop command not found."
             logger.warning(error_message)
         except subprocess.CalledProcessError as e:
-            error_message = f"nvtop failed with exit code {e.returncode}: {e.stderr.strip()}"
+            error_message = f"nvtop failed with exit code {e.returncode}"  # stderr isn't captured
             logger.error(error_message)
         except subprocess.TimeoutExpired:
             error_message = "nvtop command timed out."
