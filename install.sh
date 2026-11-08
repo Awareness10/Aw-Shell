@@ -61,6 +61,7 @@ PACKAGES=(
   nvtop
   playerctl
   power-profiles-daemon
+  python-gobject  # powerprofilesctl (the power mode switcher) needs it; optional for the daemon
   swappy
   tesseract
   tesseract-data-eng

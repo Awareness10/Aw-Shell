@@ -125,6 +125,13 @@ def test_installs_the_cvc_typelib(home):
     assert "cinnamon-desktop" in result.stdout.split()
 
 
+def test_installs_python_gobject_for_powerprofilesctl(home):
+    """Only optional for power-profiles-daemon, but powerprofilesctl fails
+    without it and the bar then finds no power profiles."""
+    result = _run(home, 'printf "%s\\n" "${PACKAGES[@]}"')
+    assert "python-gobject" in result.stdout.split()
+
+
 def test_first_start_output_goes_to_a_log(home):
     """A shell that crashes on start must leave its traceback somewhere."""
     install = home / "inst"
