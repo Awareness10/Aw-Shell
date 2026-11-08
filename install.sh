@@ -243,9 +243,11 @@ start_shell() {
   log "Starting Aw-Shell..."
   killall aw-shell 2>/dev/null || true
   mkdir -p "$(dirname "$SHELL_LOG")"
-  # Opens the settings window on its own the first time (no config yet)
-  uwsm app -- "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/main.py" >"$SHELL_LOG" 2>&1 &
-  disown
+  # Opens the settings window on its own the first time (no config yet). In
+  # its own session: run from a terminal (the updater opens one), the shell
+  # would otherwise die when that terminal closes
+  setsid -f uwsm app -- "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/main.py" \
+    >"$SHELL_LOG" 2>&1 </dev/null
 }
 
 # Whether the shell is still up a few seconds after starting: it is called

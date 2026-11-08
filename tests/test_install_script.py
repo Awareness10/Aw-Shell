@@ -139,11 +139,33 @@ def test_first_start_output_goes_to_a_log(home):
     result = _run(home, "start_shell", PATH=path, AW_SHELL_DIR=str(install))
     assert result.returncode == 0, result.stderr
     log = home / ".local" / "state" / "aw-shell" / "shell.log"
-    for _ in range(50):  # the shell runs in the background (disowned)
+    for _ in range(50):  # the shell runs in the background (its own session)
         if "CvcImportError" in log.read_text():
             break
         time.sleep(0.05)
     assert "CvcImportError" in log.read_text()
+
+
+def test_shell_starts_in_its_own_session(home):
+    """The updater runs install.sh in a terminal; closing it hangs up the
+    terminal's session, which would kill a shell started in it."""
+    install = home / "inst"
+    (install / ".venv" / "bin").mkdir(parents=True)
+    (install / ".venv" / "bin" / "python").write_text("#!/bin/bash\nexit 0\n")
+    (install / ".venv" / "bin" / "python").chmod(0o755)
+    session = home / "session"
+    path = _fake_bin(
+        home, hyprctl="exit 0", killall="exit 1",
+        uwsm=f'echo "$$ $(ps -o sid= -p $$)" > "{session}"',
+    )
+    result = _run(home, "start_shell", PATH=path, AW_SHELL_DIR=str(install))
+    assert result.returncode == 0, result.stderr
+    for _ in range(50):
+        if session.exists() and session.read_text().strip():
+            break
+        time.sleep(0.05)
+    pid, sid = session.read_text().split()
+    assert pid == sid  # a session leader: no controlling terminal to lose
 
 
 @pytest.mark.parametrize("running", [True, False])
