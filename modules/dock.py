@@ -372,7 +372,7 @@ class Dock(Window):
         display_name = None
         
         if desktop_app:
-            icon_img = desktop_app.get_icon_pixbuf(size=self.icon_size) 
+            icon_img = apps.icon_pixbuf(desktop_app, self.icon_size) 
             display_name = desktop_app.display_name or desktop_app.name
         
         id_value = app_identifier["name"] if isinstance(app_identifier, dict) else app_identifier

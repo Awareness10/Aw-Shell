@@ -131,7 +131,7 @@ class HyprlandWindowButton(Button):
         # Get icon using improved method with fallbacks
         icon_pixbuf = None
         if desktop_app:
-            icon_pixbuf = desktop_app.get_icon_pixbuf(size=icon_size_main)
+            icon_pixbuf = apps.icon_pixbuf(desktop_app, icon_size_main)
         
         if not icon_pixbuf:
             # Fallback to IconResolver
@@ -193,7 +193,7 @@ class HyprlandWindowButton(Button):
         # Enhanced icon resolution for overlay
         icon_pixbuf = None
         if hasattr(self, 'desktop_app') and self.desktop_app:
-            icon_pixbuf = self.desktop_app.get_icon_pixbuf(size=icon_size_overlay)
+            icon_pixbuf = apps.icon_pixbuf(self.desktop_app, icon_size_overlay)
             
         if not icon_pixbuf:
             icon_pixbuf = icon_resolver.get_icon_pixbuf(self.app_id, icon_size_overlay)

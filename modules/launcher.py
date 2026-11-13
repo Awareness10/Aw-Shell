@@ -211,7 +211,7 @@ class AppLauncher(Box):
                 orientation="h",
                 spacing=10,
                 children=[
-                    Image(name="app-icon", pixbuf=app.get_icon_pixbuf(size=24), h_align="start"),
+                    Image(name="app-icon", pixbuf=apps.icon_pixbuf(app, 24), h_align="start"),
                     Label(
                         name="app-label",
                         label=app.display_name or "Unknown",

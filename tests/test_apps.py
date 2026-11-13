@@ -10,6 +10,7 @@ from utils.apps import (
     find_app,
     find_app_by_key,
     fuzzy_match,
+    icon_pixbuf,
     normalize_window_class,
     rank_apps,
     score_app,
@@ -182,3 +183,33 @@ class TestRankApps:
 
     def test_non_matches_dropped(self):
         assert rank_apps([_app(display_name="Firefox")], "zzz") == []
+
+
+class _CachingApp:
+    """Like fabric's DesktopApp: keeps the first pixbuf it loads and returns
+    it for every later size."""
+
+    def __init__(self):
+        self._pixbuf = None
+        self.loads = []
+
+    def get_icon_pixbuf(self, size=48):
+        if self._pixbuf:
+            return self._pixbuf
+        self.loads.append(size)
+        self._pixbuf = f"pixbuf@{size}"
+        return self._pixbuf
+
+
+def test_icon_pixbuf_is_the_size_asked_for_whoever_asked_first():
+    app = _CachingApp()
+    assert icon_pixbuf(app, 48) == "pixbuf@48"  # the dock
+    assert icon_pixbuf(app, 20) == "pixbuf@20"  # then the notch
+    assert icon_pixbuf(app, 48) == "pixbuf@48"
+
+
+def test_icon_pixbuf_loads_each_size_once():
+    app = _CachingApp()
+    for size in (20, 48, 20, 48, 20):
+        icon_pixbuf(app, size)
+    assert app.loads == [20, 48]

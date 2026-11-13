@@ -130,6 +130,17 @@ def rank_apps(apps, query: str) -> list:
     return [app for _, app in scored]
 
 
+def icon_pixbuf(app, size: int):
+    """app's icon at `size`. fabric's DesktopApp returns the first pixbuf it
+    loaded whatever size is asked for next, and the apps are shared between
+    the dock, launcher, notch and overview, which each want their own size."""
+    sizes = app.__dict__.setdefault("_sized_pixbufs", {})
+    if size not in sizes:
+        app._pixbuf = None
+        sizes[size] = app.get_icon_pixbuf(size=size)
+    return sizes[size]
+
+
 # One scan of the desktop apps for the whole shell: the dock, launcher, notch
 # and overview on every monitor used to scan on their own, and the dock again
 # on every window opening or closing
