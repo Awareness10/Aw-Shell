@@ -376,11 +376,40 @@ class Conversion():
 
         # 2) Si ambos son códigos de moneda (p. ej. “USD”, “ARS”)
         #    asumimos que están en mayúsculas y tienen 3 letras.
-        if len(from_type) == 3 and len(to_type) == 3 and from_type.isalpha() and to_type.isalpha():
-            return self._convert_currency_via_floatrates(value, from_type, to_type)
+        if all(code.isalpha() and 3 <= len(code) <= 5 for code in (from_type, to_type)):
+            return self._convert_currency(value, from_type, to_type)
 
         # 3) Si no cae en ningún caso, error.
         raise ValueError(f"Unsupported conversion: {from_type} to {to_type}")
+
+    def _convert_currency(self, value: float, from_code: str, to_code: str) -> float:
+        """Fiat pairs from floatrates; anything it doesn't know (crypto) from
+        CoinGecko."""
+        try:
+            return self._convert_currency_via_floatrates(value, from_code, to_code)
+        except ValueError as unknown:
+            from_lower, to_lower = from_code.lower(), to_code.lower()
+            prices = self._coingecko_prices(from_lower, to_lower)
+            if prices.get(from_lower, {}).get(to_lower):
+                return value * prices[from_lower][to_lower]
+            if prices.get(to_lower, {}).get(from_lower):  # fiat to crypto
+                return value / prices[to_lower][from_lower]
+            raise unknown
+
+    @staticmethod
+    def _coingecko_prices(*symbols: str) -> dict:
+        """{coin: {versus: price}} between the lowercase symbols, in one
+        request (the keyless API allows only a few a minute); coins and
+        pairs CoinGecko doesn't have are left out."""
+        both = ",".join(symbols)
+        resp = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"symbols": both, "vs_currencies": both},
+            timeout=5,
+        )
+        if resp.status_code == 429:
+            raise ValueError("CoinGecko rate limit reached, try again in a minute")
+        return resp.json() if resp.status_code == 200 else {}
 
     def _convert_currency_via_floatrates(self, value: float, from_code: str, to_code: str) -> float:
         """

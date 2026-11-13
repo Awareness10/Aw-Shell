@@ -387,6 +387,79 @@ class TestCurrency:
         assert result == pytest.approx(2.54)
 
 
+class TestCrypto:
+    """Codes floatrates doesn't know are asked from CoinGecko by symbol."""
+
+    @pytest.fixture
+    def web(self, monkeypatch):
+        import utils.conversion as conversion
+
+        prices = {"btc": {"nok": 650000, "usd": 68000}, "eth": {"btc": 0.028},
+                  "doge": {"usd": 0.1}}
+        fiat = {"usd": {"nok": {"rate": "9.5"}}, "nok": {"usd": {"rate": "0.105"}}}
+        asked = []
+
+        def get(url, params=None, timeout=None):
+            asked.append(url)
+            reply = type("Reply", (), {})()
+            reply.status_code = 200
+            if "floatrates" in url:
+                code = url.rsplit("/", 1)[1].removesuffix(".json")
+                reply.status_code = 200 if code in fiat else 403
+                reply.json = lambda: fiat[code]
+            else:
+                coins, versus = (params[key].split(",") for key in ("symbols", "vs_currencies"))
+                found = {coin: {v: prices[coin][v] for v in versus if v in prices[coin]}
+                         for coin in coins if coin in prices}
+                reply.json = lambda: found
+            return reply
+
+        monkeypatch.setattr(conversion.requests, "get", get)
+        return asked
+
+    def test_crypto_to_fiat(self, conv, web):
+        result, suffix = conv.parse_input_and_convert("2 BTC to NOK")
+        assert (result, suffix) == (1300000, "NOK")
+
+    def test_fiat_to_crypto(self, conv, web):
+        result, suffix = conv.parse_input_and_convert("1300 NOK to BTC")
+        assert result == pytest.approx(0.002)
+        assert suffix == "BTC"
+
+    def test_crypto_to_crypto(self, conv, web):
+        result, _ = conv.parse_input_and_convert("10 eth to btc")
+        assert result == pytest.approx(0.28)
+
+    def test_four_letter_symbol(self, conv, web):
+        result, suffix = conv.parse_input_and_convert("50 DOGE to USD")
+        assert result == pytest.approx(5)
+        assert suffix == "USD"
+
+    def test_fiat_pairs_never_ask_coingecko(self, conv, web):
+        conv.parse_input_and_convert("100 USD to NOK")
+        assert web == ["https://www.floatrates.com/daily/usd.json"]
+
+    def test_one_coingecko_request_per_conversion(self, conv, web):
+        conv.parse_input_and_convert("1300 NOK to BTC")
+        assert len([url for url in web if "coingecko" in url]) == 1
+
+    def test_rate_limit_is_an_error(self, conv, web, monkeypatch):
+        import utils.conversion as conversion
+
+        limited = type("Reply", (), {"status_code": 429})()
+        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: limited)
+        with pytest.raises(ValueError):
+            conv.parse_input_and_convert("1 BTC to NOK")
+
+
+        with pytest.raises(ValueError):
+            conv.parse_input_and_convert("1 ZZZ to NOK")
+
+    def test_unknown_code_raises(self, conv, web):
+        with pytest.raises(ValueError):
+            conv.parse_input_and_convert("1 ZZZ to NOK")
+
+
 class TestFormatResult:
 
     @pytest.mark.parametrize("value, text", [
