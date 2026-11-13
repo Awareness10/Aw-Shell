@@ -252,6 +252,21 @@ class TestCleanType:
         assert conv.clean_type("usd") == "USD"
         assert conv.clean_type("ars") == "ARS"
 
+    @pytest.mark.parametrize("unit", ["min", "mph", "deg", "psi", "cal", "cup", "bar", "kHz"])
+    def test_three_letter_unit_wins_over_currency(self, conv, unit):
+        assert conv.clean_type(unit) == unit
+
+    def test_three_letter_plural_of_a_unit_wins_over_currency(self, conv):
+        assert conv.clean_type("lbs") == "lb"
+        assert conv.clean_type("LBS") == "LBS"
+
+    def test_lowercase_currency_without_a_unit_of_that_name(self, conv):
+        assert conv.clean_type("nok") == "NOK"
+
+    @pytest.mark.parametrize("code", ["CUP", "BAR"])
+    def test_uppercase_three_letters_is_currency(self, conv, code):
+        assert conv.clean_type(code) == code
+
     def test_plural_stripped(self, conv):
         assert conv.clean_type("kilograms") == "kilogram"
         assert conv.clean_type("meters") == "meter"
@@ -300,6 +315,29 @@ class TestParseInputAndConvert:
     def test_unit_starting_with_e_is_not_an_exponent(self, conv):
         result, _ = conv.parse_input_and_convert("5EB to PB")
         assert result == pytest.approx(5 * 1024)
+
+    @pytest.mark.parametrize("text, value", [
+        ("5 mph to kmph", 8.0467),
+        ("90 min to h", 1.5),
+        ("180 deg to rad", 3.1416),
+        ("2 cup to ml", 473.176),
+        ("1 bar to psi", 14.5038),
+    ])
+    def test_three_letter_units(self, conv, text, value):
+        result, _ = conv.parse_input_and_convert(text)
+        assert result == pytest.approx(value, rel=1e-3)
+
+    def test_lbs_are_pounds(self, conv):
+        result, suffix = conv.parse_input_and_convert("10lbs to kg")
+        assert result == pytest.approx(4.536, abs=0.001)
+        assert suffix == "kg"
+
+    def test_uppercase_cup_is_the_currency(self, conv, monkeypatch):
+        asked = []
+        monkeypatch.setattr(conv, "_convert_currency_via_floatrates",
+                            lambda value, a, b: asked.append((value, a, b)) or 1.0)
+        conv.parse_input_and_convert("10 CUP to usd")
+        assert asked == [(10.0, "CUP", "USD")]
 
     def test_invalid_format_raises(self, conv):
         with pytest.raises(ValueError):

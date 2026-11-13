@@ -311,6 +311,7 @@ class Units():
 class Conversion():
     def __init__(self):
         self.units = Units()
+        self._unit_names = {name for chart in vars(self.units).values() for name in chart}
 
     def convert(self, value: float, from_type: str, to_type: str):
         """
@@ -444,7 +445,11 @@ class Conversion():
         Si es moneda (3 letras), lo pasa a mayúsculas. 
         Si termina en 's' (y no es 'celsius'), le quita la 's' para 
         las otras unidades. """
+        if type in self._unit_names:
+            return type  # "cup" is the unit; "CUP" is the currency
         if len(type) == 3 and type.isalpha():
+            if type.islower() and type.endswith("s") and type[:-1] in self._unit_names:
+                return type[:-1]  # "lbs" is pounds, not a currency
             return type.upper()
         if type.endswith("s") and type.lower() != "celsius":
             # Para las tablas que tienen singular/plural
