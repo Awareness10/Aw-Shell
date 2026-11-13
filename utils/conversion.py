@@ -309,6 +309,10 @@ class Units():
         # Ya no usamos currency_converter aquí.
 
 
+class ConversionError(ValueError):
+    """Why an expression can't be converted, worded for the launcher."""
+
+
 def format_result(value: float) -> str:
     """Two decimals; four significant digits below 1 (0.001538 BTC, not 0.00)."""
     if value == 0 or abs(value) >= 1:
@@ -380,21 +384,24 @@ class Conversion():
             return self._convert_currency(value, from_type, to_type)
 
         # 3) Si no cae en ningún caso, error.
-        raise ValueError(f"Unsupported conversion: {from_type} to {to_type}")
+        raise ConversionError(f"Can't convert {from_type} to {to_type}")
 
     def _convert_currency(self, value: float, from_code: str, to_code: str) -> float:
         """Fiat pairs from floatrates; anything it doesn't know (crypto) from
         CoinGecko."""
         try:
-            return self._convert_currency_via_floatrates(value, from_code, to_code)
-        except ValueError as unknown:
-            from_lower, to_lower = from_code.lower(), to_code.lower()
-            prices = self._coingecko_prices(from_lower, to_lower)
-            if prices.get(from_lower, {}).get(to_lower):
-                return value * prices[from_lower][to_lower]
-            if prices.get(to_lower, {}).get(from_lower):  # fiat to crypto
-                return value / prices[to_lower][from_lower]
-            raise unknown
+            try:
+                return self._convert_currency_via_floatrates(value, from_code, to_code)
+            except ValueError:
+                from_lower, to_lower = from_code.lower(), to_code.lower()
+                prices = self._coingecko_prices(from_lower, to_lower)
+        except requests.RequestException as error:
+            raise ConversionError("Can't reach the rates service") from error
+        if prices.get(from_lower, {}).get(to_lower):
+            return value * prices[from_lower][to_lower]
+        if prices.get(to_lower, {}).get(from_lower):  # fiat to crypto
+            return value / prices[to_lower][from_lower]
+        raise ConversionError(f"No rate for {from_code.upper()} to {to_code.upper()}")
 
     @staticmethod
     def _coingecko_prices(*symbols: str) -> dict:
@@ -408,7 +415,7 @@ class Conversion():
             timeout=5,
         )
         if resp.status_code == 429:
-            raise ValueError("CoinGecko rate limit reached, try again in a minute")
+            raise ConversionError("CoinGecko rate limit reached, try again in a minute")
         return resp.json() if resp.status_code == 200 else {}
 
     def _convert_currency_via_floatrates(self, value: float, from_code: str, to_code: str) -> float:
@@ -443,6 +450,13 @@ class Conversion():
         except ValueError:
             return False
 
+    @staticmethod
+    def _number(token: str) -> float:
+        try:
+            return float(token)
+        except ValueError:
+            raise ConversionError(f"'{token}' is not a number") from None
+
     @classmethod
     def _split_glued(cls, token: str) -> list[str]:
         """'10km' -> ['10', 'km']; numbers ('1e3') and units stay whole."""
@@ -460,10 +474,10 @@ class Conversion():
         if "and" in parts:  # valor unidad1 and valor2 unidad2 _ a unidad_destino
             parts.remove("and")
             if len(parts) != 6:
-                raise ValueError("Formato inválido. Esperado: 'value from_type and value2 from_type2 _ to_type'")
+                raise ConversionError("Expected: 1 h and 30 min to s")
             
             value1, from_type1, value2, from_type2, _, to_type = parts
-            value1, value2 = float(value1), float(value2)
+            value1, value2 = self._number(value1), self._number(value2)
             from_type1 = self.clean_type(from_type1)
             from_type2 = self.clean_type(from_type2)
             to_type = self.clean_type(to_type)
@@ -477,9 +491,9 @@ class Conversion():
                 return res, to_type + addition
         else:
             if len(parts) != 4:
-                raise ValueError("Formato inválido. Esperado: 'value from_type _ to_type'")
+                raise ConversionError("Expected: 10 km to mi")
             value, from_type, _, to_type = parts
-            value = float(value)
+            value = self._number(value)
             from_type = self.clean_type(from_type)
             to_type = self.clean_type(to_type)
             return self.convert(value, from_type, to_type), to_type + addition

@@ -523,14 +523,16 @@ class AppLauncher(Box):
 
         # Perform conversion in thread
         def do_conversion(*_):  # GLib.Thread passes its data argument
+            from utils.conversion import ConversionError, format_result
+
             try:
                 result_value, result_type = self.converter.parse_input_and_convert(expr)
-                from utils.conversion import format_result
-
                 result_str = format_result(result_value)
                 if result_type is not None:
                     result_str += f" {result_type}"
-            except:
+            except ConversionError as error:
+                result_str = f"Error: {error}"
+            except Exception:
                 result_str = "Error: Invalid conversion expression"
 
             # Update the history entry

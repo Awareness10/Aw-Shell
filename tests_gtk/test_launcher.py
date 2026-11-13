@@ -177,6 +177,19 @@ def test_conversion_result_replaces_loading_entry(launcher, tmp_path):
         assert json.load(f) == [";10km to miles => 6.21 miles"]
 
 
+@pytest.mark.parametrize("text, shown", [
+    (";10 km to kg", ";10 km to kg => Error: Can't convert km to kg"),
+    (";10 km", ";10 km => Error: Expected: 10 km to mi"),
+])
+def test_conversion_error_shows_the_reason(launcher, tmp_path, text, shown):
+    launcher.conversion_history_path = str(tmp_path / "conversion.json")
+    launcher.conversion_history = []
+    launcher.search_entry.set_text(text)
+    launcher.evaluate_conversion_expression(text)
+    assert pump_until(lambda: "Loading" not in launcher.conversion_history[0])
+    assert launcher.conversion_history == [shown]
+
+
 def test_new_search_after_results_finished_loading(launcher):
     """The finished loader's idle source is gone; removing it again made GLib
     warn "Source ID ... was not found" on every search."""

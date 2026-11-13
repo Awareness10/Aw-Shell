@@ -2,7 +2,7 @@
 
 import pytest
 
-from utils.conversion import Conversion, Units
+from utils.conversion import Conversion, ConversionError, Units
 
 
 @pytest.fixture
@@ -234,7 +234,7 @@ class TestOtherConversions:
 class TestConversionErrors:
 
     def test_unsupported_conversion_raises(self, conv):
-        with pytest.raises(ValueError, match="Unsupported conversion"):
+        with pytest.raises(ValueError, match="Can't convert kg to meter"):
             conv.convert(1, "kg", "meter")
 
     def test_nonsense_units_raises(self, conv):
@@ -470,3 +470,48 @@ class TestFormatResult:
     def test_small_values_keep_four_significant_digits(self, value, text):
         from utils.conversion import format_result
         assert format_result(value) == text
+
+
+class TestErrorReasons:
+    """ConversionError's text is what the launcher shows after "Error:"."""
+
+    @pytest.mark.parametrize("text, reason", [
+        ("10 km to kg", "Can't convert km to kg"),
+        ("10 km", "Expected: 10 km to mi"),
+        ("10 km to mi please", "Expected: 10 km to mi"),
+        ("1 h and x minutes to minutes", "'x' is not a number"),
+        ("1 h and 30 to minutes", "Expected: 1 h and 30 min to s"),
+    ])
+    def test_reason(self, conv, text, reason):
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert(text)
+        assert str(error.value) == reason
+
+    def test_unknown_currency(self, conv, monkeypatch):
+        import utils.conversion as conversion
+
+        nothing = type("Reply", (), {"status_code": 403, "json": lambda self: {}})()
+        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: nothing)
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 ZZZ to NOK")
+        assert str(error.value) == "No rate for ZZZ to NOK"
+
+    def test_rate_limit(self, conv, monkeypatch):
+        import utils.conversion as conversion
+
+        replies = iter([type("Reply", (), {"status_code": code})() for code in (403, 429)])
+        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: next(replies))
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 BTC to NOK")
+        assert str(error.value) == "CoinGecko rate limit reached, try again in a minute"
+
+    def test_no_network(self, conv, monkeypatch):
+        import utils.conversion as conversion
+
+        def get(*args, **kwargs):
+            raise conversion.requests.ConnectionError("unreachable")
+
+        monkeypatch.setattr(conversion.requests, "get", get)
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 USD to NOK")
+        assert str(error.value) == "Can't reach the rates service"
