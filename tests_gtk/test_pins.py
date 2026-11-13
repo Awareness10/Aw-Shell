@@ -1,6 +1,7 @@
 """Pins: saved to ~/.local/share/aw-shell/pins.json, and clicks open, copy or clear a pin."""
 
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -280,3 +281,17 @@ def test_cells_built_when_first_shown(board):
 
 def test_cells_built_on_first_use(board):
     assert len(board().cells) == pins.SLOTS
+
+
+_download_favicon = pins.download_favicon  # the real one; the fixture above replaces it
+
+
+def test_favicon_download_reports_the_saved_file(monkeypatch):
+    fetched, results = [], []
+    monkeypatch.setattr(pins.urllib.request, "urlretrieve",
+                        lambda url, path: fetched.append(url))
+    _download_favicon("https://example.org/some/page", results.append)
+    assert pump_until(lambda: results), "download thread never reported back"
+    assert fetched == ["https://example.org/favicon.ico"]
+    assert results[0].endswith(".ico")
+    os.remove(results[0])

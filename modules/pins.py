@@ -73,7 +73,7 @@ def download_favicon(url, callback):
     """Download a favicon asynchronously and call the callback with the result."""
     favicon_url = get_favicon_url(url)
 
-    def do_download():
+    def do_download(*_):  # GLib.Thread passes its data argument
         temp_file = None
         try:
             temp_fd, temp_path = tempfile.mkstemp(suffix='.ico')
