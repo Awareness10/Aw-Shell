@@ -376,3 +376,12 @@ class TestCurrency:
         assert result == pytest.approx(956.20, abs=0.01)
         assert suffix == "NOK"
         assert rates == ["https://www.floatrates.com/daily/usd.json"]
+
+    def test_no_amount_means_one(self, conv, rates):
+        result, suffix = conv.parse_input_and_convert("USD to NOK")
+        assert result == pytest.approx(9.56, abs=0.01)
+        assert suffix == "NOK"
+
+    def test_no_amount_with_units(self, conv):
+        result, _ = conv.parse_input_and_convert("inch to cm")
+        assert result == pytest.approx(2.54)

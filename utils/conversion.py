@@ -399,18 +399,25 @@ class Conversion():
         return value * rate
 
     @staticmethod
-    def _split_glued(token: str) -> list[str]:
-        """'10km' -> ['10', 'km']; numbers ('1e3') and units stay whole."""
+    def _is_number(token: str) -> bool:
         try:
             float(token)
-            return [token]
+            return True
         except ValueError:
-            pass
+            return False
+
+    @classmethod
+    def _split_glued(cls, token: str) -> list[str]:
+        """'10km' -> ['10', 'km']; numbers ('1e3') and units stay whole."""
+        if cls._is_number(token):
+            return [token]
         match = _GLUED.fullmatch(token)
         return list(match.groups()) if match else [token]
 
     def parse_input_and_convert(self, input: str):
         parts = [part for token in input.split() for part in self._split_glued(token)]
+        if parts and not self._is_number(parts[0]):
+            parts.insert(0, "1")  # "usd to nok" is one dollar
         addition = "s" if parts[-1].endswith("s") else ""
 
         if "and" in parts:  # valor unidad1 and valor2 unidad2 _ a unidad_destino
