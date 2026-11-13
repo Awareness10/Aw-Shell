@@ -346,3 +346,33 @@ class TestParseInputAndConvert:
     def test_invalid_and_format_raises(self, conv):
         with pytest.raises(ValueError):
             conv.parse_input_and_convert("1 kg and 2 _ lb")
+
+
+# =========================================================================
+# Currency
+# =========================================================================
+
+class TestCurrency:
+
+    @pytest.fixture
+    def rates(self, monkeypatch):
+        """floatrates.com's answer for USD; it sends the rate as a string."""
+        import utils.conversion as conversion
+
+        asked = []
+
+        def get(url, timeout=None):
+            asked.append(url)
+            reply = type("Reply", (), {})()
+            reply.status_code = 200
+            reply.json = lambda: {"nok": {"code": "NOK", "rate": "9.56203637"}}
+            return reply
+
+        monkeypatch.setattr(conversion.requests, "get", get)
+        return asked
+
+    def test_rate_sent_as_a_string(self, conv, rates):
+        result, suffix = conv.parse_input_and_convert("100 USD to NOK")
+        assert result == pytest.approx(956.20, abs=0.01)
+        assert suffix == "NOK"
+        assert rates == ["https://www.floatrates.com/daily/usd.json"]

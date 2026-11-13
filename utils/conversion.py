@@ -395,7 +395,7 @@ class Conversion():
         if to_lower not in data:
             raise ValueError(f"Moneda destino '{to_code}' no encontrada en la respuesta de floatrates para '{from_code}'")
 
-        rate = data[to_lower]["rate"]
+        rate = float(data[to_lower]["rate"])  # floatrates sends it as a string
         return value * rate
 
     @staticmethod
