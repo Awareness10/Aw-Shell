@@ -285,6 +285,22 @@ class TestParseInputAndConvert:
         result, suffix = conv.parse_input_and_convert("1 hour and 30 minute _ minute")
         assert result == pytest.approx(90, abs=0.1)
 
+    @pytest.mark.parametrize("text, value, suffix", [
+        ("10km to miles", 6.2137, "miles"),
+        ("6in to cm", 15.24, "cm"),
+        ("6inch to cm", 15.24, "cm"),
+        ("1.5h to minutes", 90, "minutes"),
+        ("1h and 30minutes to minutes", 90, "minutes"),
+    ])
+    def test_number_glued_to_unit(self, conv, text, value, suffix):
+        result, got_suffix = conv.parse_input_and_convert(text)
+        assert result == pytest.approx(value, abs=0.01)
+        assert got_suffix == suffix
+
+    def test_unit_starting_with_e_is_not_an_exponent(self, conv):
+        result, _ = conv.parse_input_and_convert("5EB to PB")
+        assert result == pytest.approx(5 * 1024)
+
     def test_invalid_format_raises(self, conv):
         with pytest.raises(ValueError):
             conv.parse_input_and_convert("just some random text")

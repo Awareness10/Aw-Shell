@@ -1,4 +1,9 @@
+import re
+
 import requests
+
+# A number with its unit attached, as in "10km"
+_GLUED = re.compile(r"([-+]?(?:\d+\.?\d*|\.\d+))(\D.*)")
 
 
 class Units():
@@ -392,8 +397,19 @@ class Conversion():
         rate = data[to_lower]["rate"]
         return value * rate
 
+    @staticmethod
+    def _split_glued(token: str) -> list[str]:
+        """'10km' -> ['10', 'km']; numbers ('1e3') and units stay whole."""
+        try:
+            float(token)
+            return [token]
+        except ValueError:
+            pass
+        match = _GLUED.fullmatch(token)
+        return list(match.groups()) if match else [token]
+
     def parse_input_and_convert(self, input: str):
-        parts = input.split()
+        parts = [part for token in input.split() for part in self._split_glued(token)]
         addition = "s" if parts[-1].endswith("s") else ""
 
         if "and" in parts:  # valor unidad1 and valor2 unidad2 _ a unidad_destino
