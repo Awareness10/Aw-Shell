@@ -522,7 +522,7 @@ class AppLauncher(Box):
         self.update_conversion_viewport()
 
         # Perform conversion in thread
-        def do_conversion():
+        def do_conversion(*_):  # GLib.Thread passes its data argument
             try:
                 result_value, result_type = self.converter.parse_input_and_convert(expr)
                 if result_type is None:
