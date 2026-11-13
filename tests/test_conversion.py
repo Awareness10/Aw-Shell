@@ -385,3 +385,15 @@ class TestCurrency:
     def test_no_amount_with_units(self, conv):
         result, _ = conv.parse_input_and_convert("inch to cm")
         assert result == pytest.approx(2.54)
+
+
+class TestFormatResult:
+
+    @pytest.mark.parametrize("value, text", [
+        (6.2137, "6.21"), (956.203637, "956.20"), (0, "0.00"), (-12.345, "-12.35"),
+        (0.5, "0.5000"), (0.0015384, "0.001538"), (0.00000152, "0.000001520"),
+        (-0.0312, "-0.03120"),
+    ])
+    def test_small_values_keep_four_significant_digits(self, value, text):
+        from utils.conversion import format_result
+        assert format_result(value) == text

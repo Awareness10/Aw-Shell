@@ -525,10 +525,11 @@ class AppLauncher(Box):
         def do_conversion(*_):  # GLib.Thread passes its data argument
             try:
                 result_value, result_type = self.converter.parse_input_and_convert(expr)
-                if result_type is None:
-                    result_str = f"{result_value:.2f}"
-                else:
-                    result_str = f"{result_value:.2f} {result_type}"
+                from utils.conversion import format_result
+
+                result_str = format_result(result_value)
+                if result_type is not None:
+                    result_str += f" {result_type}"
             except:
                 result_str = "Error: Invalid conversion expression"
 

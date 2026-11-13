@@ -1,3 +1,4 @@
+import math
 import re
 
 import requests
@@ -306,6 +307,13 @@ class Units():
         }
 
         # Ya no usamos currency_converter aquí.
+
+
+def format_result(value: float) -> str:
+    """Two decimals; four significant digits below 1 (0.001538 BTC, not 0.00)."""
+    if value == 0 or abs(value) >= 1:
+        return f"{value:.2f}"
+    return f"{value:.{3 - math.floor(math.log10(abs(value)))}f}"
 
 
 class Conversion():
