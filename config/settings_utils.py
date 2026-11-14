@@ -4,12 +4,12 @@ import re
 import shlex
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
-import toml
 from fabric.utils.helpers import exec_shell_command_async
 
-from . import terminal
+from . import terminal, toml_writer
 from .data import (
     AW_CONFIG_DIR,
     CONFIG_DIR,
@@ -286,10 +286,10 @@ def ensure_matugen_config(generate: bool = True):
     existing_config = {}
     if os.path.exists(config_path):
         try:
-            with open(config_path, "r") as f:
-                existing_config = toml.load(f)
+            with open(config_path, "rb") as f:
+                existing_config = tomllib.load(f)
             shutil.copyfile(config_path, config_path + ".bak")
-        except toml.TomlDecodeError:
+        except tomllib.TOMLDecodeError:
             print(
                 f"Warning: Could not decode TOML from {config_path}. A new default config will be created."
             )
@@ -310,8 +310,9 @@ def ensure_matugen_config(generate: bool = True):
     )  # existing_config se modifica in-place
 
     try:
+        text = toml_writer.dumps(merged_config)  # before opening: a failure keeps the file
         with open(config_path, "w") as f:
-            toml.dump(merged_config, f)
+            f.write(text)
     except Exception as e:
         print(f"Error writing matugen config to {config_path}: {e}")
 

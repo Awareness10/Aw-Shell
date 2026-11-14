@@ -1,7 +1,7 @@
+import json
 import os
 import subprocess
 
-import ijson
 from fabric.utils import remove_handler
 from fabric.utils.helpers import get_relative_path
 from fabric.widgets.box import Box
@@ -86,16 +86,13 @@ class EmojiPicker(Box):
         self.show_all()
 
     def _load_emoji_data(self):
-        emoji_data = {}
         emoji_file_path = get_relative_path("../assets/emoji.json")
         if not os.path.exists(emoji_file_path):
             print(f"Emoji JSON file not found at: {emoji_file_path}")
             return {}
 
         with open(emoji_file_path, 'rb') as f:
-            for emoji_char, emoji_info in ijson.kvitems(f, ''):
-                emoji_data[emoji_char] = emoji_info
-        return emoji_data
+            return json.load(f)
 
     def close_picker(self):
         self.stack.children = []

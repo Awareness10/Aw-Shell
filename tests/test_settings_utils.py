@@ -804,7 +804,7 @@ class TestEnsureMatugenConfig:
         assert matugen_config.exists()
 
     def test_hyprland_colors_template_reapplies_borders(self, matugen_env):
-        import toml
+        import tomllib
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
         matugen_config = config_dir / "matugen" / "config.toml"
         with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
@@ -812,14 +812,14 @@ class TestEnsureMatugenConfig:
                        return_value=str(matugen_config)):
                 with patch("config.settings_utils.exec_shell_command_async"):
                     ensure_matugen_config()
-        hook = toml.loads(matugen_config.read_text())["templates"]["hyprland-lua"]["post_hook"]
+        hook = tomllib.loads(matugen_config.read_text())["templates"]["hyprland-lua"]["post_hook"]
         assert f"hyprctl eval '{APPLY_COLORS_FN}()'" in hook
         assert "reload" not in hook
 
     def test_writes_full_palette_json_for_other_tools(self, matugen_env):
         """matuwrap (wrp) reads this file so the terminal follows aw-shell's
         scheme/custom color instead of recomputing tonal-spot colors."""
-        import toml
+        import tomllib
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
         matugen_config = config_dir / "matugen" / "config.toml"
         with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
@@ -827,14 +827,14 @@ class TestEnsureMatugenConfig:
                        return_value=str(matugen_config)):
                 with patch("config.settings_utils.exec_shell_command_async"):
                     ensure_matugen_config()
-        template = toml.loads(matugen_config.read_text())["templates"]["aw-shell-colors-json"]
+        template = tomllib.loads(matugen_config.read_text())["templates"]["aw-shell-colors-json"]
         assert template["input_path"].endswith("/matugen/templates/colors.json")
         assert template["output_path"] == f"{aw_dir}/colors.json"
 
     def test_templates_from_app_dir_outputs_to_user_dir(self, matugen_env):
         """The templates ship with the (possibly read-only) code; matugen
         writes only into the user's folder."""
-        import toml
+        import tomllib
 
         from config.paths import MATUGEN_TEMPLATES
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
@@ -842,7 +842,7 @@ class TestEnsureMatugenConfig:
         with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
             with patch("config.settings_utils.exec_shell_command_async"):
                 ensure_matugen_config()
-        templates = toml.loads(matugen_config.read_text())["templates"]
+        templates = tomllib.loads(matugen_config.read_text())["templates"]
         ours = {k: v for k, v in templates.items() if k.startswith(("aw-shell", "hyprland"))}
         assert ours
         for name, template in ours.items():
@@ -851,20 +851,50 @@ class TestEnsureMatugenConfig:
         assert templates["aw-shell"]["output_path"] == str(css_colors)
 
     def test_merges_with_existing_config(self, matugen_env):
-        import toml
+        import tomllib
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
         matugen_config = config_dir / "matugen" / "config.toml"
         matugen_config.parent.mkdir(parents=True, exist_ok=True)
-        existing = {"config": {"custom_key": "custom_value"}}
-        matugen_config.write_text(toml.dumps(existing))
+        matugen_config.write_text('[config]\ncustom_key = "custom_value"\n')
         with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
             with patch("config.settings_utils.os.path.expanduser",
                        return_value=str(matugen_config)):
                 with patch("config.settings_utils.exec_shell_command_async"):
                     ensure_matugen_config()
-        result = toml.loads(matugen_config.read_text())
+        result = tomllib.loads(matugen_config.read_text())
         assert result["config"]["custom_key"] == "custom_value"
         assert result["config"]["reload_apps"] is True
+
+    def test_merge_keeps_the_users_own_keys(self, matugen_env):
+        """Values of any TOML type the user added are written back as read,
+        and the file read is kept as config.toml.bak."""
+        import tomllib
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        matugen_config = config_dir / "matugen" / "config.toml"
+        matugen_config.parent.mkdir(parents=True, exist_ok=True)
+        users = (
+            'top = "level"\n'
+            '[config]\nreload_apps = false\nversion = 2\nscale = 1.5\n'
+            '[config.wallpaper]\ncommand = "swww"\n'
+            '[templates.kitty]\ninput_path = "~/.config/matugen/kitty \\"x\\".conf"\n'
+            'output_path = "~/.config/kitty/colors.conf"\n'
+            '[[hooks]]\nrun = "notify-send done"\n'
+            '[[hooks]]\nrun = "true"\n'
+        )
+        matugen_config.write_text(users)
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.exec_shell_command_async"):
+                ensure_matugen_config(generate=False)
+        result = tomllib.loads(matugen_config.read_text())
+        assert result["top"] == "level"
+        assert result["config"]["version"] == 2 and result["config"]["scale"] == 1.5
+        assert result["config"]["reload_apps"] is True  # ours wins
+        assert result["config"]["wallpaper"]["command"] == "awww"
+        assert result["config"]["wallpaper"]["set"] is True
+        assert result["templates"]["kitty"]["input_path"] == '~/.config/matugen/kitty "x".conf'
+        assert result["hooks"] == [{"run": "notify-send done"}, {"run": "true"}]
+        assert "aw-shell" in result["templates"]
+        assert (matugen_config.parent / "config.toml.bak").read_text() == users
 
     def test_handles_corrupt_toml(self, matugen_env, capsys):
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
