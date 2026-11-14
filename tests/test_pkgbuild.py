@@ -41,6 +41,7 @@ TYPELIBS = {
     "NM": "libnm",
     "Playerctl": "playerctl",
     "Gray": "bundled",  # built by the PKGBUILD (the AUR's gray-git is broken)
+    "DbusmenuGtk3": "libdbusmenu-gtk3",  # tray menus (modules/systemtray.py)
     "Cvc": "cinnamon-desktop",  # fabric.audio
 }
 
@@ -86,7 +87,7 @@ def test_every_typelib_the_shell_loads_has_its_package(depends):
     for folder in ("config", "modules", "services", "utils", "widgets"):
         for path in (REPO / folder).rglob("*.py"):
             namespaces |= set(re.findall(r"require_version\(['\"](\w+)['\"]", path.read_text()))
-    assert {"Gtk", "GtkLayerShell", "NM", "Gray"} <= namespaces  # the scan works
+    assert {"Gtk", "GtkLayerShell", "NM", "DbusmenuGtk3"} <= namespaces  # the scan works
     assert "cinnamon-desktop" in depends  # Cvc, loaded by fabric.audio (not scanned)
     for namespace in namespaces:
         assert namespace in TYPELIBS, f"{namespace}: add its package to TYPELIBS and the PKGBUILD"
