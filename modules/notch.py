@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from fabric.audio.service import Audio
 from fabric.hyprland.widgets import HyprlandActiveWindow as ActiveWindow
 from fabric.utils.helpers import FormattedString
@@ -25,6 +28,23 @@ from utils.icon_resolver import IconResolver
 from utils.notch_layout import notch_layout
 from utils.occlusion import OcclusionWatcher
 from widgets.wayland import WaylandWindow as Window
+
+
+@dataclass(frozen=True)
+class NotchView:
+    """A view open_notch(name) shows on the notch stack."""
+
+    name: str
+    # Child of the notch stack
+    widget: object
+    on_open: Callable[[], object] | None = None
+    # Runs after on_open
+    focus: Callable[[], object] | None = None
+    hide_bar_revealers: bool = False
+    # Dashboard views: section to go to, and the applet stack child in the
+    # widgets section. Applets switch in place while the dashboard shows.
+    section: str | None = None
+    applet: object | None = None
 
 
 class Notch(Window):
@@ -303,6 +323,7 @@ class Notch(Window):
 
         self.stack.set_interpolate_size(True)
         self.stack.set_homogeneous(False)
+        self._views = self._build_views()
 
         self.corner_left = Box(
             name="notch-corner-left",
@@ -799,150 +820,109 @@ class Notch(Window):
         finally:
             self._focused_monitor_done = True
 
+    def _build_views(self):
+        """The views open_notch() can show, by name (see NotchView)."""
+        widgets_section = {"section": "widgets", "hide_bar_revealers": True}
+
+        def focus_search(view):
+            return lambda: (view.search_entry.set_text(""), view.search_entry.grab_focus())
+
+        views = [
+            # Dashboard applets, in the widgets section's applet stack
+            NotchView("dashboard", self.dashboard, applet=self.nhistory, **widgets_section),
+            NotchView("bluetooth", self.dashboard, applet=self.btdevices, **widgets_section),
+            NotchView(
+                "network_applet", self.dashboard, applet=self.nwconnections, **widgets_section
+            ),
+            # Other dashboard sections
+            *(
+                NotchView(name, self.dashboard, section=name, hide_bar_revealers=True)
+                for name in ("pins", "kanban", "wallpapers", "mixer")
+            ),
+            NotchView("tmux", self.tmux, on_open=lambda: self.tmux.open_manager()),
+            NotchView(
+                "cliphist", self.cliphist, on_open=lambda: GLib.idle_add(self.cliphist.open)
+            ),
+            NotchView(
+                "launcher",
+                self.launcher,
+                on_open=lambda: self.launcher.open_launcher(),
+                focus=focus_search(self.launcher),
+            ),
+            NotchView(
+                "emoji",
+                self.emoji,
+                on_open=lambda: self.emoji.open_picker(),
+                focus=focus_search(self.emoji),
+            ),
+            NotchView("overview", self.overview, hide_bar_revealers=True),
+            NotchView("power", self.power),
+            NotchView("tools", self.tools),
+        ]
+        return {view.name: view for view in views}
+
+    def _view(self, widget_name: str) -> "NotchView":
+        """The registered view; an unknown name shows the dashboard as it is."""
+        view = self._views.get(widget_name)
+        if view is None:
+            view = NotchView(widget_name, self.dashboard, hide_bar_revealers=True)
+        return view
+
+    def _is_view_showing(self, view: "NotchView") -> bool:
+        if self.stack.get_visible_child() != view.widget:
+            return False
+        if view.widget != self.dashboard:
+            return True
+        if view.section is None:
+            return False
+        return self.dashboard.stack.get_visible_child() == getattr(
+            self.dashboard, view.section
+        ) and (view.applet is None or self.applet_stack.get_visible_child() == view.applet)
+
+    def _show_dashboard_section(self, view: "NotchView"):
+        if view.section is None:
+            return
+        self.dashboard.go_to_section(view.section)
+        if view.applet is not None:
+            self.applet_stack.set_visible_child(view.applet)
+
     def _open_notch_internal(self, widget_name: str):
-        
         self.notch_revealer.set_reveal_child(True)
         self.notch_box.add_style_class("open")
         self.stack.add_style_class("open")
-        current_stack_child = self.stack.get_visible_child()
-        is_dashboard_currently_visible = current_stack_child == self.dashboard
+        view = self._view(widget_name)
 
-        if widget_name == "network_applet":
-            if is_dashboard_currently_visible:
-                if (
-                    self.dashboard.stack.get_visible_child() == self.dashboard.widgets
-                    and self.applet_stack.get_visible_child() == self.nwconnections
-                ):
-                    self.close_notch()
-                    return
+        # Opening the view that is showing closes the notch
+        if self._is_view_showing(view):
+            self.close_notch()
+            return
 
-                self.set_keyboard_mode("exclusive")
-                self.dashboard.go_to_section("widgets")
-                self.applet_stack.set_visible_child(self.nwconnections)
-                return
-
-        elif widget_name == "bluetooth":
-            if is_dashboard_currently_visible:
-                if (
-                    self.dashboard.stack.get_visible_child() == self.dashboard.widgets
-                    and self.applet_stack.get_visible_child() == self.btdevices
-                ):
-                    self.close_notch()
-                    return
-
-                self.set_keyboard_mode("exclusive")
-                self.dashboard.go_to_section("widgets")
-                self.applet_stack.set_visible_child(self.btdevices)
-                return
-
-        elif widget_name == "dashboard":
-            if is_dashboard_currently_visible:
-                if (
-                    self.dashboard.stack.get_visible_child() == self.dashboard.widgets
-                    and self.applet_stack.get_visible_child() == self.nhistory
-                ):
-                    self.close_notch()
-                    return
-
-                self.set_keyboard_mode("exclusive")
-                self.dashboard.go_to_section("widgets")
-                self.applet_stack.set_visible_child(self.nhistory)
-                return
-
-        dashboard_sections_map = {
-            "pins": self.dashboard.pins,
-            "kanban": self.dashboard.kanban,
-            "wallpapers": self.dashboard.wallpapers,
-            "mixer": self.dashboard.mixer,
-        }
-        if widget_name in dashboard_sections_map:
-            section_widget_instance = dashboard_sections_map[widget_name]
-
-            if (
-                is_dashboard_currently_visible
-                and self.dashboard.stack.get_visible_child() == section_widget_instance
-            ):
-                self.close_notch()
-                return
-
-        target_widget_on_stack = None
-        action_on_open = None
-        focus_action = None
-
-        hide_bar_revealers = False
-
-        widget_configs = {
-            "tmux": {"instance": self.tmux, "action": self.tmux.open_manager},
-            "cliphist": {
-                "instance": self.cliphist,
-                "action": lambda: GLib.idle_add(self.cliphist.open),
-            },
-            "launcher": {
-                "instance": self.launcher,
-                "action": self.launcher.open_launcher,
-                "focus": lambda: (
-                    self.launcher.search_entry.set_text(""),
-                    self.launcher.search_entry.grab_focus(),
-                ),
-            },
-            "emoji": {
-                "instance": self.emoji,
-                "action": self.emoji.open_picker,
-                "focus": lambda: (
-                    self.emoji.search_entry.set_text(""),
-                    self.emoji.search_entry.grab_focus(),
-                ),
-            },
-            "overview": {"instance": self.overview, "hide_revealers": True},
-            "power": {"instance": self.power},
-            "tools": {"instance": self.tools},
-        }
-
-        if widget_name in widget_configs:
-            config = widget_configs[widget_name]
-            target_widget_on_stack = config["instance"]
-            action_on_open = config.get("action")
-            focus_action = config.get("focus")
-            hide_bar_revealers = config.get("hide_revealers", False)
-
-            if current_stack_child == target_widget_on_stack:
-                self.close_notch()
-                return
-        else:
-            target_widget_on_stack = self.dashboard
-            hide_bar_revealers = True
+        # Applets switch in place while the dashboard is showing
+        if view.applet is not None and self.stack.get_visible_child() == self.dashboard:
+            self.set_keyboard_mode("exclusive")
+            self._show_dashboard_section(view)
+            return
 
         self.set_keyboard_mode("exclusive")
-        self.stack.set_visible_child(target_widget_on_stack)
+        self.stack.set_visible_child(view.widget)
 
-        if action_on_open:
-            action_on_open()
-        if focus_action:
-            focus_action()
+        if view.on_open:
+            view.on_open()
+        if view.focus:
+            view.focus()
 
-        if target_widget_on_stack == self.dashboard:
-            if widget_name == "bluetooth":
-                self.dashboard.go_to_section("widgets")
-                self.applet_stack.set_visible_child(self.btdevices)
-            elif widget_name == "network_applet":
-                self.dashboard.go_to_section("widgets")
-                self.applet_stack.set_visible_child(self.nwconnections)
-            elif widget_name in dashboard_sections_map:
-                self.dashboard.go_to_section(widget_name)
-            elif widget_name == "dashboard":
-                self.dashboard.go_to_section("widgets")
-                self.applet_stack.set_visible_child(self.nhistory)
+        self._show_dashboard_section(view)
 
         if self._layout.keep_bar_revealers:
             self.bar.revealer_right.set_reveal_child(True)
             self.bar.revealer_left.set_reveal_child(True)
         else:
-            self.bar.revealer_right.set_reveal_child(not hide_bar_revealers)
-            self.bar.revealer_left.set_reveal_child(not hide_bar_revealers)
+            self.bar.revealer_right.set_reveal_child(not view.hide_bar_revealers)
+            self.bar.revealer_left.set_reveal_child(not view.hide_bar_revealers)
 
         if self.bar and not self.bar.get_visible() and data.BAR_POSITION == "Top":
             self.set_margin("0px 8px 8px 8px")
-        
+
         self._is_notch_open = True
 
     def toggle_hidden(self):
@@ -1193,16 +1173,7 @@ class Notch(Window):
             "tmux",
         ]:
             self.stack.remove_style_class(style)
-        for w in [
-            self.launcher,
-            self.dashboard,
-            self.overview,
-            self.emoji,
-            self.power,
-            self.tools,
-            self.tmux,
-            self.cliphist,
-        ]:
+        for w in dict.fromkeys(view.widget for view in self._views.values()):
             w.remove_style_class("open")
 
         self.stack.add_style_class("launcher")
@@ -1264,47 +1235,39 @@ class Notch(Window):
 
         return False
 
+    @staticmethod
+    def _typed_char(keyval):
+        """The character a key types into the launcher search, or None."""
+        keychar = chr(keyval) if 32 <= keyval <= 126 else None
+
+        is_valid_char = (
+            (keyval >= Gdk.KEY_a and keyval <= Gdk.KEY_z)
+            or (keyval >= Gdk.KEY_A and keyval <= Gdk.KEY_Z)
+            or (keyval >= Gdk.KEY_0 and keyval <= Gdk.KEY_9)
+            or keyval
+            in (Gdk.KEY_space, Gdk.KEY_underscore, Gdk.KEY_minus, Gdk.KEY_period)
+        )
+        return keychar if is_valid_char else None
+
     def on_key_press(self, widget, event):
         """Handle key presses at the notch level"""
 
         if self._launcher_transitioning:
-            keyval = event.keyval
-            keychar = chr(keyval) if 32 <= keyval <= 126 else None
-
-            is_valid_char = (
-                (keyval >= Gdk.KEY_a and keyval <= Gdk.KEY_z)
-                or (keyval >= Gdk.KEY_A and keyval <= Gdk.KEY_Z)
-                or (keyval >= Gdk.KEY_0 and keyval <= Gdk.KEY_9)
-                or keyval
-                in (Gdk.KEY_space, Gdk.KEY_underscore, Gdk.KEY_minus, Gdk.KEY_period)
-            )
-
-            if is_valid_char and keychar:
+            keychar = self._typed_char(event.keyval)
+            if keychar:
                 self._typed_chars_buffer += keychar
                 print(
                     f"Buffered character: {keychar}, buffer now: '{self._typed_chars_buffer}'"
                 )
                 return True
 
+        # Typing on the dashboard's widgets section opens the launcher
         if (
             self.stack.get_visible_child() == self.dashboard
             and self.dashboard.stack.get_visible_child() == self.dashboard.widgets
         ):
-            if self.stack.get_visible_child() == self.launcher:
-                return False
-
-            keyval = event.keyval
-            keychar = chr(keyval) if 32 <= keyval <= 126 else None
-
-            is_valid_char = (
-                (keyval >= Gdk.KEY_a and keyval <= Gdk.KEY_z)
-                or (keyval >= Gdk.KEY_A and keyval <= Gdk.KEY_Z)
-                or (keyval >= Gdk.KEY_0 and keyval <= Gdk.KEY_9)
-                or keyval
-                in (Gdk.KEY_space, Gdk.KEY_underscore, Gdk.KEY_minus, Gdk.KEY_period)
-            )
-
-            if is_valid_char and keychar:
+            keychar = self._typed_char(event.keyval)
+            if keychar:
                 print(f"Notch received keypress: {keychar}")
 
                 self.open_launcher_with_text(keychar)
