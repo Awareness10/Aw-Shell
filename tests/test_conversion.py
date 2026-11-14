@@ -1,8 +1,33 @@
 """Tests for utils/conversion.py - Unit conversion logic."""
 
+import io
+import json
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, urlsplit
+
 import pytest
 
 from utils.conversion import Conversion, ConversionError, Units
+
+
+def serve(monkeypatch, answer, asked=None):
+    """Stand in for urlopen: answer(url) gives (status, body). Like urlopen,
+    a status outside 2xx raises HTTPError; every request must time out in 5 s."""
+    import utils.conversion as conversion
+
+    def urlopen(url, timeout=None):
+        assert timeout == 5
+        if asked is not None:
+            asked.append(url)
+        status, body = answer(url)
+        body = body if isinstance(body, bytes) else json.dumps(body).encode()
+        if not 200 <= status < 300:
+            raise HTTPError(url, status, "error", {}, io.BytesIO(body))
+        reply = io.BytesIO(body)
+        reply.status = status
+        return reply
+
+    monkeypatch.setattr(conversion, "urlopen", urlopen)
 
 
 @pytest.fixture
@@ -357,18 +382,9 @@ class TestCurrency:
     @pytest.fixture
     def rates(self, monkeypatch):
         """floatrates.com's answer for USD; it sends the rate as a string."""
-        import utils.conversion as conversion
-
         asked = []
-
-        def get(url, timeout=None):
-            asked.append(url)
-            reply = type("Reply", (), {})()
-            reply.status_code = 200
-            reply.json = lambda: {"nok": {"code": "NOK", "rate": "9.56203637"}}
-            return reply
-
-        monkeypatch.setattr(conversion.requests, "get", get)
+        serve(monkeypatch, lambda url: (200, {"nok": {"code": "NOK", "rate": "9.56203637"}}),
+              asked)
         return asked
 
     def test_rate_sent_as_a_string(self, conv, rates):
@@ -392,29 +408,23 @@ class TestCrypto:
 
     @pytest.fixture
     def web(self, monkeypatch):
-        import utils.conversion as conversion
-
         prices = {"btc": {"nok": 650000, "usd": 68000}, "eth": {"btc": 0.028},
                   "doge": {"usd": 0.1}}
         fiat = {"usd": {"nok": {"rate": "9.5"}}, "nok": {"usd": {"rate": "0.105"}}}
         asked = []
 
-        def get(url, params=None, timeout=None):
-            asked.append(url)
-            reply = type("Reply", (), {})()
-            reply.status_code = 200
+        def answer(url):
             if "floatrates" in url:
                 code = url.rsplit("/", 1)[1].removesuffix(".json")
-                reply.status_code = 200 if code in fiat else 403
-                reply.json = lambda: fiat[code]
-            else:
-                coins, versus = (params[key].split(",") for key in ("symbols", "vs_currencies"))
-                found = {coin: {v: prices[coin][v] for v in versus if v in prices[coin]}
+                return (200, fiat[code]) if code in fiat else (403, b"")
+            parts = urlsplit(url)
+            assert parts.netloc + parts.path == "api.coingecko.com/api/v3/simple/price"
+            params = parse_qs(parts.query)
+            coins, versus = (params[key][0].split(",") for key in ("symbols", "vs_currencies"))
+            return 200, {coin: {v: prices[coin][v] for v in versus if v in prices[coin]}
                          for coin in coins if coin in prices}
-                reply.json = lambda: found
-            return reply
 
-        monkeypatch.setattr(conversion.requests, "get", get)
+        serve(monkeypatch, answer, asked)
         return asked
 
     def test_crypto_to_fiat(self, conv, web):
@@ -444,10 +454,7 @@ class TestCrypto:
         assert len([url for url in web if "coingecko" in url]) == 1
 
     def test_rate_limit_is_an_error(self, conv, web, monkeypatch):
-        import utils.conversion as conversion
-
-        limited = type("Reply", (), {"status_code": 429})()
-        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: limited)
+        serve(monkeypatch, lambda url: (429, b""))
         with pytest.raises(ValueError):
             conv.parse_input_and_convert("1 BTC to NOK")
 
@@ -488,30 +495,38 @@ class TestErrorReasons:
         assert str(error.value) == reason
 
     def test_unknown_currency(self, conv, monkeypatch):
-        import utils.conversion as conversion
-
-        nothing = type("Reply", (), {"status_code": 403, "json": lambda self: {}})()
-        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: nothing)
+        serve(monkeypatch, lambda url: (403, {}))
         with pytest.raises(ConversionError) as error:
             conv.parse_input_and_convert("1 ZZZ to NOK")
         assert str(error.value) == "No rate for ZZZ to NOK"
 
     def test_rate_limit(self, conv, monkeypatch):
-        import utils.conversion as conversion
-
-        replies = iter([type("Reply", (), {"status_code": code})() for code in (403, 429)])
-        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: next(replies))
+        replies = iter([(403, b""), (429, b"")])
+        serve(monkeypatch, lambda url: next(replies))
         with pytest.raises(ConversionError) as error:
             conv.parse_input_and_convert("1 BTC to NOK")
         assert str(error.value) == "CoinGecko rate limit reached, try again in a minute"
 
-    def test_no_network(self, conv, monkeypatch):
-        import utils.conversion as conversion
+    @pytest.mark.parametrize("failure", [
+        URLError("Name or service not known"), ConnectionRefusedError(), TimeoutError(),
+    ])
+    def test_no_network(self, conv, monkeypatch, failure):
+        def unreachable(url):
+            raise failure
 
-        def get(*args, **kwargs):
-            raise conversion.requests.ConnectionError("unreachable")
-
-        monkeypatch.setattr(conversion.requests, "get", get)
+        serve(monkeypatch, unreachable)
         with pytest.raises(ConversionError) as error:
             conv.parse_input_and_convert("1 USD to NOK")
         assert str(error.value) == "Can't reach the rates service"
+
+    def test_unreadable_coingecko_answer(self, conv, monkeypatch):
+        serve(monkeypatch, lambda url: (403, b"") if "floatrates" in url else (200, b"<html>"))
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 BTC to NOK")
+        assert str(error.value) == "Can't reach the rates service"
+
+    def test_unreadable_floatrates_answer_falls_back_to_coingecko(self, conv, monkeypatch):
+        serve(monkeypatch, lambda url: (200, b"<html>") if "floatrates" in url
+              else (200, {"btc": {"nok": 650000}}))
+        result, _ = conv.parse_input_and_convert("1 BTC to NOK")
+        assert result == 650000

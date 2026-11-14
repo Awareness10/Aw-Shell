@@ -1,7 +1,10 @@
+import http.client
+import json
 import math
 import re
-
-import requests
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 # A number with its unit attached, as in "10km"
 _GLUED = re.compile(r"([-+]?(?:\d+\.?\d*|\.\d+))(\D.*)")
@@ -313,6 +316,43 @@ class ConversionError(ValueError):
     """Why an expression can't be converted, worded for the launcher."""
 
 
+class _NoAnswer(Exception):
+    """The rates service couldn't be reached, or its answer was unreadable."""
+
+
+class _BadJSON(_NoAnswer, ValueError):
+    """The body isn't JSON. Also a ValueError, so a bad floatrates answer
+    still falls back to CoinGecko."""
+
+
+class _Reply:
+    """An HTTP answer: its status code and body."""
+
+    def __init__(self, status_code: int, body: bytes):
+        self.status_code = status_code
+        self.body = body
+
+    def json(self):
+        try:
+            return json.loads(self.body)
+        except ValueError as error:
+            raise _BadJSON(str(error)) from error
+
+
+def _get(url: str, params: dict | None = None, timeout: float = 5) -> _Reply:
+    """GET url; any HTTP status is a reply, no answer at all is _NoAnswer."""
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    try:
+        with urlopen(url, timeout=timeout) as resp:
+            return _Reply(resp.status, resp.read())
+    except HTTPError as error:  # 4xx/5xx still answered
+        error.close()
+        return _Reply(error.code, b"")
+    except (OSError, http.client.HTTPException) as error:  # DNS, refused, timeout
+        raise _NoAnswer(str(error)) from error
+
+
 def format_result(value: float) -> str:
     """Two decimals; four significant digits below 1 (0.001538 BTC, not 0.00)."""
     if value == 0 or abs(value) >= 1:
@@ -395,7 +435,7 @@ class Conversion():
             except ValueError:
                 from_lower, to_lower = from_code.lower(), to_code.lower()
                 prices = self._coingecko_prices(from_lower, to_lower)
-        except requests.RequestException as error:
+        except _NoAnswer as error:
             raise ConversionError("Can't reach the rates service") from error
         if prices.get(from_lower, {}).get(to_lower):
             return value * prices[from_lower][to_lower]
@@ -409,7 +449,7 @@ class Conversion():
         request (the keyless API allows only a few a minute); coins and
         pairs CoinGecko doesn't have are left out."""
         both = ",".join(symbols)
-        resp = requests.get(
+        resp = _get(
             "https://api.coingecko.com/api/v3/simple/price",
             params={"symbols": both, "vs_currencies": both},
             timeout=5,
@@ -431,7 +471,7 @@ class Conversion():
             return value
 
         url = f"https://www.floatrates.com/daily/{from_lower}.json"
-        resp = requests.get(url, timeout=5)
+        resp = _get(url, timeout=5)
         if resp.status_code != 200:
             raise ValueError(f"Error al obtener datos de floatrates para {from_code}")
 
