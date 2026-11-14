@@ -20,8 +20,7 @@ from fabric import Application
 from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
-from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE, GTK_THEMING
-from config.gtk_theme import apply_gtk_theme
+from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
 from config.legacy import move_legacy_files
 from config.migrate import fix_hyprlock_config, old_install_notice
 from config.paths import APP_DIR, USER_DIR, self_updatable
@@ -31,7 +30,7 @@ from modules.corners import Corners
 from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
-from utils.stylesheet import build_stylesheet
+from utils.commands import ShellCommands, install_legacy_aliases
 from utils.tooltips import install_tooltip_dedup
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
@@ -171,17 +170,20 @@ if __name__ == "__main__":
     # Create the application with all components
     app = Application(f"{APP_NAME}", *app_components)
 
-    def set_css():
-        app.set_stylesheet_from_string(build_stylesheet(), base_path=str(APP_DIR))
+    # `fabric-cli exec aw-shell 'shell.<command>()'` (keybinds, matugen
+    # post_hooks) runs in this module's namespace; see utils/commands.py
+    shell = ShellCommands(app, notch)
 
-    app.set_css = set_css
+    # Older generated aw-shell.lua / matugen configs call `app.set_css()`,
+    # `app.apply_gtk_theme()` and `notch....`, so `app` and `notch` stay
+    # module globals too
+    install_legacy_aliases(app, shell)
 
-    app.set_css()
+    shell.reload_css()
 
     # GTK apps in the shell's colors (or put the user's files back when off);
     # matugen's post_hook calls it again after a wallpaper change
-    app.apply_gtk_theme = lambda: apply_gtk_theme(GTK_THEMING)
-    app.apply_gtk_theme()
+    shell.apply_gtk_theme()
 
     # Package installs: point users with an old clone at --migrate, once the
     # shell's notification server is up

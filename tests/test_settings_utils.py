@@ -816,6 +816,22 @@ class TestEnsureMatugenConfig:
         assert f"hyprctl eval '{APPLY_COLORS_FN}()'" in hook
         assert "reload" not in hook
 
+    def test_shell_post_hooks_use_command_facade(self, matugen_env):
+        """The shell's hooks call `shell.*` (utils/commands.py), not the
+        widget tree."""
+        import toml
+        tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
+        matugen_config = config_dir / "matugen" / "config.toml"
+        with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
+            with patch("config.settings_utils.os.path.expanduser",
+                       return_value=str(matugen_config)):
+                with patch("config.settings_utils.exec_shell_command_async"):
+                    ensure_matugen_config()
+        templates = toml.loads(matugen_config.read_text())["templates"]
+        assert (templates["aw-shell-colors-json"]["post_hook"]
+                == "fabric-cli exec aw-shell 'shell.apply_gtk_theme()' &")
+        assert templates["aw-shell"]["post_hook"] == "fabric-cli exec aw-shell 'shell.reload_css()' &"
+
     def test_writes_full_palette_json_for_other_tools(self, matugen_env):
         """matuwrap (wrp) reads this file so the terminal follows aw-shell's
         scheme/custom color instead of recomputing tonal-spot colors."""
