@@ -22,6 +22,7 @@ from modules.power import PowerMenu
 from modules.tmux import TmuxManager
 from modules.tools import Toolbox
 from utils.icon_resolver import IconResolver
+from utils.notch_layout import notch_layout
 from utils.occlusion import OcclusionWatcher
 from widgets.wayland import WaylandWindow as Window
 
@@ -37,105 +38,22 @@ class Notch(Window):
             self.monitor_manager = get_monitor_manager()
         except ImportError:
             pass
-        is_panel_vertical = False
-        if data.PANEL_THEME == "Panel":
-            is_panel_vertical = data.VERTICAL
-
-        anchor_val = "top"
-        revealer_transition_type = "slide-down"
-
-        if data.PANEL_THEME == "Notch":
-            anchor_val = "top"
-            revealer_transition_type = "slide-down"
-        elif data.PANEL_THEME == "Panel":
-            if is_panel_vertical:
-                if data.BAR_POSITION == "Left":
-                    match data.PANEL_POSITION:
-                        case "Start":
-                            anchor_val = "left top"
-                            revealer_transition_type = "slide-right"
-                        case "Center":
-                            anchor_val = "left"
-                            revealer_transition_type = "slide-right"
-                        case "End":
-                            anchor_val = "left bottom"
-                            revealer_transition_type = "slide-right"
-                        case _:
-                            anchor_val = "left"
-                            revealer_transition_type = "slide-right"
-                elif data.BAR_POSITION == "Right":
-                    match data.PANEL_POSITION:
-                        case "Start":
-                            anchor_val = "right top"
-                            revealer_transition_type = "slide-left"
-                        case "Center":
-                            anchor_val = "right"
-                            revealer_transition_type = "slide-left"
-                        case "End":
-                            anchor_val = "right bottom"
-                            revealer_transition_type = "slide-left"
-                        case _:
-                            anchor_val = "right"
-                            revealer_transition_type = "slide-left"
-            else:
-                if data.BAR_POSITION == "Top":
-                    match data.PANEL_POSITION:
-                        case "Start":
-                            anchor_val = "top left"
-                            revealer_transition_type = "slide-down"
-                        case "Center":
-                            anchor_val = "top"
-                            revealer_transition_type = "slide-down"
-                        case "End":
-                            anchor_val = "top right"
-                            revealer_transition_type = "slide-down"
-                        case _:
-                            anchor_val = "top"
-                            revealer_transition_type = "slide-down"
-                elif data.BAR_POSITION == "Bottom":
-                    match data.PANEL_POSITION:
-                        case "Start":
-                            anchor_val = "bottom left"
-                            revealer_transition_type = "slide-up"
-                        case "Center":
-                            anchor_val = "bottom"
-                            revealer_transition_type = "slide-up"
-                        case "End":
-                            anchor_val = "bottom right"
-                            revealer_transition_type = "slide-up"
-                        case _:
-                            anchor_val = "bottom"
-                            revealer_transition_type = "slide-up"
-
-        default_top_anchor_margin_str = "-40px 8px 8px 8px"
-        pills_margin_top_str = "-40px 0px 0px 0px"
-        dense_edge_margin_top_str = "-46px 0px 0px 0px"
-        current_margin_str = ""
-
-        if data.PANEL_THEME == "Panel":
-            current_margin_str = "0px 0px 0px 0px"
-        else:
-            if data.VERTICAL:
-                current_margin_str = "0px 0px 0px 0px"
-            else:
-                if data.BAR_POSITION == "Bottom":
-                    current_margin_str = "0px 0px 0px 0px"
-                else:
-                    match data.BAR_THEME:
-                        case "Pills":
-                            current_margin_str = pills_margin_top_str
-                        case "Dense" | "Edge":
-                            current_margin_str = dense_edge_margin_top_str
-                        case _:
-                            current_margin_str = default_top_anchor_margin_str
+        self._layout = layout = notch_layout(
+            panel_theme=data.PANEL_THEME,
+            bar_position=data.BAR_POSITION,
+            panel_position=data.PANEL_POSITION,
+            vertical=data.VERTICAL,
+            bar_theme=data.BAR_THEME,
+        )
+        is_panel_vertical = layout.is_panel_vertical
 
         super().__init__(
             name="notch",
             layer="overlay",
-            anchor=anchor_val,
-            margin=current_margin_str,
+            anchor=layout.anchor,
+            margin=layout.margin,
             keyboard_mode="none",
-            exclusivity="none" if data.PANEL_THEME == "Notch" else "normal",
+            exclusivity=layout.exclusivity,
             visible=True,
             all_visible=True,
             monitor=monitor_id,
@@ -347,10 +265,7 @@ class Notch(Window):
             name="notch-content",
             v_expand=True,
             h_expand=True,
-            style_classes=["invert"]
-            if (not data.VERTICAL and data.BAR_THEME in ["Dense", "Edge"])
-            and data.BAR_POSITION not in ["Bottom"]
-            else [],
+            style_classes=["invert"] if layout.invert else [],
             transition_type="crossfade",
             transition_duration=250,
             children=[
@@ -372,9 +287,7 @@ class Notch(Window):
             self.stack.add_style_class(data.BAR_POSITION.lower())
             self.stack.add_style_class(data.PANEL_POSITION.lower())
 
-        if is_panel_vertical or (
-            data.PANEL_POSITION in ["Start", "End"] and data.PANEL_THEME == "Panel"
-        ):
+        if layout.narrow_views:
             self.compact.set_size_request(260, 40)
             self.launcher.set_size_request(320, 635)
             self.tmux.set_size_request(320, 635)
@@ -419,7 +332,7 @@ class Notch(Window):
 
         self.notch_revealer = Revealer(
             name="notch-revealer",
-            transition_type=revealer_transition_type,
+            transition_type=layout.revealer_transition,
             transition_duration=250,
             child_revealed=True,
             child=self.notch_box,
@@ -436,16 +349,9 @@ class Notch(Window):
         self._is_notch_open = False
         self._scrolling = False
 
-        if data.VERTICAL:
-            vert_comp_size = {
-                "Pills": 38,
-                "Dense": 50,
-                "Edge": 44,
-            }.get(data.BAR_THEME, 38)
-            
-            if is_panel_vertical:
-                vert_comp_size = 1
-                
+        if layout.vert_comp_size is not None:
+            vert_comp_size = layout.vert_comp_size
+
             self.vert_comp_left = Box(name="vert-comp")
             self.vert_comp_left.set_size_request(vert_comp_size, 0)
             self.vert_comp_left.set_sensitive(False)
@@ -844,12 +750,7 @@ class Notch(Window):
             self.notch_revealer.set_reveal_child(False)
 
         if self.bar and not self.bar.get_visible() and data.BAR_POSITION == "Top":
-            if data.BAR_THEME == "Pills":
-                self.set_margin("-40px 0px 0px 0px")
-            elif data.BAR_THEME in ["Dense", "Edge"]:
-                self.set_margin("-46px 0px 0px 0px")
-            else:
-                self.set_margin("-40px 8px 8px 8px")
+            self.set_margin(self._layout.hidden_bar_margin)
 
     def open_notch(self, widget_name: str):
         # Debug info for troubleshooting
@@ -1032,12 +933,7 @@ class Notch(Window):
                 self.dashboard.go_to_section("widgets")
                 self.applet_stack.set_visible_child(self.nhistory)
 
-        if (
-            data.BAR_POSITION in ["Top", "Bottom"]
-            and data.PANEL_THEME == "Panel"
-            or data.BAR_POSITION in ["Bottom"]
-            and data.PANEL_THEME == "Notch"
-        ):
+        if self._layout.keep_bar_revealers:
             self.bar.revealer_right.set_reveal_child(True)
             self.bar.revealer_left.set_reveal_child(True)
         else:
