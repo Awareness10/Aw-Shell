@@ -10,6 +10,7 @@ from gi.repository import Gdk, GObject, Gtk
 
 import modules.controls as controls
 import modules.icons as icons
+import modules.level_sources as level_sources
 from services.brightness import Brightness
 
 DEBOUNCE = 0.1  # DebouncedValueMixin._debounce_timeout, in seconds
@@ -93,7 +94,7 @@ def audio(sandbox, monkeypatch):
     fake = FakeAudio()
     fake.speaker = FakeStream()
     fake.microphone = FakeStream()
-    monkeypatch.setattr(controls, "Audio", lambda: fake)
+    monkeypatch.setattr(level_sources, "Audio", lambda: fake)
     return fake
 
 
@@ -531,3 +532,27 @@ def test_mic_icon_mute(audio, make):
     assert label(icon) == icons.mic
     assert not has_class(icon, "muted") and not has_class(icon.control_label, "muted")
     assert stream.volume_sets == []
+
+
+def test_destroyed_controls_stop_listening(audio, brightness):
+    """The services outlive the bars and dashboards (one per monitor)."""
+    from fabric.widgets.box import Box
+
+    def listening(obj, signal):
+        signal_id, detail = GObject.signal_parse_name(signal, obj, True)
+        return GObject.signal_has_handler_pending(obj, signal_id, detail, False)
+
+    box = Box(children=[
+        cls() for cls in (controls.BrightnessSlider, controls.BrightnessSmall,
+                          controls.BrightnessIcon, controls.VolumeSlider, controls.VolumeSmall,
+                          controls.VolumeIcon, controls.MicSlider, controls.MicSmall,
+                          controls.MicIcon)
+    ])
+    assert listening(brightness, "screen") and listening(audio.speaker, "changed")
+    box.destroy()  # children go through GTK's destroy, not the Python override
+    for obj, signal in [(brightness, "screen"), (audio, "notify::speaker"),
+                        (audio, "notify::microphone"), (audio.speaker, "changed"),
+                        (audio.microphone, "changed")]:
+        assert not listening(obj, signal), signal
+    brightness.change(70)
+    audio.speaker.change(volume=10)
