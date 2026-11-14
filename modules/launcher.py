@@ -502,7 +502,6 @@ class AppLauncher(Box):
         expr = text.lstrip("=").strip()
         if not expr:
             return
-        # Loaded here, not with the shell: it imports numpy (~40 ms)
         import utils.calculator as calculator
 
         result_str = calculator.evaluate(expr)
