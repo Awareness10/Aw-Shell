@@ -246,3 +246,23 @@ def test_typing_on_dashboard_widgets_opens_launcher(notch, run_pending):
     assert notch.on_key_press(notch, SimpleNamespace(keyval=Gdk.KEY_b)) is True
     assert notch.on_key_press(notch, SimpleNamespace(keyval=Gdk.KEY_Escape)) is False
     assert pump_until(lambda: notch.launcher.search_entry.get_text() == "ab")
+
+
+def test_public_attribute_paths(notch):
+    """Paths Hyprland keybinds (config/settings_utils.py), main.py and other
+    modules reach through the notch; user configs depend on them."""
+    assert callable(notch.open_notch)
+    assert callable(notch.close_notch)
+    assert callable(notch.force_occlusion)
+    assert callable(notch.restore_from_occlusion)
+    assert callable(notch.dashboard.wallpapers.set_random_wallpaper)
+    assert callable(notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit)
+    assert notch.monitor_id == 0
+    assert notch.monitor_manager is not None
+    for name in ("bar", "stack", "compact", "compact_stack", "notch_box", "notch_revealer",
+                 "notch_complete", "notch_wrap", "hover_eventbox", "corner_left",
+                 "corner_right", "launcher", "overview", "emoji", "power", "tools", "tmux",
+                 "cliphist", "applet_stack", "nhistory", "btdevices", "nwconnections",
+                 "active_window", "active_window_box", "window_icon", "window_label",
+                 "player_small", "user_label", "audio", "volume_box", "mic_box"):
+        assert hasattr(notch, name), name

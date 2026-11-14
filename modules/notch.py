@@ -25,6 +25,7 @@ from modules.power import PowerMenu
 from modules.tmux import TmuxManager
 from modules.tools import Toolbox
 from utils.icon_resolver import IconResolver
+from utils.monitor_manager import get_monitor_manager
 from utils.notch_layout import notch_layout
 from utils.occlusion import OcclusionWatcher
 from widgets.wayland import WaylandWindow as Window
@@ -50,14 +51,7 @@ class NotchView:
 class Notch(Window):
     def __init__(self, monitor_id: int = 0, **kwargs):
         self.monitor_id = monitor_id
-        self.monitor_manager = None
-        
-        # Get monitor manager
-        try:
-            from utils.monitor_manager import get_monitor_manager
-            self.monitor_manager = get_monitor_manager()
-        except ImportError:
-            pass
+        self.monitor_manager = get_monitor_manager()
         self._layout = layout = notch_layout(
             panel_theme=data.PANEL_THEME,
             bar_position=data.BAR_POSITION,
@@ -65,7 +59,6 @@ class Notch(Window):
             vertical=data.VERTICAL,
             bar_theme=data.BAR_THEME,
         )
-        is_panel_vertical = layout.is_panel_vertical
 
         super().__init__(
             name="notch",
@@ -79,6 +72,16 @@ class Notch(Window):
             monitor=monitor_id,
         )
 
+        self._init_state(kwargs.get("bar", None))
+        self._build_views()
+        self._build_osd()
+        self._build_compact()
+        self._build_stack()
+        self._build_frame()
+        self._finish_init()
+
+    def _init_state(self, bar):
+        """State the handlers rely on: timers, flags, the bar link, app lookups."""
         # Audio display variables
         self.VOLUME_DISPLAY_DURATION = 2000
         self._current_display_timeout_id = None
@@ -88,7 +91,7 @@ class Notch(Window):
         self._launcher_transitioning = False
         self._launcher_transition_timeout = None
 
-        self.bar = kwargs.get("bar", None)
+        self.bar = bar
         self.is_hovered = False
         self.connect("realize", self._on_realize)
         self._prevent_occlusion = False
@@ -99,6 +102,8 @@ class Notch(Window):
         self._all_apps = apps.desktop_apps()
         self.app_identifiers = apps.app_identifiers()
 
+    def _build_views(self):
+        """The dashboard and the other views the notch opens."""
         self.dashboard = Dashboard(notch=self)
         self.nhistory = self.dashboard.widgets.notification_history
 
@@ -110,12 +115,14 @@ class Notch(Window):
         self.nwconnections.set_visible(False)
 
         self.launcher = AppLauncher(notch=self)
-        self.overview = Overview(monitor_id=monitor_id)
+        self.overview = Overview(monitor_id=self.monitor_id)
         self.emoji = EmojiPicker(notch=self)
         self.power = PowerMenu(notch=self)
         self.tmux = TmuxManager(notch=self)
         self.cliphist = ClipHistory(notch=self)
 
+    def _build_osd(self):
+        """Volume and microphone displays shown in the compact notch."""
         # Audio service initialization
         self.audio = Audio()
 
@@ -188,6 +195,8 @@ class Notch(Window):
             ]
         )
 
+    def _build_compact(self):
+        """The closed notch: active window, player, user and OSD."""
         self.window_label = Label(
             name="notch-window-label",
             h_expand=True,
@@ -280,12 +289,14 @@ class Notch(Window):
         self.compact.connect("enter-notify-event", self.on_button_enter)
         self.compact.connect("leave-notify-event", self.on_button_leave)
 
+    def _build_stack(self):
+        """The notch content stack holding every view, and the view registry."""
         self.tools = Toolbox(notch=self)
         self.stack = Stack(
             name="notch-content",
             v_expand=True,
             h_expand=True,
-            style_classes=["invert"] if layout.invert else [],
+            style_classes=["invert"] if self._layout.invert else [],
             transition_type="crossfade",
             transition_duration=250,
             children=[
@@ -307,7 +318,7 @@ class Notch(Window):
             self.stack.add_style_class(data.BAR_POSITION.lower())
             self.stack.add_style_class(data.PANEL_POSITION.lower())
 
-        if layout.narrow_views:
+        if self._layout.narrow_views:
             self.compact.set_size_request(260, 40)
             self.launcher.set_size_request(320, 635)
             self.tmux.set_size_request(320, 635)
@@ -323,8 +334,10 @@ class Notch(Window):
 
         self.stack.set_interpolate_size(True)
         self.stack.set_homogeneous(False)
-        self._views = self._build_views()
+        self._views = self._build_view_registry()
 
+    def _build_frame(self):
+        """Corners, revealer and wrappers around the stack; adds it to the window."""
         self.corner_left = Box(
             name="notch-corner-left",
             orientation="v",
@@ -353,7 +366,7 @@ class Notch(Window):
 
         self.notch_revealer = Revealer(
             name="notch-revealer",
-            transition_type=layout.revealer_transition,
+            transition_type=self._layout.revealer_transition,
             transition_duration=250,
             child_revealed=True,
             child=self.notch_box,
@@ -363,15 +376,15 @@ class Notch(Window):
 
         self.notch_complete = Box(
             name="notch-complete",
-            orientation="v" if is_panel_vertical else "h",
+            orientation="v" if self._layout.is_panel_vertical else "h",
             children=[self.notch_revealer],
         )
 
         self._is_notch_open = False
         self._scrolling = False
 
-        if layout.vert_comp_size is not None:
-            vert_comp_size = layout.vert_comp_size
+        if self._layout.vert_comp_size is not None:
+            vert_comp_size = self._layout.vert_comp_size
 
             self.vert_comp_left = Box(name="vert-comp")
             self.vert_comp_left.set_size_request(vert_comp_size, 0)
@@ -415,6 +428,8 @@ class Notch(Window):
             self.add(self.notch_wrap)
         self.show_all()
 
+    def _finish_init(self):
+        """Keybindings, signals, initial reveal state and occlusion watching."""
         # Connect audio signals after a short delay
         GLib.timeout_add(100, self._connect_audio_signals)
 
@@ -820,7 +835,7 @@ class Notch(Window):
         finally:
             self._focused_monitor_done = True
 
-    def _build_views(self):
+    def _build_view_registry(self):
         """The views open_notch() can show, by name (see NotchView)."""
         widgets_section = {"section": "widgets", "hide_bar_revealers": True}
 
