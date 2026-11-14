@@ -131,6 +131,9 @@ def format_result(result) -> str:
 def evaluate(expr: str) -> str:
     """Result of expr as display text, or "Error: ..."."""
     try:
-        return format_result(eval(to_python(expr), {"__builtins__": {}}, _NAMESPACE))
+        result = eval(to_python(expr), {"__builtins__": {}}, _NAMESPACE)
+        if callable(result):  # a bare function name ("sin") isn't a result
+            raise NameError(f"name '{expr.strip()}' is not defined")
+        return format_result(result)
     except Exception as e:
         return f"Error: {e}"

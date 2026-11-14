@@ -128,3 +128,10 @@ def test_errors(expr, error):
 def test_no_builtins():
     assert evaluate("__import__('os')").startswith("Error: ")
     assert evaluate("open('/etc/passwd')").startswith("Error: ")
+
+
+def test_bare_function_name_is_an_error():
+    from utils.calculator import evaluate
+
+    assert evaluate("sin") == "Error: name 'sin' is not defined"
+    assert evaluate("arange") == "Error: name 'arange' is not defined"
