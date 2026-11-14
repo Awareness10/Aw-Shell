@@ -1134,7 +1134,7 @@ class Notch(Window):
 
                 icon_pixbuf = None
                 if desktop_app:
-                    icon_pixbuf = desktop_app.get_icon_pixbuf(size=icon_size)
+                    icon_pixbuf = apps.icon_pixbuf(desktop_app, icon_size)
 
                 if not icon_pixbuf:
                     icon_pixbuf = self.icon_resolver.get_icon_pixbuf(app_id, icon_size)

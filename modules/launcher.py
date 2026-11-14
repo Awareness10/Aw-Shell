@@ -211,7 +211,7 @@ class AppLauncher(Box):
                 orientation="h",
                 spacing=10,
                 children=[
-                    Image(name="app-icon", pixbuf=app.get_icon_pixbuf(size=24), h_align="start"),
+                    Image(name="app-icon", pixbuf=apps.icon_pixbuf(app, 24), h_align="start"),
                     Label(
                         name="app-label",
                         label=app.display_name or "Unknown",
@@ -522,14 +522,17 @@ class AppLauncher(Box):
         self.update_conversion_viewport()
 
         # Perform conversion in thread
-        def do_conversion():
+        def do_conversion(*_):  # GLib.Thread passes its data argument
+            from utils.conversion import ConversionError, format_result
+
             try:
                 result_value, result_type = self.converter.parse_input_and_convert(expr)
-                if result_type is None:
-                    result_str = f"{result_value:.2f}"
-                else:
-                    result_str = f"{result_value:.2f} {result_type}"
-            except:
+                result_str = format_result(result_value)
+                if result_type is not None:
+                    result_str += f" {result_type}"
+            except ConversionError as error:
+                result_str = f"Error: {error}"
+            except Exception:
                 result_str = "Error: Invalid conversion expression"
 
             # Update the history entry

@@ -59,11 +59,30 @@
 
 #button-volume,
 #button-mic,
-#button-brightness,
+#button-brightness {
+  color: var(--surface-bright);
+  border: 3px solid var(--primary);
+}
+
+/* Battery rings are read-only gauges: tertiary accent sets them apart from the knobs */
 #button-mouse-battery,
 #button-headset-battery {
   color: var(--surface-bright);
-  border: 3px solid var(--primary);
+  border: 3px solid var(--tertiary);
+}
+
+#control-small-divider {
+  min-width: 2px;
+  min-height: 16px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background-color: var(--surface-bright);
+}
+
+#control-small.vertical #control-small-divider {
+  min-width: 16px;
+  min-height: 2px;
+  margin: 2px 0;
 }
 
 #button-volume.muted,

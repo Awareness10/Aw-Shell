@@ -2,7 +2,7 @@
 
 import pytest
 
-from utils.conversion import Conversion, Units
+from utils.conversion import Conversion, ConversionError, Units
 
 
 @pytest.fixture
@@ -234,7 +234,7 @@ class TestOtherConversions:
 class TestConversionErrors:
 
     def test_unsupported_conversion_raises(self, conv):
-        with pytest.raises(ValueError, match="Unsupported conversion"):
+        with pytest.raises(ValueError, match="Can't convert kg to meter"):
             conv.convert(1, "kg", "meter")
 
     def test_nonsense_units_raises(self, conv):
@@ -251,6 +251,21 @@ class TestCleanType:
     def test_three_letter_currency_uppercased(self, conv):
         assert conv.clean_type("usd") == "USD"
         assert conv.clean_type("ars") == "ARS"
+
+    @pytest.mark.parametrize("unit", ["min", "mph", "deg", "psi", "cal", "cup", "bar", "kHz"])
+    def test_three_letter_unit_wins_over_currency(self, conv, unit):
+        assert conv.clean_type(unit) == unit
+
+    def test_three_letter_plural_of_a_unit_wins_over_currency(self, conv):
+        assert conv.clean_type("lbs") == "lb"
+        assert conv.clean_type("LBS") == "LBS"
+
+    def test_lowercase_currency_without_a_unit_of_that_name(self, conv):
+        assert conv.clean_type("nok") == "NOK"
+
+    @pytest.mark.parametrize("code", ["CUP", "BAR"])
+    def test_uppercase_three_letters_is_currency(self, conv, code):
+        assert conv.clean_type(code) == code
 
     def test_plural_stripped(self, conv):
         assert conv.clean_type("kilograms") == "kilogram"
@@ -285,6 +300,45 @@ class TestParseInputAndConvert:
         result, suffix = conv.parse_input_and_convert("1 hour and 30 minute _ minute")
         assert result == pytest.approx(90, abs=0.1)
 
+    @pytest.mark.parametrize("text, value, suffix", [
+        ("10km to miles", 6.2137, "miles"),
+        ("6in to cm", 15.24, "cm"),
+        ("6inch to cm", 15.24, "cm"),
+        ("1.5h to minutes", 90, "minutes"),
+        ("1h and 30minutes to minutes", 90, "minutes"),
+    ])
+    def test_number_glued_to_unit(self, conv, text, value, suffix):
+        result, got_suffix = conv.parse_input_and_convert(text)
+        assert result == pytest.approx(value, abs=0.01)
+        assert got_suffix == suffix
+
+    def test_unit_starting_with_e_is_not_an_exponent(self, conv):
+        result, _ = conv.parse_input_and_convert("5EB to PB")
+        assert result == pytest.approx(5 * 1024)
+
+    @pytest.mark.parametrize("text, value", [
+        ("5 mph to kmph", 8.0467),
+        ("90 min to h", 1.5),
+        ("180 deg to rad", 3.1416),
+        ("2 cup to ml", 473.176),
+        ("1 bar to psi", 14.5038),
+    ])
+    def test_three_letter_units(self, conv, text, value):
+        result, _ = conv.parse_input_and_convert(text)
+        assert result == pytest.approx(value, rel=1e-3)
+
+    def test_lbs_are_pounds(self, conv):
+        result, suffix = conv.parse_input_and_convert("10lbs to kg")
+        assert result == pytest.approx(4.536, abs=0.001)
+        assert suffix == "kg"
+
+    def test_uppercase_cup_is_the_currency(self, conv, monkeypatch):
+        asked = []
+        monkeypatch.setattr(conv, "_convert_currency_via_floatrates",
+                            lambda value, a, b: asked.append((value, a, b)) or 1.0)
+        conv.parse_input_and_convert("10 CUP to usd")
+        assert asked == [(10.0, "CUP", "USD")]
+
     def test_invalid_format_raises(self, conv):
         with pytest.raises(ValueError):
             conv.parse_input_and_convert("just some random text")
@@ -292,3 +346,172 @@ class TestParseInputAndConvert:
     def test_invalid_and_format_raises(self, conv):
         with pytest.raises(ValueError):
             conv.parse_input_and_convert("1 kg and 2 _ lb")
+
+
+# =========================================================================
+# Currency
+# =========================================================================
+
+class TestCurrency:
+
+    @pytest.fixture
+    def rates(self, monkeypatch):
+        """floatrates.com's answer for USD; it sends the rate as a string."""
+        import utils.conversion as conversion
+
+        asked = []
+
+        def get(url, timeout=None):
+            asked.append(url)
+            reply = type("Reply", (), {})()
+            reply.status_code = 200
+            reply.json = lambda: {"nok": {"code": "NOK", "rate": "9.56203637"}}
+            return reply
+
+        monkeypatch.setattr(conversion.requests, "get", get)
+        return asked
+
+    def test_rate_sent_as_a_string(self, conv, rates):
+        result, suffix = conv.parse_input_and_convert("100 USD to NOK")
+        assert result == pytest.approx(956.20, abs=0.01)
+        assert suffix == "NOK"
+        assert rates == ["https://www.floatrates.com/daily/usd.json"]
+
+    def test_no_amount_means_one(self, conv, rates):
+        result, suffix = conv.parse_input_and_convert("USD to NOK")
+        assert result == pytest.approx(9.56, abs=0.01)
+        assert suffix == "NOK"
+
+    def test_no_amount_with_units(self, conv):
+        result, _ = conv.parse_input_and_convert("inch to cm")
+        assert result == pytest.approx(2.54)
+
+
+class TestCrypto:
+    """Codes floatrates doesn't know are asked from CoinGecko by symbol."""
+
+    @pytest.fixture
+    def web(self, monkeypatch):
+        import utils.conversion as conversion
+
+        prices = {"btc": {"nok": 650000, "usd": 68000}, "eth": {"btc": 0.028},
+                  "doge": {"usd": 0.1}}
+        fiat = {"usd": {"nok": {"rate": "9.5"}}, "nok": {"usd": {"rate": "0.105"}}}
+        asked = []
+
+        def get(url, params=None, timeout=None):
+            asked.append(url)
+            reply = type("Reply", (), {})()
+            reply.status_code = 200
+            if "floatrates" in url:
+                code = url.rsplit("/", 1)[1].removesuffix(".json")
+                reply.status_code = 200 if code in fiat else 403
+                reply.json = lambda: fiat[code]
+            else:
+                coins, versus = (params[key].split(",") for key in ("symbols", "vs_currencies"))
+                found = {coin: {v: prices[coin][v] for v in versus if v in prices[coin]}
+                         for coin in coins if coin in prices}
+                reply.json = lambda: found
+            return reply
+
+        monkeypatch.setattr(conversion.requests, "get", get)
+        return asked
+
+    def test_crypto_to_fiat(self, conv, web):
+        result, suffix = conv.parse_input_and_convert("2 BTC to NOK")
+        assert (result, suffix) == (1300000, "NOK")
+
+    def test_fiat_to_crypto(self, conv, web):
+        result, suffix = conv.parse_input_and_convert("1300 NOK to BTC")
+        assert result == pytest.approx(0.002)
+        assert suffix == "BTC"
+
+    def test_crypto_to_crypto(self, conv, web):
+        result, _ = conv.parse_input_and_convert("10 eth to btc")
+        assert result == pytest.approx(0.28)
+
+    def test_four_letter_symbol(self, conv, web):
+        result, suffix = conv.parse_input_and_convert("50 DOGE to USD")
+        assert result == pytest.approx(5)
+        assert suffix == "USD"
+
+    def test_fiat_pairs_never_ask_coingecko(self, conv, web):
+        conv.parse_input_and_convert("100 USD to NOK")
+        assert web == ["https://www.floatrates.com/daily/usd.json"]
+
+    def test_one_coingecko_request_per_conversion(self, conv, web):
+        conv.parse_input_and_convert("1300 NOK to BTC")
+        assert len([url for url in web if "coingecko" in url]) == 1
+
+    def test_rate_limit_is_an_error(self, conv, web, monkeypatch):
+        import utils.conversion as conversion
+
+        limited = type("Reply", (), {"status_code": 429})()
+        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: limited)
+        with pytest.raises(ValueError):
+            conv.parse_input_and_convert("1 BTC to NOK")
+
+
+        with pytest.raises(ValueError):
+            conv.parse_input_and_convert("1 ZZZ to NOK")
+
+    def test_unknown_code_raises(self, conv, web):
+        with pytest.raises(ValueError):
+            conv.parse_input_and_convert("1 ZZZ to NOK")
+
+
+class TestFormatResult:
+
+    @pytest.mark.parametrize("value, text", [
+        (6.2137, "6.21"), (956.203637, "956.20"), (0, "0.00"), (-12.345, "-12.35"),
+        (0.5, "0.5000"), (0.0015384, "0.001538"), (0.00000152, "0.000001520"),
+        (-0.0312, "-0.03120"),
+    ])
+    def test_small_values_keep_four_significant_digits(self, value, text):
+        from utils.conversion import format_result
+        assert format_result(value) == text
+
+
+class TestErrorReasons:
+    """ConversionError's text is what the launcher shows after "Error:"."""
+
+    @pytest.mark.parametrize("text, reason", [
+        ("10 km to kg", "Can't convert km to kg"),
+        ("10 km", "Expected: 10 km to mi"),
+        ("10 km to mi please", "Expected: 10 km to mi"),
+        ("1 h and x minutes to minutes", "'x' is not a number"),
+        ("1 h and 30 to minutes", "Expected: 1 h and 30 min to s"),
+    ])
+    def test_reason(self, conv, text, reason):
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert(text)
+        assert str(error.value) == reason
+
+    def test_unknown_currency(self, conv, monkeypatch):
+        import utils.conversion as conversion
+
+        nothing = type("Reply", (), {"status_code": 403, "json": lambda self: {}})()
+        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: nothing)
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 ZZZ to NOK")
+        assert str(error.value) == "No rate for ZZZ to NOK"
+
+    def test_rate_limit(self, conv, monkeypatch):
+        import utils.conversion as conversion
+
+        replies = iter([type("Reply", (), {"status_code": code})() for code in (403, 429)])
+        monkeypatch.setattr(conversion.requests, "get", lambda *a, **k: next(replies))
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 BTC to NOK")
+        assert str(error.value) == "CoinGecko rate limit reached, try again in a minute"
+
+    def test_no_network(self, conv, monkeypatch):
+        import utils.conversion as conversion
+
+        def get(*args, **kwargs):
+            raise conversion.requests.ConnectionError("unreachable")
+
+        monkeypatch.setattr(conversion.requests, "get", get)
+        with pytest.raises(ConversionError) as error:
+            conv.parse_input_and_convert("1 USD to NOK")
+        assert str(error.value) == "Can't reach the rates service"

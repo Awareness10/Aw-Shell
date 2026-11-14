@@ -1,4 +1,10 @@
+import math
+import re
+
 import requests
+
+# A number with its unit attached, as in "10km"
+_GLUED = re.compile(r"([-+]?(?:\d+\.?\d*|\.\d+))(\D.*)")
 
 
 class Units():
@@ -303,9 +309,21 @@ class Units():
         # Ya no usamos currency_converter aquí.
 
 
+class ConversionError(ValueError):
+    """Why an expression can't be converted, worded for the launcher."""
+
+
+def format_result(value: float) -> str:
+    """Two decimals; four significant digits below 1 (0.001538 BTC, not 0.00)."""
+    if value == 0 or abs(value) >= 1:
+        return f"{value:.2f}"
+    return f"{value:.{3 - math.floor(math.log10(abs(value)))}f}"
+
+
 class Conversion():
     def __init__(self):
         self.units = Units()
+        self._unit_names = {name for chart in vars(self.units).values() for name in chart}
 
     def convert(self, value: float, from_type: str, to_type: str):
         """
@@ -362,11 +380,43 @@ class Conversion():
 
         # 2) Si ambos son códigos de moneda (p. ej. “USD”, “ARS”)
         #    asumimos que están en mayúsculas y tienen 3 letras.
-        if len(from_type) == 3 and len(to_type) == 3 and from_type.isalpha() and to_type.isalpha():
-            return self._convert_currency_via_floatrates(value, from_type, to_type)
+        if all(code.isalpha() and 3 <= len(code) <= 5 for code in (from_type, to_type)):
+            return self._convert_currency(value, from_type, to_type)
 
         # 3) Si no cae en ningún caso, error.
-        raise ValueError(f"Unsupported conversion: {from_type} to {to_type}")
+        raise ConversionError(f"Can't convert {from_type} to {to_type}")
+
+    def _convert_currency(self, value: float, from_code: str, to_code: str) -> float:
+        """Fiat pairs from floatrates; anything it doesn't know (crypto) from
+        CoinGecko."""
+        try:
+            try:
+                return self._convert_currency_via_floatrates(value, from_code, to_code)
+            except ValueError:
+                from_lower, to_lower = from_code.lower(), to_code.lower()
+                prices = self._coingecko_prices(from_lower, to_lower)
+        except requests.RequestException as error:
+            raise ConversionError("Can't reach the rates service") from error
+        if prices.get(from_lower, {}).get(to_lower):
+            return value * prices[from_lower][to_lower]
+        if prices.get(to_lower, {}).get(from_lower):  # fiat to crypto
+            return value / prices[to_lower][from_lower]
+        raise ConversionError(f"No rate for {from_code.upper()} to {to_code.upper()}")
+
+    @staticmethod
+    def _coingecko_prices(*symbols: str) -> dict:
+        """{coin: {versus: price}} between the lowercase symbols, in one
+        request (the keyless API allows only a few a minute); coins and
+        pairs CoinGecko doesn't have are left out."""
+        both = ",".join(symbols)
+        resp = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"symbols": both, "vs_currencies": both},
+            timeout=5,
+        )
+        if resp.status_code == 429:
+            raise ConversionError("CoinGecko rate limit reached, try again in a minute")
+        return resp.json() if resp.status_code == 200 else {}
 
     def _convert_currency_via_floatrates(self, value: float, from_code: str, to_code: str) -> float:
         """
@@ -389,20 +439,45 @@ class Conversion():
         if to_lower not in data:
             raise ValueError(f"Moneda destino '{to_code}' no encontrada en la respuesta de floatrates para '{from_code}'")
 
-        rate = data[to_lower]["rate"]
+        rate = float(data[to_lower]["rate"])  # floatrates sends it as a string
         return value * rate
 
+    @staticmethod
+    def _is_number(token: str) -> bool:
+        try:
+            float(token)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _number(token: str) -> float:
+        try:
+            return float(token)
+        except ValueError:
+            raise ConversionError(f"'{token}' is not a number") from None
+
+    @classmethod
+    def _split_glued(cls, token: str) -> list[str]:
+        """'10km' -> ['10', 'km']; numbers ('1e3') and units stay whole."""
+        if cls._is_number(token):
+            return [token]
+        match = _GLUED.fullmatch(token)
+        return list(match.groups()) if match else [token]
+
     def parse_input_and_convert(self, input: str):
-        parts = input.split()
+        parts = [part for token in input.split() for part in self._split_glued(token)]
+        if parts and not self._is_number(parts[0]):
+            parts.insert(0, "1")  # "usd to nok" is one dollar
         addition = "s" if parts[-1].endswith("s") else ""
 
         if "and" in parts:  # valor unidad1 and valor2 unidad2 _ a unidad_destino
             parts.remove("and")
             if len(parts) != 6:
-                raise ValueError("Formato inválido. Esperado: 'value from_type and value2 from_type2 _ to_type'")
+                raise ConversionError("Expected: 1 h and 30 min to s")
             
             value1, from_type1, value2, from_type2, _, to_type = parts
-            value1, value2 = float(value1), float(value2)
+            value1, value2 = self._number(value1), self._number(value2)
             from_type1 = self.clean_type(from_type1)
             from_type2 = self.clean_type(from_type2)
             to_type = self.clean_type(to_type)
@@ -416,9 +491,9 @@ class Conversion():
                 return res, to_type + addition
         else:
             if len(parts) != 4:
-                raise ValueError("Formato inválido. Esperado: 'value from_type _ to_type'")
+                raise ConversionError("Expected: 10 km to mi")
             value, from_type, _, to_type = parts
-            value = float(value)
+            value = self._number(value)
             from_type = self.clean_type(from_type)
             to_type = self.clean_type(to_type)
             return self.convert(value, from_type, to_type), to_type + addition
@@ -428,7 +503,11 @@ class Conversion():
         Si es moneda (3 letras), lo pasa a mayúsculas. 
         Si termina en 's' (y no es 'celsius'), le quita la 's' para 
         las otras unidades. """
+        if type in self._unit_names:
+            return type  # "cup" is the unit; "CUP" is the currency
         if len(type) == 3 and type.isalpha():
+            if type.islower() and type.endswith("s") and type[:-1] in self._unit_names:
+                return type[:-1]  # "lbs" is pounds, not a currency
             return type.upper()
         if type.endswith("s") and type.lower() != "celsius":
             # Para las tablas que tienen singular/plural
