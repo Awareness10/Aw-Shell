@@ -1,7 +1,21 @@
 {
-  "version": "1.2.18",
+  "version": "1.3.0",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.3.0",
+      "changes": [
+        "<b>feat:</b> The launcher converts crypto prices (BTC to NOK, NOK to BTC, DOGE), with rates from CoinGecko",
+        "<b>feat:</b> A failed conversion says why: bad format, no rate, rate limit or no connection",
+        "<b>feat:</b> The battery rings in the bar stand apart from the knobs (own color, full ring, divider)",
+        "<b>fix:</b> Currency conversion works again: the result replaces \"Loading\" and rates are read correctly",
+        "<b>fix:</b> Conversion accepts a number glued to its unit (10km to miles) and no amount at all (usd to nok means 1 USD)",
+        "<b>fix:</b> Lowercase min, mph and lbs convert as units, not as currency codes",
+        "<b>fix:</b> Conversion results below 1 keep four significant digits",
+        "<b>fix:</b> App icons are sharp at every size, not scaled from the first size loaded",
+        "<b>fix:</b> Pins show website icons for links"
+      ]
+    },
     {
       "version": "1.2.18",
       "changes": [
@@ -239,16 +253,14 @@
     }
   ],
   "changelog": [
-    "<b>perf:</b> The shell starts about 5 times faster (3.3 s to about 0.6 s with two monitors)",
-    "<b>fix:</b> The updater runs the update in your terminal, so it can ask for your sudo password instead of getting stuck; its log is readable again",
-    "<b>fix:</b> Reloading the shell no longer shows \"Command not found: Aw-Shell\" (press Apply in Settings once to get it)",
-    "<b>fix:</b> Shell keybinds no longer fire twice when hyprland.lua loads Aw-Shell's config through $HOME (SUPER+W closed the launcher right away; press Apply in Settings once)",
-    "<b>fix:</b> Pins and Kanban stay in sync between monitors, and Pins picks files with the system file picker",
-    "<b>fix:</b> No thin black stripe in the bar when there are no power modes",
-    "<b>fix:</b> GPU usage keeps updating after a failed reading",
-    "<b>fix:</b> Settings show \"&\" in labels instead of an underlined space",
-    "<b>feat:</b> Screenshot keybinds: Print picks a screen, Shift+Print selects an area (change them in Settings)",
-    "<b>feat:</b> GTK apps can follow the wallpaper colors (opt-in, in Settings)",
-    "<b>update:</b> The installer upgrades the whole system along with Aw-Shell's packages, warns when they fail, and adds python-gobject (power modes) and a Japanese font (the player's ¯\\_(ツ)_/¯)"
+    "<b>feat:</b> The launcher converts crypto prices (BTC to NOK, NOK to BTC, DOGE), with rates from CoinGecko",
+    "<b>feat:</b> A failed conversion says why: bad format, no rate, rate limit or no connection",
+    "<b>feat:</b> The battery rings in the bar stand apart from the knobs (own color, full ring, divider)",
+    "<b>fix:</b> Currency conversion works again: the result replaces \"Loading\" and rates are read correctly",
+    "<b>fix:</b> Conversion accepts a number glued to its unit (10km to miles) and no amount at all (usd to nok means 1 USD)",
+    "<b>fix:</b> Lowercase min, mph and lbs convert as units, not as currency codes",
+    "<b>fix:</b> Conversion results below 1 keep four significant digits",
+    "<b>fix:</b> App icons are sharp at every size, not scaled from the first size loaded",
+    "<b>fix:</b> Pins show website icons for links"
   ]
 }
