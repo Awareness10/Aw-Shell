@@ -819,6 +819,7 @@ class TestEnsureMatugenConfig:
     def test_shell_post_hooks_use_command_facade(self, matugen_env):
         """The shell's hooks call `shell.*` (utils/commands.py), not the
         widget tree."""
+        import tomllib
         tmp_path, home, config_dir, aw_dir, current_wall, hypr_colors, css_colors = matugen_env
         matugen_config = config_dir / "matugen" / "config.toml"
         with self._matugen_patches(home, config_dir, aw_dir, current_wall, hypr_colors, css_colors):
