@@ -31,9 +31,42 @@ from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
 from utils.commands import ShellCommands, install_legacy_aliases
+from utils.global_keybinds import init_global_keybind_objects
+from utils.monitor_manager import get_monitor_manager, select_monitors
 from utils.tooltips import install_tooltip_dedup
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
+
+
+def build_monitor_components(monitor_id, monitor_manager, corners_visible):
+    """Corners, bar, notch and dock for one monitor, registered with the
+    monitor manager; returns them by name."""
+    corners = Corners(monitor_id=monitor_id)
+    bar = Bar(monitor_id=monitor_id)
+    notch = Notch(monitor_id=monitor_id)
+    dock = Dock(monitor_id=monitor_id)
+
+    # Layer surfaces are per-output, so each monitor needs its own corners
+    corners.set_visible(corners_visible)
+
+    bar.notch = notch
+    notch.bar = bar
+
+    components = {"bar": bar, "notch": notch, "dock": dock, "corners": corners}
+    monitor_manager.register_monitor_instances(monitor_id, components)
+    return components
+
+
+def build_notification_popup(notches, primary_monitor_id):
+    """One notification popup, sharing the main monitor's notch widgets; the
+    first shown monitor stands in if the main one isn't selected. It starts
+    there and follows focus to any shown monitor as notifications arrive."""
+    popup_monitor_id = primary_monitor_id if primary_monitor_id in notches else next(iter(notches))
+    return NotificationPopup(
+        widgets=notches[popup_monitor_id].dashboard.widgets,
+        monitor=popup_monitor_id,
+        follow_focus_monitors=list(notches),
+    )
 
 if __name__ == "__main__":
     setproctitle.setproctitle(APP_NAME)
@@ -69,103 +102,27 @@ if __name__ == "__main__":
         GLib.idle_add(_launch_updater)
         GLib.timeout_add(3600000, _launch_updater)
 
-    # Initialize multi-monitor services
-    try:
-        from utils.global_keybinds import init_global_keybind_objects
-        from utils.monitor_manager import get_monitor_manager
-        
-        monitor_manager = get_monitor_manager()
-        init_global_keybind_objects()
-        
-        # Get all available monitors
-        all_monitors = monitor_manager.get_monitors()
-        multi_monitor_enabled = True
-    except ImportError:
-        # Fallback to single monitor mode
-        all_monitors = [{'id': 0, 'name': 'default'}]
-        monitor_manager = None
-        multi_monitor_enabled = False
-    
-    # Filter monitors based on selected_monitors configuration
-    selected_monitors_config = config.get("selected_monitors", [])
-    
-    # If selected_monitors is empty, show on all monitors (current behavior)
-    if not selected_monitors_config:
-        monitors = all_monitors
-        print("Aw-Shell: No specific monitors selected, showing on all monitors")
-    else:
-        # Filter monitors to only include selected ones
-        monitors = []
-        selected_monitor_names = set(selected_monitors_config)
-        
-        for monitor in all_monitors:
-            monitor_name = monitor.get('name', f'monitor-{monitor.get("id", 0)}')
-            if monitor_name in selected_monitor_names:
-                monitors.append(monitor)
-                print(f"Aw-Shell: Including monitor '{monitor_name}' (selected)")
-            else:
-                print(f"Aw-Shell: Excluding monitor '{monitor_name}' (not selected)")
-        
-        # Fallback: if no valid monitors found, use all monitors
-        if not monitors:
-            print("Aw-Shell: No valid selected monitors found, falling back to all monitors")
-            monitors = all_monitors
-    
-    # Create application components list
-    app_components = []
-    notches = {}
+    # Multi-monitor services
+    monitor_manager = get_monitor_manager()
+    init_global_keybind_objects()
+    monitors = select_monitors(monitor_manager.get_monitors(), config.get("selected_monitors", []))
 
     # The main monitor holds workspace 1; notifications start there
-    primary_monitor_id = monitor_manager.get_primary_monitor_id() if monitor_manager else 0
-    
-    # Create components for each monitor
+    primary_monitor_id = monitor_manager.get_primary_monitor_id()
+
+    app_components = []
+    notches = {}
     for monitor in monitors:
-        monitor_id = monitor['id']
-        
-        # Create monitor-specific components
-        if multi_monitor_enabled:
-            corners = Corners(monitor_id=monitor_id)
-            bar = Bar(monitor_id=monitor_id)
-            notch = Notch(monitor_id=monitor_id)
-            dock = Dock(monitor_id=monitor_id)
-        else:
-            # Single monitor fallback
-            corners = Corners()
-            bar = Bar()
-            notch = Notch()
-            dock = Dock()
+        components = build_monitor_components(
+            monitor["id"], monitor_manager, config.get("corners_visible", True))
+        app_components.extend(components[name] for name in ("corners", "bar", "notch", "dock"))
+        notches[monitor["id"]] = components["notch"]
 
-        # Layer surfaces are per-output, so each monitor needs its own corners
-        corners.set_visible(config.get("corners_visible", True))
-        app_components.append(corners)
-        
-        # Connect bar and notch
-        bar.notch = notch
-        notch.bar = bar
-        
-        notches[monitor_id] = notch
+    # The last monitor's notch, as before: older configs' `notch.open_notch(...)`
+    # binds use it (open_notch moves to the focused monitor's notch itself)
+    notch = components["notch"]
 
-        # Register instances in monitor manager if available
-        if multi_monitor_enabled and monitor_manager:
-            monitor_manager.register_monitor_instances(monitor_id, {
-                'bar': bar,
-                'notch': notch,
-                'dock': dock,
-                'corners': corners
-            })
-        
-        # Add components to app list
-        app_components.extend([bar, notch, dock])
-
-    # One notification popup, sharing the main monitor's notch widgets; the
-    # first shown monitor stands in if the main one isn't selected. It starts
-    # there and follows focus to any shown monitor as notifications arrive
-    popup_monitor_id = primary_monitor_id if primary_monitor_id in notches else next(iter(notches))
-    app_components.append(NotificationPopup(
-        widgets=notches[popup_monitor_id].dashboard.widgets,
-        monitor=popup_monitor_id if multi_monitor_enabled else None,
-        follow_focus_monitors=list(notches) if multi_monitor_enabled else None,
-    ))
+    app_components.append(build_notification_popup(notches, primary_monitor_id))
 
     # Create the application with all components
     app = Application(f"{APP_NAME}", *app_components)

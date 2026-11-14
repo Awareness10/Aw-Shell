@@ -66,6 +66,29 @@ def _match_monitor_rule(selector: str, monitors: List[Dict]) -> Optional[str]:
     return None
 
 
+def select_monitors(all_monitors: List[Dict], selected_names) -> List[Dict]:
+    """The monitors the shell shows on: those named in the selected_monitors
+    setting, or all of them when it's empty or names none that exist."""
+    if not selected_names:
+        print("Aw-Shell: No specific monitors selected, showing on all monitors")
+        return all_monitors
+
+    selected = set(selected_names)
+    monitors = []
+    for monitor in all_monitors:
+        monitor_name = monitor.get('name', f'monitor-{monitor.get("id", 0)}')
+        if monitor_name in selected:
+            monitors.append(monitor)
+            print(f"Aw-Shell: Including monitor '{monitor_name}' (selected)")
+        else:
+            print(f"Aw-Shell: Excluding monitor '{monitor_name}' (not selected)")
+
+    if not monitors:
+        print("Aw-Shell: No valid selected monitors found, falling back to all monitors")
+        return all_monitors
+    return monitors
+
+
 class MonitorManager:
     """
     Centralized monitor management for Aw-Shell multi-monitor support.

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from utils.monitor_manager import MonitorManager, Signal, get_monitor_manager
+from utils.monitor_manager import MonitorManager, Signal, get_monitor_manager, select_monitors
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -665,3 +665,30 @@ class TestQueryFocusedMonitor:
     def test_hyprctl_failure(self):
         mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
         assert self._query(mgr, error=FileNotFoundError) is None
+
+
+# ── select_monitors ───────────────────────────────────────────────────
+
+ALL = [{"id": 0, "name": "HDMI-A-1"}, {"id": 1, "name": "DP-3"}, {"id": 2}]
+
+
+@pytest.mark.parametrize("selected", [[], None])
+def test_select_monitors_empty_selection_shows_all(selected, capsys):
+    assert select_monitors(ALL, selected) is ALL
+    assert "No specific monitors selected" in capsys.readouterr().out
+
+
+def test_select_monitors_keeps_selected_in_monitor_order(capsys):
+    assert select_monitors(ALL, ["DP-3", "HDMI-A-1"]) == ALL[:2]
+    out = capsys.readouterr().out
+    assert "Including monitor 'HDMI-A-1' (selected)" in out
+    assert "Excluding monitor 'monitor-2' (not selected)" in out
+
+
+def test_select_monitors_unnamed_monitor_matches_fallback_name():
+    assert select_monitors(ALL, ["monitor-2"]) == [ALL[2]]
+
+
+def test_select_monitors_none_existing_falls_back_to_all(capsys):
+    assert select_monitors(ALL, ["DP-9"]) is ALL
+    assert "falling back to all monitors" in capsys.readouterr().out
