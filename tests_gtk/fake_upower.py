@@ -5,10 +5,7 @@ from its own thread). Exposes a laptop battery at 80%, discharging.
 Usage: python fake_upower.py  (prints "ready" once the name is owned)
 """
 
-import dbus
-import dbus.service
-from dbus.mainloop.glib import DBusGMainLoop
-from gi.repository import GLib
+from gi.repository import Gio, GLib
 
 NAME = "org.freedesktop.UPower"
 PATH = "/org/freedesktop/UPower"
@@ -17,67 +14,89 @@ DISPLAY_DEVICE = PATH + "/devices/DisplayDevice"
 BATTERY = PATH + "/devices/battery_BAT0"
 
 BATTERY_PROPS = {
-    "Type": dbus.UInt32(2),  # battery
-    "PowerSupply": True,
-    "IsPresent": True,
-    "IsRechargeable": True,
-    "Online": False,
-    "Percentage": dbus.Double(80.0),
-    "State": dbus.UInt32(2),  # discharging
-    "TimeToEmpty": dbus.Int64(5400),
-    "TimeToFull": dbus.Int64(0),
-    "Energy": dbus.Double(40.0),
-    "EnergyFull": dbus.Double(50.0),
-    "EnergyRate": dbus.Double(8.0),
-    "IconName": "battery-good-symbolic",
-    "Model": "Test Battery",
-    "Vendor": "Aw-Shell",
-    "NativePath": "BAT0",
-    "WarningLevel": dbus.UInt32(1),
+    "Type": GLib.Variant("u", 2),  # battery
+    "PowerSupply": GLib.Variant("b", True),
+    "IsPresent": GLib.Variant("b", True),
+    "IsRechargeable": GLib.Variant("b", True),
+    "Online": GLib.Variant("b", False),
+    "Percentage": GLib.Variant("d", 80.0),
+    "State": GLib.Variant("u", 2),  # discharging
+    "TimeToEmpty": GLib.Variant("x", 5400),
+    "TimeToFull": GLib.Variant("x", 0),
+    "Energy": GLib.Variant("d", 40.0),
+    "EnergyFull": GLib.Variant("d", 50.0),
+    "EnergyRate": GLib.Variant("d", 8.0),
+    "IconName": GLib.Variant("s", "battery-good-symbolic"),
+    "Model": GLib.Variant("s", "Test Battery"),
+    "Vendor": GLib.Variant("s", "Aw-Shell"),
+    "NativePath": GLib.Variant("s", "BAT0"),
+    "WarningLevel": GLib.Variant("u", 1),
 }
 
+UPOWER_PROPS = {
+    "OnBattery": GLib.Variant("b", True),
+    "LidIsPresent": GLib.Variant("b", True),
+    "LidIsClosed": GLib.Variant("b", False),
+}
 
-class Device(dbus.service.Object):
-    def __init__(self, bus, path, props):
-        super().__init__(bus, path)
-        self.props = props
+INTROSPECTION = Gio.DBusNodeInfo.new_for_xml(f"""
+<node>
+  <interface name="org.freedesktop.DBus.Properties">
+    <method name="Get">
+      <arg type="s" direction="in"/><arg type="s" direction="in"/>
+      <arg type="v" direction="out"/>
+    </method>
+    <method name="GetAll">
+      <arg type="s" direction="in"/>
+      <arg type="a{{sv}}" direction="out"/>
+    </method>
+  </interface>
+  <interface name="{NAME}">
+    <method name="EnumerateDevices"><arg type="ao" direction="out"/></method>
+    <method name="GetDisplayDevice"><arg type="o" direction="out"/></method>
+    <method name="GetCriticalAction"><arg type="s" direction="out"/></method>
+  </interface>
+</node>
+""")
+PROPERTIES_IFACE, UPOWER_IFACE = INTROSPECTION.interfaces
 
-    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ss", out_signature="v")
-    def Get(self, interface, prop):
-        return self.props[prop]
 
-    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="s", out_signature="a{sv}")
-    def GetAll(self, interface):
-        return self.props
+def _properties(props):
+    def handle(connection, sender, path, interface, method, params, invocation):
+        if method == "Get":
+            _iface, prop = params.unpack()
+            if prop not in props:
+                invocation.return_dbus_error(
+                    "org.freedesktop.DBus.Error.InvalidArgs", f"No such property {prop}")
+                return
+            invocation.return_value(GLib.Variant("(v)", (props[prop],)))
+        else:
+            invocation.return_value(GLib.Variant("(a{sv})", (props,)))
+    return handle
 
 
-class UPower(dbus.service.Object):
-    @dbus.service.method(NAME, out_signature="ao")
-    def EnumerateDevices(self):
-        return [dbus.ObjectPath(BATTERY)]
-
-    @dbus.service.method(NAME, out_signature="o")
-    def GetDisplayDevice(self):
-        return dbus.ObjectPath(DISPLAY_DEVICE)
-
-    @dbus.service.method(NAME, out_signature="s")
-    def GetCriticalAction(self):
-        return "PowerOff"
-
-    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ss", out_signature="v")
-    def Get(self, interface, prop):
-        return {"OnBattery": True, "LidIsPresent": True, "LidIsClosed": False}[prop]
+def _upower(connection, sender, path, interface, method, params, invocation):
+    replies = {
+        "EnumerateDevices": GLib.Variant("(ao)", ([BATTERY],)),
+        "GetDisplayDevice": GLib.Variant("(o)", (DISPLAY_DEVICE,)),
+        "GetCriticalAction": GLib.Variant("(s)", ("PowerOff",)),
+    }
+    invocation.return_value(replies[method])
 
 
 def main():
-    DBusGMainLoop(set_as_default=True)
-    bus = dbus.SystemBus()
-    UPower(bus, PATH)
-    Device(bus, DISPLAY_DEVICE, BATTERY_PROPS)
-    Device(bus, BATTERY, BATTERY_PROPS)
-    _name = dbus.service.BusName(NAME, bus)  # noqa: F841 - owns the name while alive
-    print("ready", flush=True)
-    GLib.MainLoop().run()
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    bus.register_object(PATH, UPOWER_IFACE, _upower, None, None)
+    bus.register_object(PATH, PROPERTIES_IFACE, _properties(UPOWER_PROPS), None, None)
+    for path in (DISPLAY_DEVICE, BATTERY):
+        bus.register_object(path, PROPERTIES_IFACE, _properties(BATTERY_PROPS), None, None)
+    loop = GLib.MainLoop()
+    Gio.bus_own_name_on_connection(
+        bus, NAME, Gio.BusNameOwnerFlags.NONE,
+        lambda *_: print("ready", flush=True),  # owns the name while alive
+        lambda *_: loop.quit(),
+    )
+    loop.run()
 
 
 if __name__ == "__main__":

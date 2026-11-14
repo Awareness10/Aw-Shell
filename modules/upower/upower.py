@@ -1,4 +1,4 @@
-import dbus
+from gi.repository import Gio, GLib
 
 
 class UPowerManager():
@@ -8,41 +8,40 @@ class UPowerManager():
         self.UPOWER_PATH = "/org/freedesktop/UPower"
 
         self.DBUS_PROPERTIES = "org.freedesktop.DBus.Properties"
-        self.bus = dbus.SystemBus()
+        self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+
+    def _call(self, path, interface, method, *args, signature=None):
+        """Call a method on UPower and return its reply as plain Python
+        values: the single value for one-value replies, else a tuple.
+        Raises GLib.Error on D-Bus errors (UPower not running, ...)."""
+        parameters = GLib.Variant(signature, args) if signature else None
+        reply = self.bus.call_sync(
+            self.UPOWER_NAME, path, interface, method, parameters,
+            None, Gio.DBusCallFlags.NONE, -1, None,
+        ).unpack()
+        return reply[0] if len(reply) == 1 else reply
+
+    def _get(self, path, interface, prop):
+        return self._call(path, self.DBUS_PROPERTIES, "Get", interface, prop, signature="(ss)")
 
     def detect_devices(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH)
-        upower_interface = dbus.Interface(upower_proxy, self.UPOWER_NAME)
-
-        devices = upower_interface.EnumerateDevices()
+        devices = self._call(self.UPOWER_PATH, self.UPOWER_NAME, 'EnumerateDevices')
         return devices
 
     def get_display_device(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH)
-        upower_interface = dbus.Interface(upower_proxy, self.UPOWER_NAME)
-
-        dispdev = upower_interface.GetDisplayDevice()
+        dispdev = self._call(self.UPOWER_PATH, self.UPOWER_NAME, 'GetDisplayDevice')
         return dispdev
 
     def get_critical_action(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH)
-        upower_interface = dbus.Interface(upower_proxy, self.UPOWER_NAME)
-
-        critical_action = upower_interface.GetCriticalAction()
+        critical_action = self._call(self.UPOWER_PATH, self.UPOWER_NAME, 'GetCriticalAction')
         return critical_action
 
     def get_device_percentage(self, battery):
-        battery_proxy = self.bus.get_object(self.UPOWER_NAME, battery)
-        battery_proxy_interface = dbus.Interface(battery_proxy, self.DBUS_PROPERTIES)
-
-        return battery_proxy_interface.Get(self.UPOWER_NAME + ".Device", "Percentage")
+        return self._get(battery, self.UPOWER_NAME + ".Device", "Percentage")
 
     def get_full_device_information(self, battery):
-        battery_proxy = self.bus.get_object(self.UPOWER_NAME, battery)
-        battery_proxy_interface = dbus.Interface(battery_proxy, self.DBUS_PROPERTIES)
-
         # Use GetAll to retrieve all properties in a single DBus call
-        all_properties = battery_proxy_interface.GetAll(self.UPOWER_NAME + ".Device")
+        all_properties = self._call(battery, self.DBUS_PROPERTIES, "GetAll", self.UPOWER_NAME + ".Device", signature="(s)")
         
         # Extract properties with default values for missing keys
         information_table = {
@@ -79,52 +78,31 @@ class UPowerManager():
         return information_table
 
     def is_lid_present(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH)
-        upower_interface = dbus.Interface(upower_proxy, self.DBUS_PROPERTIES)
-
-        is_lid_present = bool(upower_interface.Get(self.UPOWER_NAME, 'LidIsPresent'))
+        is_lid_present = bool(self._get(self.UPOWER_PATH, self.UPOWER_NAME, 'LidIsPresent'))
         return is_lid_present
 
     def is_lid_closed(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH)
-        upower_interface = dbus.Interface(upower_proxy, self.DBUS_PROPERTIES)
-
-        is_lid_closed = bool(upower_interface.Get(self.UPOWER_NAME, 'LidIsClosed'))
+        is_lid_closed = bool(self._get(self.UPOWER_PATH, self.UPOWER_NAME, 'LidIsClosed'))
         return is_lid_closed
 
     def on_battery(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH)
-        upower_interface = dbus.Interface(upower_proxy, self.DBUS_PROPERTIES)
-
-        on_battery = bool(upower_interface.Get(self.UPOWER_NAME, 'OnBattery'))
+        on_battery = bool(self._get(self.UPOWER_PATH, self.UPOWER_NAME, 'OnBattery'))
         return on_battery
 
     def has_wakeup_capabilities(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH + "/Wakeups")
-        upower_interface = dbus.Interface(upower_proxy, self.DBUS_PROPERTIES)
-
-        has_wakeup_capabilities = bool(upower_interface.Get(self.UPOWER_NAME+ '.Wakeups', 'HasCapability'))
+        has_wakeup_capabilities = bool(self._get(self.UPOWER_PATH + "/Wakeups", self.UPOWER_NAME + '.Wakeups', 'HasCapability'))
         return has_wakeup_capabilities
 
     def get_wakeups_data(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH + "/Wakeups")
-        upower_interface = dbus.Interface(upower_proxy, self.UPOWER_NAME + '.Wakeups')
-
-        data = upower_interface.GetData()
+        data = self._call(self.UPOWER_PATH + "/Wakeups", self.UPOWER_NAME + '.Wakeups', 'GetData')
         return data
 
     def get_wakeups_total(self):
-        upower_proxy = self.bus.get_object(self.UPOWER_NAME, self.UPOWER_PATH + "/Wakeups")
-        upower_interface = dbus.Interface(upower_proxy, self.UPOWER_NAME + '.Wakeups')
-
-        data = upower_interface.GetTotal()
+        data = self._call(self.UPOWER_PATH + "/Wakeups", self.UPOWER_NAME + '.Wakeups', 'GetTotal')
         return data
 
     def is_loading(self, battery):
-        battery_proxy = self.bus.get_object(self.UPOWER_NAME, battery)
-        battery_proxy_interface = dbus.Interface(battery_proxy, self.DBUS_PROPERTIES)
-
-        state = int(battery_proxy_interface.Get(self.UPOWER_NAME + ".Device", "State"))
+        state = int(self._get(battery, self.UPOWER_NAME + ".Device", "State"))
 
         if (state == 1):
             return True
@@ -132,10 +110,7 @@ class UPowerManager():
             return False
 
     def get_state(self, battery):
-        battery_proxy = self.bus.get_object(self.UPOWER_NAME, battery)
-        battery_proxy_interface = dbus.Interface(battery_proxy, self.DBUS_PROPERTIES)
-
-        state = int(battery_proxy_interface.Get(self.UPOWER_NAME + ".Device", "State"))
+        state = int(self._get(battery, self.UPOWER_NAME + ".Device", "State"))
 
         if (state == 0):
             return "Unknown"
