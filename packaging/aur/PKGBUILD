@@ -21,10 +21,9 @@ url="https://github.com/Awareness10/Aw-Shell"
 license=('AGPL-3.0-or-later')
 depends=(
   # Python and its libraries (fabric and glaze are bundled)
-  'python' 'python-gobject' 'python-cairo' 'python-click' 'python-dbus'
-  'python-ijson' 'python-loguru' 'python-numpy' 'python-pillow' 'python-psutil'
-  'python-pywayland' 'python-requests' 'python-setproctitle' 'python-toml'
-  'python-watchdog' 'pyside6'
+  'python' 'python-gobject' 'python-cairo' 'python-click' 'python-loguru'
+  'python-pillow' 'python-psutil' 'python-pywayland' 'python-setproctitle'
+  'pyside6'
   # GTK and the typelibs the shell loads; glibc for the bundled Gray library
   'gtk3' 'gtk-layer-shell' 'gdk-pixbuf2' 'glib2' 'pango' 'libnm' 'playerctl'
   'cinnamon-desktop' 'libdbusmenu-gtk3' 'glibc'

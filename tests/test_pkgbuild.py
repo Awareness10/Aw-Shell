@@ -13,20 +13,14 @@ AUR = REPO / "packaging" / "aur"
 
 # pyproject dependency -> Arch package, or why it isn't one
 PYTHON_PACKAGES = {
-    "dbus-python": "python-dbus",
-    "ijson": "python-ijson",
     "loguru": "python-loguru",
-    "numpy": "python-numpy",
     "pillow": "python-pillow",
     "psutil": "python-psutil",
     "pycairo": "python-cairo",
     "pygobject": "python-gobject",
     "pyside6": "pyside6",
     "pywayland": "python-pywayland",
-    "requests": "python-requests",
     "setproctitle": "python-setproctitle",
-    "toml": "python-toml",
-    "watchdog": "python-watchdog",
     "fabric": "bundled",  # the Awareness10 fork, see the PKGBUILD
     "glaze": "bundled",  # not packaged for Arch
 }
