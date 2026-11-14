@@ -17,8 +17,6 @@ from fabric.widgets.box import Box
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, GObject, Gtk
-from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer
 
 import modules.icons as icons
 from utils.portal import pick_file
@@ -95,17 +93,6 @@ def download_favicon(url, callback):
 
     GLib.Thread.new("favicon-download", do_download, None)
 
-class _FileEvents(FileSystemEventHandler):
-    """Watchdog runs this on its own thread; the store handles it on GTK's."""
-
-    def __init__(self, store):
-        self.store = store
-
-    def on_any_event(self, event):
-        if not event.is_directory and event.event_type in ("deleted", "moved"):
-            GLib.idle_add(self.store.on_file_event, event)
-
-
 class PinStore(GObject.Object):
     """The pins, one set for the whole shell: every monitor's board shows and
     edits the same slots. Saved to SAVE_FILE; pinned files are followed when
@@ -116,13 +103,11 @@ class PinStore(GObject.Object):
     def __init__(self):
         super().__init__()
         self.slots = [(None, None)] * SLOTS  # (content, content_type)
-        self._watched_dirs = set()
-        self._observer = Observer()
+        self._monitors = {}  # folder -> Gio.FileMonitor, kept alive while watched
         self._load()
         for content, content_type in self.slots:
             if content_type == 'file' and content:
                 self._watch(content)
-        self._observer.start()
 
     def get(self, index):
         return self.slots[index]
@@ -142,26 +127,46 @@ class PinStore(GObject.Object):
     def clear(self, index):
         self.set(index, None, None)
 
-    def on_file_event(self, event):
+    def _on_folder_changed(self, _monitor, file, other_file, event_type):
+        """A watched folder changed (runs on the main loop): unpin deleted
+        files, follow renamed ones."""
+        Event = Gio.FileMonitorEvent
+        if event_type == Event.RENAMED:
+            dest_path = other_file.get_path()
+            if os.path.isdir(dest_path):
+                return
+        elif event_type in (Event.DELETED, Event.MOVED_OUT):
+            dest_path = None
+        else:
+            return
+        src_path = os.path.realpath(file.get_path())
         for index, (content, content_type) in enumerate(self.slots):
             if content_type != 'file' or not content:
                 continue
-            if os.path.realpath(content) != os.path.realpath(event.src_path):
+            if os.path.realpath(content) != src_path:
                 continue
-            if event.event_type == 'deleted':
+            if dest_path is None:
                 self.clear(index)
-            elif os.path.exists(event.dest_path):  # moved
-                self.set(index, event.dest_path, 'file')
+            elif os.path.exists(dest_path):
+                self.set(index, dest_path, 'file')
 
     def stop(self):
-        self._observer.stop()
-        self._observer.join()
+        for monitor in self._monitors.values():
+            monitor.cancel()
+        self._monitors.clear()
 
     def _watch(self, filepath):
         folder = os.path.dirname(filepath)
-        if folder not in self._watched_dirs and os.path.isdir(folder):
-            self._observer.schedule(_FileEvents(self), folder, recursive=False)
-            self._watched_dirs.add(folder)
+        if folder in self._monitors or not os.path.isdir(folder):
+            return
+        try:
+            monitor = Gio.File.new_for_path(folder).monitor_directory(
+                Gio.FileMonitorFlags.WATCH_MOVES, None)
+        except GLib.Error as e:
+            print(f"Error watching {folder}: {e.message}")
+            return
+        monitor.connect("changed", self._on_folder_changed)
+        self._monitors[folder] = monitor
 
     def _load(self):
         if not os.path.exists(SAVE_FILE):

@@ -2,7 +2,6 @@
 
 import json
 import os
-from types import SimpleNamespace
 
 import pytest
 from conftest import pump_until
@@ -239,8 +238,9 @@ def test_deleted_file_is_unpinned_on_every_board(board, tmp_path):
     document.write_text("hi")
     first, second = board(), board()
     _pin(first.cells[0], str(document), "file")
-    first.store.on_file_event(SimpleNamespace(event_type="deleted", src_path=str(document)))
-    assert first.cells[0].content is None and second.cells[0].content is None
+    document.unlink()
+    assert pump_until(lambda: first.cells[0].content is None)
+    assert second.cells[0].content is None
 
 
 def test_moved_file_stays_pinned_at_its_new_path(board, save_file, tmp_path):
@@ -249,11 +249,28 @@ def test_moved_file_stays_pinned_at_its_new_path(board, save_file, tmp_path):
     widget = board()
     _pin(widget.cells[0], str(old), "file")
     old.rename(new)
-    widget.store.on_file_event(
-        SimpleNamespace(event_type="moved", src_path=str(old), dest_path=str(new))
-    )
-    assert widget.cells[0].content == str(new)
+    assert pump_until(lambda: widget.cells[0].content == str(new))
     assert json.loads(save_file.read_text())[0]["content"] == str(new)
+
+
+def test_file_moved_to_another_folder_is_unpinned(board, tmp_path):
+    (tmp_path / "elsewhere").mkdir()
+    document = tmp_path / "leaving.txt"
+    document.write_text("hi")
+    widget = board()
+    _pin(widget.cells[0], str(document), "file")
+    document.rename(tmp_path / "elsewhere" / "leaving.txt")
+    assert pump_until(lambda: widget.cells[0].content is None)
+
+
+def test_stopped_store_no_longer_follows_files(board, tmp_path):
+    document = tmp_path / "kept.txt"
+    document.write_text("hi")
+    widget = board()
+    _pin(widget.cells[0], str(document), "file")
+    widget.store.stop()
+    document.unlink()
+    assert not pump_until(lambda: widget.cells[0].content is None, timeout=0.5)
 
 
 def test_a_closed_board_stops_listening(board, run_pending):
