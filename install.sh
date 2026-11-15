@@ -15,11 +15,8 @@ REPO_URL="https://github.com/awareness10/Aw-Shell.git"
 OLD_DIR="$HOME/.config/aw-shell"
 INSTALL_DIR="${AW_SHELL_DIR:-$HOME/.local/src/aw-shell}"
 FONT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
-# Gray, fabric's system tray library: the AUR package for it can't install, so it
-# is built here, privately (utils/typelibs.py points GObject-Introspection at
-# it). Same commit as packaging/aur/PKGBUILD and tests_gtk/Dockerfile.
-GRAY_COMMIT=d5a8452c39b074ef6da25be95305a22203cf230e
-GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"
+# Older versions built Gray (a tray library) here; the tray is now part of the shell
+OLD_GRAY_LIB_DIR="$HOME/.local/lib/aw-shell"
 # The first start's output, to show why it failed
 SHELL_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/aw-shell/shell.log"
 DEV_MODE=false
@@ -55,7 +52,6 @@ PACKAGES=(
   libdbusmenu-gtk3
   libnotify
   matugen-bin
-  meson
   network-manager-applet
   networkmanager
   nm-connection-editor
@@ -72,7 +68,6 @@ PACKAGES=(
   ttf-nerd-fonts-symbols-mono
   upower
   uv
-  vala
   uwsm
   webp-pixbuf-loader
   wl-clipboard
@@ -198,28 +193,11 @@ check_packages() {
   fi
 }
 
-build_gray() {
-  local stamp="$GRAY_LIB_DIR/.gray-commit"
-  if [[ -f "$GRAY_LIB_DIR/girepository-1.0/Gray-0.1.typelib" && "$(cat "$stamp" 2>/dev/null)" == "$GRAY_COMMIT" ]]; then
-    log "Gray is up to date in $GRAY_LIB_DIR"
-    return 0
+remove_old_gray() {
+  if [[ -d "$OLD_GRAY_LIB_DIR" ]]; then
+    log "Removing the old Gray library in $OLD_GRAY_LIB_DIR..."
+    rm -rf "${OLD_GRAY_LIB_DIR:?}"
   fi
-  log "Building Gray into $GRAY_LIB_DIR..."
-  local tmp
-  tmp="$(mktemp -d)"
-  curl -fsSL "https://github.com/Fabric-Development/gray/archive/$GRAY_COMMIT.tar.gz" | tar xz -C "$tmp"
-  # The typelib records the library's full path, so no LD_LIBRARY_PATH is needed
-  meson setup --prefix="$HOME/.local" --libdir=lib/aw-shell --buildtype=plain \
-    "$tmp/gray-$GRAY_COMMIT" "$tmp/build" >/dev/null
-  meson compile -C "$tmp/build" >/dev/null
-  meson install -C "$tmp/build" --destdir "$tmp/root" >/dev/null
-  # Only the library and its typelib, not headers or pkg-config files
-  mkdir -p "$GRAY_LIB_DIR"
-  cp -a "$tmp/root$GRAY_LIB_DIR/libgray.so"* "$GRAY_LIB_DIR/"
-  rm -rf "${GRAY_LIB_DIR:?}/girepository-1.0"
-  cp -a "$tmp/root$GRAY_LIB_DIR/girepository-1.0" "$GRAY_LIB_DIR/"
-  echo "$GRAY_COMMIT" > "$stamp"
-  rm -rf "${tmp:?}"
 }
 
 install_python_deps() {
@@ -366,7 +344,7 @@ main() {
   move_old_clone
   get_source
   install_packages
-  build_gray
+  remove_old_gray
   install_python_deps
   install_fonts
   setup_network

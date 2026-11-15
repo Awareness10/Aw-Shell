@@ -4,7 +4,6 @@ import subprocess
 import threading
 import time
 
-import dbus
 import psutil
 from fabric.core.fabricator import Fabricator
 from fabric.utils.helpers import invoke_repeater
@@ -40,7 +39,7 @@ class MetricsProvider:
         try:
             self.upower = UPowerManager()
             self.display_device = self.upower.get_display_device()
-        except dbus.exceptions.DBusException as e:
+        except GLib.Error as e:
             logger.warning(f"UPower unavailable, battery metrics disabled: {e}")
         self.bat_percent = 0.0
         self.bat_charging = None
@@ -87,7 +86,7 @@ class MetricsProvider:
             return None
         try:
             return self.upower.get_full_device_information(self.display_device)
-        except dbus.exceptions.DBusException:
+        except GLib.Error:
             return None
 
     def _start_gpu_update_async(self):

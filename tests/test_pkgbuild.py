@@ -13,20 +13,14 @@ AUR = REPO / "packaging" / "aur"
 
 # pyproject dependency -> Arch package, or why it isn't one
 PYTHON_PACKAGES = {
-    "dbus-python": "python-dbus",
-    "ijson": "python-ijson",
     "loguru": "python-loguru",
-    "numpy": "python-numpy",
     "pillow": "python-pillow",
     "psutil": "python-psutil",
     "pycairo": "python-cairo",
     "pygobject": "python-gobject",
     "pyside6": "pyside6",
     "pywayland": "python-pywayland",
-    "requests": "python-requests",
     "setproctitle": "python-setproctitle",
-    "toml": "python-toml",
-    "watchdog": "python-watchdog",
     "fabric": "bundled",  # the Awareness10 fork, see the PKGBUILD
     "glaze": "bundled",  # not packaged for Arch
 }
@@ -40,7 +34,7 @@ TYPELIBS = {
     "GtkLayerShell": "gtk-layer-shell",
     "NM": "libnm",
     "Playerctl": "playerctl",
-    "Gray": "bundled",  # built by the PKGBUILD (the AUR's gray-git is broken)
+    "DbusmenuGtk3": "libdbusmenu-gtk3",  # tray menus (modules/systemtray.py)
     "Cvc": "cinnamon-desktop",  # fabric.audio
 }
 
@@ -78,7 +72,6 @@ def test_every_python_dependency_has_an_arch_package(depends):
             assert package in depends, f"{name} needs {package} in depends"
     assert "python-click" in depends  # fabric's own dependency
     assert "pango" in depends  # modules/notch.py uses Pango directly
-    assert "glibc" in depends  # the bundled Gray library links it
 
 
 def test_every_typelib_the_shell_loads_has_its_package(depends):
@@ -86,7 +79,7 @@ def test_every_typelib_the_shell_loads_has_its_package(depends):
     for folder in ("config", "modules", "services", "utils", "widgets"):
         for path in (REPO / folder).rglob("*.py"):
             namespaces |= set(re.findall(r"require_version\(['\"](\w+)['\"]", path.read_text()))
-    assert {"Gtk", "GtkLayerShell", "NM", "Gray"} <= namespaces  # the scan works
+    assert {"Gtk", "GtkLayerShell", "NM", "DbusmenuGtk3"} <= namespaces  # the scan works
     assert "cinnamon-desktop" in depends  # Cvc, loaded by fabric.audio (not scanned)
     for namespace in namespaces:
         assert namespace in TYPELIBS, f"{namespace}: add its package to TYPELIBS and the PKGBUILD"
@@ -94,17 +87,20 @@ def test_every_typelib_the_shell_loads_has_its_package(depends):
             assert TYPELIBS[namespace] in depends, namespace
 
 
-def test_gray_commit_matches_the_gtk_test_image():
-    dockerfile = (REPO / "tests_gtk" / "Dockerfile").read_text()
-    pinned = re.search(r"ARG GRAY_COMMIT=(\w+)", dockerfile).group(1)
-    assert _pkgbuild('"$_gray_commit"').strip() == pinned
+def test_nothing_is_compiled():
+    """The tray used to need Gray, a Vala library built by the PKGBUILD; it is
+    Python now (services/status_notifier.py), so the package has no build step."""
+    pkgbuild = (AUR / "PKGBUILD").read_text()
+    assert "arch=('any')" in pkgbuild
+    assert "makedepends" not in pkgbuild and "build()" not in pkgbuild
+    assert "gray" not in pkgbuild.lower()
 
 
 def test_launcher_runs_the_bundled_libraries():
     launcher = (AUR / "aw-shell.sh").read_text()
     assert "export AW_SHELL_LAUNCH=/usr/bin/aw-shell" in launcher
     assert "/usr/share/aw-shell/vendor" in launcher
-    assert "/usr/lib/aw-shell/lib/girepository-1.0" in launcher  # bundled Gray
+    assert "GI_TYPELIB_PATH" not in launcher  # no bundled typelibs since Gray went
     assert "exec python /usr/share/aw-shell/main.py" in launcher
 
 

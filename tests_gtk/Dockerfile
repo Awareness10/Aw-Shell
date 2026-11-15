@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libwayland-dev libffi-dev \
         gir1.2-gtk-3.0 gir1.2-gtklayershell-0.1 gir1.2-nm-1.0 gir1.2-playerctl-2.0 \
         gir1.2-cvc-1.0 \
-        valac gobject-introspection libdbusmenu-gtk3-dev libdbusmenu-glib-dev \
+        gobject-introspection libdbusmenu-gtk3-dev libdbusmenu-glib-dev \
         adwaita-icon-theme fonts-dejavu-core \
         jq procps \
     && rm -rf /var/lib/apt/lists/*
@@ -23,14 +23,6 @@ RUN curl -fsSL "https://raw.githubusercontent.com/Gustash/Hyprshot/$HYPRSHOT_COM
         -o /usr/local/bin/hyprshot \
     && echo "$HYPRSHOT_SHA256  /usr/local/bin/hyprshot" | sha256sum -c - \
     && chmod +x /usr/local/bin/hyprshot
-
-# Fabric's system tray library (not packaged by Ubuntu)
-ARG GRAY_COMMIT=d5a8452c39b074ef6da25be95305a22203cf230e
-RUN git clone https://github.com/Fabric-Development/gray /tmp/gray \
-    && git -C /tmp/gray checkout "$GRAY_COMMIT" \
-    && meson setup /tmp/gray/build /tmp/gray --prefix=/usr \
-    && ninja -C /tmp/gray/build install \
-    && rm -rf /tmp/gray
 
 # scripts/test-gtk.sh runs as the caller's UID (so files in the mounted repo
 # aren't root-owned) and adds that UID here; dbus-daemon won't start for a UID

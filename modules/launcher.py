@@ -490,8 +490,8 @@ class AppLauncher(Box):
 
     @property
     def converter(self):
-        """The unit converter, made on first use: utils.conversion imports
-        requests (~40 ms), which most starts never need."""
+        """The unit converter, made on first use: most starts never need
+        utils.conversion or the HTTP client it imports."""
         if self._converter is None:
             from utils.conversion import Conversion
 
@@ -502,7 +502,6 @@ class AppLauncher(Box):
         expr = text.lstrip("=").strip()
         if not expr:
             return
-        # Loaded here, not with the shell: it imports numpy (~40 ms)
         import utils.calculator as calculator
 
         result_str = calculator.evaluate(expr)

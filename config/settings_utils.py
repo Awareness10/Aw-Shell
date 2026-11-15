@@ -4,12 +4,12 @@ import re
 import shlex
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
-import toml
 from fabric.utils.helpers import exec_shell_command_async
 
-from . import terminal
+from . import terminal, toml_writer
 from .data import (
     AW_CONFIG_DIR,
     CONFIG_DIR,
@@ -270,12 +270,12 @@ def ensure_matugen_config(generate: bool = True):
                 "input_path": f"{MATUGEN_TEMPLATES}/colors.json",
                 "output_path": f"{str(AW_CONFIG_DIR)}/colors.json",
                 # GTK apps follow it too, when the gtk_theming setting is on
-                "post_hook": f"fabric-cli exec {APP_NAME} 'app.apply_gtk_theme()' &",
+                "post_hook": f"fabric-cli exec {APP_NAME} 'shell.apply_gtk_theme()' &",
             },
             f"{APP_NAME}": {
                 "input_path": f"{MATUGEN_TEMPLATES}/{APP_NAME}.css",
                 "output_path": str(CSS_COLORS),
-                "post_hook": f"fabric-cli exec {APP_NAME} 'app.set_css()' &",
+                "post_hook": f"fabric-cli exec {APP_NAME} 'shell.reload_css()' &",
             },
         },
     }
@@ -286,10 +286,10 @@ def ensure_matugen_config(generate: bool = True):
     existing_config = {}
     if os.path.exists(config_path):
         try:
-            with open(config_path, "r") as f:
-                existing_config = toml.load(f)
+            with open(config_path, "rb") as f:
+                existing_config = tomllib.load(f)
             shutil.copyfile(config_path, config_path + ".bak")
-        except toml.TomlDecodeError:
+        except tomllib.TOMLDecodeError:
             print(
                 f"Warning: Could not decode TOML from {config_path}. A new default config will be created."
             )
@@ -310,8 +310,9 @@ def ensure_matugen_config(generate: bool = True):
     )  # existing_config se modifica in-place
 
     try:
+        text = toml_writer.dumps(merged_config)  # before opening: a failure keeps the file
         with open(config_path, "w") as f:
-            toml.dump(merged_config, f)
+            f.write(text)
     except Exception as e:
         print(f"Error writing matugen config to {config_path}: {e}")
 
@@ -398,32 +399,29 @@ def generate_hyprlua() -> str:
             return None
         return f'hl.bind({lua_str(mods_and_key(prefix_key, suffix_key))}, {dispatcher}) -- {comment}'
 
-    def notch_bind(prefix_key: str, suffix_key: str, expr: str, comment: str) -> str | None:
+    def shell_bind(prefix_key: str, suffix_key: str, expr: str, comment: str) -> str | None:
         cmd = "fabricSend .. " + lua_str(f" '{expr}'")
         return bind(prefix_key, suffix_key, f"hl.dsp.exec_cmd({cmd})", comment)
 
-    notch_binds = [
-        ("prefix_dash", "suffix_dash", 'notch.open_notch("dashboard")', "Dashboard"),
-        ("prefix_bluetooth", "suffix_bluetooth", 'notch.open_notch("bluetooth")', "Bluetooth"),
-        ("prefix_pins", "suffix_pins", 'notch.open_notch("pins")', "Pins"),
-        ("prefix_kanban", "suffix_kanban", 'notch.open_notch("kanban")', "Kanban"),
-        ("prefix_launcher", "suffix_launcher", 'notch.open_notch("launcher")', "App Launcher"),
-        ("prefix_tmux", "suffix_tmux", 'notch.open_notch("tmux")', "Tmux"),
-        ("prefix_cliphist", "suffix_cliphist", 'notch.open_notch("cliphist")', "Clipboard History"),
-        ("prefix_toolbox", "suffix_toolbox", 'notch.open_notch("tools")', "Toolbox"),
-        ("prefix_overview", "suffix_overview", 'notch.open_notch("overview")', "Overview"),
-        ("prefix_wallpapers", "suffix_wallpapers", 'notch.open_notch("wallpapers")', "Wallpapers"),
-        ("prefix_randwall", "suffix_randwall",
-         'notch.dashboard.wallpapers.set_random_wallpaper(None, external=True)', "Random Wallpaper"),
-        ("prefix_mixer", "suffix_mixer", 'notch.open_notch("mixer")', "Audio Mixer"),
-        ("prefix_emoji", "suffix_emoji", 'notch.open_notch("emoji")', "Emoji Picker"),
-        ("prefix_power", "suffix_power", 'notch.open_notch("power")', "Power Menu"),
-        ("prefix_caffeine", "suffix_caffeine",
-         "notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit(external=True)", "Toggle Caffeine"),
-        ("prefix_toggle", "suffix_toggle",
-         "from utils.global_keybinds import get_global_keybind_handler; get_global_keybind_handler().toggle_bar()",
-         "Toggle Bar"),
-        ("prefix_css", "suffix_css", "app.set_css()", "Reload CSS"),
+    # `shell` is the command facade in the running shell (utils/commands.py)
+    shell_binds = [
+        ("prefix_dash", "suffix_dash", 'shell.open("dashboard")', "Dashboard"),
+        ("prefix_bluetooth", "suffix_bluetooth", 'shell.open("bluetooth")', "Bluetooth"),
+        ("prefix_pins", "suffix_pins", 'shell.open("pins")', "Pins"),
+        ("prefix_kanban", "suffix_kanban", 'shell.open("kanban")', "Kanban"),
+        ("prefix_launcher", "suffix_launcher", 'shell.open("launcher")', "App Launcher"),
+        ("prefix_tmux", "suffix_tmux", 'shell.open("tmux")', "Tmux"),
+        ("prefix_cliphist", "suffix_cliphist", 'shell.open("cliphist")', "Clipboard History"),
+        ("prefix_toolbox", "suffix_toolbox", 'shell.open("tools")', "Toolbox"),
+        ("prefix_overview", "suffix_overview", 'shell.open("overview")', "Overview"),
+        ("prefix_wallpapers", "suffix_wallpapers", 'shell.open("wallpapers")', "Wallpapers"),
+        ("prefix_randwall", "suffix_randwall", "shell.random_wallpaper()", "Random Wallpaper"),
+        ("prefix_mixer", "suffix_mixer", 'shell.open("mixer")', "Audio Mixer"),
+        ("prefix_emoji", "suffix_emoji", 'shell.open("emoji")', "Emoji Picker"),
+        ("prefix_power", "suffix_power", 'shell.open("power")', "Power Menu"),
+        ("prefix_caffeine", "suffix_caffeine", "shell.toggle_caffeine()", "Toggle Caffeine"),
+        ("prefix_toggle", "suffix_toggle", "shell.toggle_bar()", "Toggle Bar"),
+        ("prefix_css", "suffix_css", "shell.reload_css()", "Reload CSS"),
     ]
 
     bind_lines = [
@@ -432,7 +430,7 @@ def generate_hyprlua() -> str:
              f"Reload {APP_NAME_CAP}"),
         bind("prefix_axmsg", "suffix_axmsg", "hl.dsp.exec_cmd(axMessage)", "Message"),
     ]
-    bind_lines += [notch_bind(*spec) for spec in notch_binds]
+    bind_lines += [shell_bind(*spec) for spec in shell_binds]
     bind_lines.append(
         bind("prefix_restart_inspector", "suffix_restart_inspector",
              'hl.dsp.exec_cmd('

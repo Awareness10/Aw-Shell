@@ -1,20 +1,22 @@
 import gi
 
-gi.require_version("Gray", "0.1")
+gi.require_version("DbusmenuGtk3", "0.4")
 import logging
 import os
 
 from fabric.widgets.box import Box
-from gi.repository import Gdk, GdkPixbuf, GLib, Gray, Gtk
+from gi.repository import DbusmenuGtk3, Gdk, GdkPixbuf, GLib, Gtk
 
 import config.data as data
+from services.status_notifier import Item, Watcher, pick_pixmap, pixmap_to_pixbuf
 
 logger = logging.getLogger(__name__)
 
 _watcher = None
+_menus: dict[Item, tuple[str, DbusmenuGtk3.Menu | None]] = {}
 
 
-def _get_watcher() -> Gray.Watcher:
+def _get_watcher() -> Watcher:
     """Process-wide watcher shared by every bar's tray.
 
     Only one watcher per process can serve org.kde.StatusNotifierWatcher;
@@ -22,8 +24,33 @@ def _get_watcher() -> Gray.Watcher:
     """
     global _watcher
     if _watcher is None:
-        _watcher = Gray.Watcher()
+        _watcher = Watcher()
     return _watcher
+
+
+def _drop_menu(item: Item):
+    entry = _menus.pop(item, None)
+    if entry is not None and entry[1] is not None:
+        entry[1].destroy()
+
+
+def _get_menu(item: Item) -> DbusmenuGtk3.Menu | None:
+    """The item's dbusmenu as a Gtk.Menu, shared by every tray; built when the
+    item is added, so it has loaded by the time it pops up."""
+    path = item.get_menu_path()
+    entry = _menus.get(item)
+    if entry is not None and entry[0] == path:
+        return entry[1]
+    if entry is None:
+        item.connect("removed", _drop_menu)
+    else:
+        _drop_menu(item)
+    if not path:
+        _menus[item] = (path, None)
+        return None
+    menu = DbusmenuGtk3.Menu.new(item.owner or item.get_bus_name(), path)
+    _menus[item] = (path, menu)
+    return menu
 
 
 class SystemTray(Box):
@@ -70,13 +97,16 @@ class SystemTray(Box):
         has = len(self.get_children()) > 0
         super().set_visible(self.enabled and has)
 
-    def _get_item_pixbuf(self, item: Gray.Item) -> GdkPixbuf.Pixbuf:
+    def _get_item_pixbuf(self, item: Item) -> GdkPixbuf.Pixbuf:
         try:
-            pm = Gray.get_pixmap_for_pixmaps(item.get_icon_pixmaps(), self.pixel_size)
-            if pm:
-                return pm.as_pixbuf(self.pixel_size, GdkPixbuf.InterpType.HYPER)
-
             name = item.get_icon_name()
+            pm = pick_pixmap(item.get_icon_pixmaps(), self.pixel_size)
+            # A pixmap smaller than the icon only wins when there's no icon name
+            if pm and (pm.width >= self.pixel_size or not name):
+                pixbuf = pixmap_to_pixbuf(pm, self.pixel_size, GdkPixbuf.InterpType.HYPER)
+                if pixbuf:
+                    return pixbuf
+
             # If IconName is a file path, prioritize loading directly from the file
             if name and os.path.exists(name):
                 try:
@@ -100,7 +130,7 @@ class SystemTray(Box):
                 "image-missing", self.pixel_size, Gtk.IconLookupFlags.FORCE_SIZE
             )
 
-    def _refresh_item_ui(self, item: Gray.Item, button: Gtk.Button):
+    def _refresh_item_ui(self, item: Item, button: Gtk.Button):
         pixbuf = self._get_item_pixbuf(item)
         img = button.get_image()
         if isinstance(img, Gtk.Image):
@@ -109,11 +139,7 @@ class SystemTray(Box):
             new = Gtk.Image.new_from_pixbuf(pixbuf)
             button.set_image(new)
             new.show()
-        tip = None
-        if hasattr(item, 'get_tooltip_text'):
-            tip = item.get_tooltip_text()
-        elif hasattr(item, 'get_title'):
-            tip = item.get_title()
+        tip = item.get_title()
         if tip:
             button.set_tooltip_text(tip)
         else:
@@ -134,40 +160,29 @@ class SystemTray(Box):
         self.buttons_by_id[identifier] = btn
         self.items_by_id[identifier] = item
 
+        _get_menu(item)
         handlers = [
-            item.connect("notify::icon-pixmaps",
-                         lambda itm, pspec: self._refresh_item_ui(itm, btn)),
-            item.connect("notify::icon-name",
-                         lambda itm, pspec: self._refresh_item_ui(itm, btn)),
+            # Fires for icon, title, tooltip, status and menu changes
+            item.connect("changed", lambda itm: self._refresh_item_ui(itm, btn)),
+            item.connect("removed", lambda itm: self.on_item_instance_removed(identifier, itm)),
         ]
-
-        try:
-            handlers.append(
-                item.connect("icon-changed", lambda itm: self._refresh_item_ui(itm, btn))
-            )
-        except TypeError:
-            pass
-
-        handlers.append(
-            item.connect("removed", lambda itm: self.on_item_instance_removed(identifier, itm))
-        )
         self.item_handlers_by_id[identifier] = handlers
 
         self.add(btn)
         btn.show_all()
         self._update_visibility()
 
-    def do_bake_item_button(self, item: Gray.Item) -> Gtk.Button:
+    def do_bake_item_button(self, item: Item) -> Gtk.Button:
         btn = Gtk.Button()
         btn.connect("button-press-event", lambda b, e: self.on_button_click(b, item, e))
         img = Gtk.Image.new_from_pixbuf(self._get_item_pixbuf(item))
         btn.set_image(img)
-        tip = item.get_tooltip_text() if hasattr(item, 'get_tooltip_text') else getattr(item, 'get_title', lambda: None)()
+        tip = item.get_title()
         if tip:
             btn.set_tooltip_text(tip)
         return btn
 
-    def on_item_instance_removed(self, identifier: str, removed_item: Gray.Item):
+    def on_item_instance_removed(self, identifier: str, removed_item: Item):
         if self.items_by_id.get(identifier) is removed_item:
             self._disconnect_item(identifier)
             btn = self.buttons_by_id.pop(identifier, None)
@@ -176,21 +191,19 @@ class SystemTray(Box):
                 btn.destroy()
             self._update_visibility()
 
-    def on_button_click(self, button: Gtk.Button, item: Gray.Item, event: Gdk.EventButton):
+    def on_button_click(self, button: Gtk.Button, item: Item, event: Gdk.EventButton):
         if event.button == Gdk.BUTTON_PRIMARY:
             try:
                 item.activate(int(event.x_root), int(event.y_root))
             except Exception as e:
                 logger.error(f"Activate error: {e}")
         elif event.button == Gdk.BUTTON_SECONDARY:
-            menu = getattr(item, 'get_menu', lambda: None)()
+            menu = _get_menu(item)
             if isinstance(menu, Gtk.Menu):
                 menu.popup_at_widget(button, Gdk.Gravity.SOUTH_WEST,
                                      Gdk.Gravity.NORTH_WEST, event)
             else:
-                cm = getattr(item, 'context_menu', None)
-                if cm:
-                    try:
-                        cm(int(event.x_root), int(event.y_root))
-                    except Exception as e:
-                        logger.error(f"ContextMenu error: {e}")
+                try:
+                    item.context_menu(int(event.x_root), int(event.y_root))
+                except Exception as e:
+                    logger.error(f"ContextMenu error: {e}")

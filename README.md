@@ -69,7 +69,7 @@
 Requirements:
 - Hyprland 0.56.2 or newer
 - [uwsm](https://github.com/Vladimir-csp/uwsm): the installer and the generated Hyprland config launch the shell with `uwsm app`
-- `pacman` with access to the AUR; the installer installs `base-devel` and `git` if missing, uses `paru` or `yay`, and installs `yay-bin` if neither is present. fabric-cli only exists in the AUR. Gray (fabric's system tray library) has no working package, so the installer builds it into `~/.local/lib/aw-shell`
+- `pacman` with access to the AUR; the installer installs `base-devel` and `git` if missing, uses `paru` or `yay`, and installs `yay-bin` if neither is present. fabric-cli only exists in the AUR
 - systemd
 - About 4 GB of free RAM (or swap) while the installer builds the AUR packages; building `awww-git` alone peaks near 4 GB
 
@@ -109,7 +109,7 @@ To undo it, remove the `source ~/.config/matuwrap/scripts/matuwrap` line from `~
 
 2. Install system dependencies (Arch Linux):
     - [fabric-cli](https://github.com/Fabric-Development/fabric-cli)
-    - [Gray](https://github.com/Fabric-Development/gray): its AUR package can't install, so build it into `~/.local/lib/aw-shell`, where Aw-Shell looks for it: `source install.sh && build_gray` (needs `meson` and `vala`)
+    - `libdbusmenu-gtk3`: tray menus
     - [Matugen](https://github.com/InioX/matugen)
     - `cinnamon-desktop`: its Cvc typelib is what fabric's audio service uses; the shell won't start without it
     - `adobe-source-han-sans-jp-fonts` `awww` `brightnessctl` `cava` `cliphist` `ddcutil`
@@ -214,7 +214,7 @@ uv run ruff check .           # lint
 uv audit --preview-features audit-command   # known vulnerabilities in locked dependencies
 ```
 
-Running `tests_gtk` locally needs `sway` (`pacman -S sway`) and the libraries the shell itself uses (e.g. gtk-layer-shell, Gray, NetworkManager and playerctl typelibs); with a working Aw-Shell install, only sway is missing. Without them, use the Docker script.
+Running `tests_gtk` locally needs `sway` (`pacman -S sway`) and the libraries the shell itself uses (e.g. gtk-layer-shell, DbusmenuGtk3, NetworkManager and playerctl typelibs); with a working Aw-Shell install, only sway is missing. Without them, use the Docker script.
 
 Coverage is on by default (`--cov` in `pyproject.toml`). Use the local runs while working, and the Docker run before pushing: it uses Ubuntu 24.04 like CI, so results can differ from Arch, which ships newer libraries.
 

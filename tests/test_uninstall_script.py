@@ -42,7 +42,7 @@ def test_keeps_user_data_unless_asked(home):
     assert not (home / ".local/src/aw-shell").exists()
     assert not (home / ".cache/aw-shell").exists()
     assert not (home / ".local/share/fonts/aw-shell").exists()
-    assert not (home / ".local/lib/aw-shell").exists()  # Gray built by install.sh
+    assert not (home / ".local/lib/aw-shell").exists()  # Gray, built by older install.sh
     assert (home / ".config/aw-shell/marker").exists()
     assert (home / ".local/share/aw-shell").exists()
     assert (home / ".local/state/aw-shell").exists()
