@@ -1,7 +1,7 @@
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from fabric.audio.service import Audio
 from fabric.hyprland.widgets import HyprlandActiveWindow as ActiveWindow
 from fabric.utils.helpers import FormattedString
 from fabric.widgets.box import Box
@@ -19,6 +19,7 @@ from modules.corners import MyCorner
 from modules.dashboard import Dashboard
 from modules.emoji import EmojiPicker
 from modules.launcher import AppLauncher
+from modules.notch_osd import AudioDisplays
 from modules.overview import Overview
 from modules.player import PlayerSmall
 from modules.power import PowerMenu
@@ -99,7 +100,6 @@ class Notch(Window):
         self._forced_occlusion = False
 
         self.icon_resolver = IconResolver()
-        self._all_apps = apps.desktop_apps()
         self.app_identifiers = apps.app_identifiers()
 
     def _build_views(self):
@@ -123,86 +123,16 @@ class Notch(Window):
 
     def _build_osd(self):
         """Volume and microphone displays shown in the compact notch."""
-        # Audio service initialization
-        self.audio = Audio()
-
-        # Volume display widgets
-        self.volume_icon = Image(
-            name="volume-display-icon",
-            icon_name="audio-volume-high-symbolic",
-            icon_size=16
-        )
-        self.volume_icon.set_valign(Gtk.Align.CENTER)
-        
-        self.volume_label = Label(
-            name="volume-display-label",
-            label="..."
-        )
-        self.volume_label.set_valign(Gtk.Align.CENTER)
-        
-        self.volume_bar = Gtk.ProgressBar(
-            name="volume-display-bar"
-        )
-        self.volume_bar.set_fraction(1.0)
-        self.volume_bar.set_show_text(False)
-        self.volume_bar.set_hexpand(False)
-        self.volume_bar.set_valign(Gtk.Align.CENTER)
-   
-        self.volume_box = Box(
-            name="volume-display-box",
-            orientation="h",
-            spacing=8,
-            h_align="center",
-            v_align="center",
-            children=[
-                self.volume_icon,
-                self.volume_bar,
-                self.volume_label
-            ]
-        )
-        
-        # Microphone display widgets
-        self.mic_icon = Image(
-            name="mic-display-icon", 
-            icon_name="microphone-sensitivity-high-symbolic",
-            icon_size=16
-        )
-        self.mic_icon.set_valign(Gtk.Align.CENTER)
-        
-        self.mic_label = Label(
-            name="mic-display-label",
-            label="..."
-        )
-        self.mic_label.set_valign(Gtk.Align.CENTER)
-        
-        self.mic_bar = Gtk.ProgressBar(
-            name="mic-display-bar"
-        )
-        self.mic_bar.set_fraction(1.0)
-        self.mic_bar.set_show_text(False)
-        self.mic_bar.set_valign(Gtk.Align.CENTER)
-        
-        self.mic_box = Box(
-            name="mic-display-box",
-            orientation="h",
-            spacing=8,
-            h_align="center",
-            v_align="center",
-            children=[
-                self.mic_icon,
-                self.mic_bar,
-                self.mic_label
-            ]
-        )
+        self.audio_displays = AudioDisplays(show=self._show_audio_display)
+        self.audio = self.audio_displays.volume.source.audio
+        volume, mic = self.audio_displays.volume, self.audio_displays.mic
+        self.volume_icon, self.volume_bar = volume.icon, volume.bar
+        self.volume_label, self.volume_box = volume.label, volume.box
+        self.mic_icon, self.mic_bar = mic.icon, mic.bar
+        self.mic_label, self.mic_box = mic.label, mic.box
 
     def _build_compact(self):
         """The closed notch: active window, player, user and OSD."""
-        self.window_label = Label(
-            name="notch-window-label",
-            h_expand=True,
-            h_align="fill",
-        )
-
         self.window_icon = Image(
             name="notch-window-icon", icon_name="application-x-executable", icon_size=20
         )
@@ -467,268 +397,42 @@ class Notch(Window):
 
         self.connect("key-press-event", self.on_key_press)
 
-    # Audio-related methods
-    def _connect_audio_signals(self, retry_count=0):
-        max_retries = 5
-        
-        try:
-            if self.audio:
-                self.audio.connect("notify::speaker", self._on_speaker_changed)
-                self.audio.connect("notify::microphone", self._on_microphone_changed)
-                
-                if self.audio.speaker:
-                    self.audio.speaker.connect("changed", self._on_speaker_changed_signal)
-                    GLib.idle_add(self._update_volume_widgets_silently)
-                
-                if self.audio.microphone:
-                    self.audio.microphone.connect("changed", self._on_microphone_changed_signal)
-                    GLib.idle_add(self._update_mic_widgets_silently)
-                
-                GLib.timeout_add(500, self._enable_audio_display)
-                return False
-                    
-        except Exception as e:
-            print(f"Audio connection error (attempt {retry_count + 1}): {e}")
-        
-        if retry_count < max_retries - 1:
-            GLib.timeout_add(1000, lambda: self._connect_audio_signals(retry_count + 1))
-        
+    def _connect_audio_signals(self):
+        self.audio_displays.connect()
+        self.connect("destroy", lambda *_: self.audio_displays.disconnect())
+        GLib.timeout_add(500, self._enable_audio_display)
         return False
-
-    def _on_speaker_changed(self, audio_service, speaker):
-        if self.audio.speaker:
-            try:
-                self.audio.speaker.disconnect_by_func(self._on_speaker_changed_signal)
-            except:
-                pass
-            self.audio.speaker.connect("changed", self._on_speaker_changed_signal)
-            self._update_volume_widgets_silently()
-
-    def _on_microphone_changed(self, audio_service, microphone):
-        if self.audio.microphone:
-            try:
-                self.audio.microphone.disconnect_by_func(self._on_microphone_changed_signal)
-            except:
-                pass
-            self.audio.microphone.connect("changed", self._on_microphone_changed_signal)
-            self._update_mic_widgets_silently()
-
-    def _on_speaker_changed_signal(self, speaker, *args):
-        self._handle_speaker_change()
-
-    def _on_microphone_changed_signal(self, microphone, *args):
-        self._handle_microphone_change()
-
-    def _handle_speaker_change(self):
-        if not self.audio or not self.audio.speaker:
-            return
-            
-        if self._suppress_first_audio_display:
-            self._update_volume_widgets_silently()
-            return
-            
-        speaker = self.audio.speaker
-        volume = speaker.volume
-        is_muted = speaker.muted
-        
-        volume_int = int(round(volume))
-        volume_percentage = volume_int / 100.0
-        self.volume_bar.set_fraction(volume_percentage)
-        
-        self._update_volume_appearance(volume_int, is_muted)
-        
-        if is_muted:
-            self.volume_icon.set_from_icon_name("audio-volume-muted-symbolic", 16)
-            self.volume_label.set_text("Muted")
-        elif volume_int == 0:
-            self.volume_icon.set_from_icon_name("audio-volume-muted-symbolic", 16)
-            self.volume_label.set_text("Muted")
-        else:
-            if volume_int <= 33:
-                icon_name = "audio-volume-low-symbolic"
-            elif volume_int <= 66:
-                icon_name = "audio-volume-medium-symbolic"
-            else:
-                icon_name = "audio-volume-high-symbolic"
-                
-            self.volume_icon.set_from_icon_name(icon_name, 16)
-            self.volume_label.set_text(f"{volume_int}%")
-        
-        if not self._is_notch_open:
-            self.show_volume_display()
-
-    def _handle_microphone_change(self):
-        if not self.audio or not self.audio.microphone:
-            return
-            
-        if self._suppress_first_audio_display:
-            self._update_mic_widgets_silently()
-            return
-            
-        microphone = self.audio.microphone
-        volume = microphone.volume
-        is_muted = microphone.muted
-        
-        volume_int = int(round(volume))
-        volume_percentage = volume_int / 100.0
-        self.mic_bar.set_fraction(volume_percentage)
-        
-        self._update_mic_appearance(volume_int, is_muted)
-        
-        if is_muted:
-            self.mic_icon.set_from_icon_name("microphone-disabled-symbolic", 16)
-            self.mic_label.set_text("Muted")
-        else:
-            self.mic_icon.set_from_icon_name("microphone-sensitivity-high-symbolic", 16)
-            self.mic_label.set_text(f"{volume_int}%")
-        
-        if not self._is_notch_open:
-            self.show_mic_display()
 
     def _enable_audio_display(self):
+        """Startup values (and the first changes) only update the displays."""
         self._suppress_first_audio_display = False
+        self.audio_displays.arm()
         return False
 
-    def _update_volume_appearance(self, volume_int, is_muted):
-        volume_box_style = self.volume_box.get_style_context()
-        volume_icon_style = self.volume_icon.get_style_context()
-        volume_bar_style = self.volume_bar.get_style_context()
-        
-        for cls in ["volume-muted", "volume-low", "volume-medium", "volume-high"]:
-            volume_box_style.remove_class(cls)
-            volume_icon_style.remove_class(cls)
-            volume_bar_style.remove_class(cls)
-        
-        if is_muted or volume_int == 0:
-            volume_box_style.add_class("volume-muted")
-            volume_icon_style.add_class("volume-muted")
-            volume_bar_style.add_class("volume-muted")
-        elif volume_int <= 33:
-            volume_box_style.add_class("volume-low")
-            volume_icon_style.add_class("volume-low")
-            volume_bar_style.add_class("volume-low")
-        elif volume_int <= 66:
-            volume_box_style.add_class("volume-medium")
-            volume_icon_style.add_class("volume-medium")
-            volume_bar_style.add_class("volume-medium")
-        else:
-            volume_box_style.add_class("volume-high")
-            volume_icon_style.add_class("volume-high")
-            volume_bar_style.add_class("volume-high")
-
-    def _update_mic_appearance(self, volume_int, is_muted):
-        mic_box_style = self.mic_box.get_style_context()
-        mic_icon_style = self.mic_icon.get_style_context()
-        mic_bar_style = self.mic_bar.get_style_context()
-        
-        for cls in ["mic-muted", "mic-low", "mic-medium", "mic-high"]:
-            mic_box_style.remove_class(cls)
-            mic_icon_style.remove_class(cls)
-            mic_bar_style.remove_class(cls)
-        
-        if is_muted:
-            mic_box_style.add_class("mic-muted")
-            mic_icon_style.add_class("mic-muted")
-            mic_bar_style.add_class("mic-muted")
-        elif volume_int <= 33:
-            mic_box_style.add_class("mic-low")
-            mic_icon_style.add_class("mic-low")
-            mic_bar_style.add_class("mic-low")
-        elif volume_int <= 66:
-            mic_box_style.add_class("mic-medium")
-            mic_icon_style.add_class("mic-medium")
-            mic_bar_style.add_class("mic-medium")
-        else:
-            mic_box_style.add_class("mic-high")
-            mic_icon_style.add_class("mic-high")
-            mic_bar_style.add_class("mic-high")
-
-    def _update_volume_widgets_silently(self):
-        if not self.audio or not self.audio.speaker:
+    def _show_audio_display(self, display):
+        if self._is_notch_open:
             return
-            
-        speaker = self.audio.speaker
-        volume = speaker.volume
-        is_muted = speaker.muted
-        
-        volume_int = int(round(volume))
-        volume_percentage = volume_int / 100.0
-        self.volume_bar.set_fraction(volume_percentage)
-        
-        self._update_volume_appearance(volume_int, is_muted)
-        
-        if is_muted:
-            self.volume_icon.set_from_icon_name("audio-volume-muted-symbolic", 16)
-            self.volume_label.set_text("Muted")
-        elif volume_int == 0:
-            self.volume_icon.set_from_icon_name("audio-volume-muted-symbolic", 16)
-            self.volume_label.set_text("Muted")
-        else:
-            if volume_int <= 33:
-                icon_name = "audio-volume-low-symbolic"
-            elif volume_int <= 66:
-                icon_name = "audio-volume-medium-symbolic"
-            else:
-                icon_name = "audio-volume-high-symbolic"
-                
-            self.volume_icon.set_from_icon_name(icon_name, 16)
-            self.volume_label.set_text(f"{volume_int}%")
-
-    def _update_mic_widgets_silently(self):
-        if not self.audio or not self.audio.microphone:
-            return
-            
-        microphone = self.audio.microphone
-        volume = microphone.volume
-        is_muted = microphone.muted
-        
-        volume_int = int(round(volume))
-        volume_percentage = volume_int / 100.0
-        self.mic_bar.set_fraction(volume_percentage)
-        
-        self._update_mic_appearance(volume_int, is_muted)
-        
-        if is_muted:
-            self.mic_icon.set_from_icon_name("microphone-disabled-symbolic", 16)
-            self.mic_label.set_text(" Muted")
-        else:
-            self.mic_icon.set_from_icon_name("microphone-sensitivity-high-symbolic", 16)
-            self.mic_label.set_text(f" {volume_int}%")
+        if self._current_display_timeout_id:
+            GLib.source_remove(self._current_display_timeout_id)
+        self.compact_stack.set_visible_child(display.box)
+        self._current_display_timeout_id = GLib.timeout_add(
+            self.VOLUME_DISPLAY_DURATION, self.return_to_normal_view
+        )
 
     def show_volume_display(self):
-        if self._is_notch_open:
-            return
-            
-        if self._current_display_timeout_id:
-            GLib.source_remove(self._current_display_timeout_id)
-        
-        self.compact_stack.set_visible_child(self.volume_box)
-        self._current_display_timeout_id = GLib.timeout_add(
-            self.VOLUME_DISPLAY_DURATION, 
-            self.return_to_normal_view
-        )
+        self._show_audio_display(self.audio_displays.volume)
 
     def show_mic_display(self):
-        if self._is_notch_open:
-            return
-            
-        if self._current_display_timeout_id:
-            GLib.source_remove(self._current_display_timeout_id)
-        
-        self.compact_stack.set_visible_child(self.mic_box)
-        self._current_display_timeout_id = GLib.timeout_add(
-            self.VOLUME_DISPLAY_DURATION, 
-            self.return_to_normal_view
-        )
+        self._show_audio_display(self.audio_displays.mic)
 
     def return_to_normal_view(self):
         self._current_display_timeout_id = None
-        
+
         if not self._is_notch_open:
             current_child = self.compact_stack.get_visible_child()
             if current_child in [self.volume_box, self.mic_box]:
                 self.compact_stack.set_visible_child(self.active_window_box)
-        
+
         return False
 
     def on_button_enter(self, widget, event):
@@ -940,10 +644,6 @@ class Notch(Window):
 
         self._is_notch_open = True
 
-    def toggle_hidden(self):
-        self.hidden = not self.hidden
-        self.set_visible(not self.hidden)
-
     def _on_compact_scroll(self, widget, event):
         if self._scrolling:
             return True
@@ -1006,62 +706,27 @@ class Notch(Window):
             return
 
         self.window_icon.set_visible(True)
-
-        from fabric.hyprland.widgets import get_hyprland_connection
-
-        conn = get_hyprland_connection()
-        if conn:
-            try:
-                import json
-
-                active_window_json = conn.send_command("j/activewindow").reply.decode()
-                active_window_data = json.loads(active_window_json)
-                app_id = active_window_data.get(
-                    "initialClass", ""
-                ) or active_window_data.get("class", "")
-
-                icon_size = 20
-                desktop_app = self.find_app(app_id)
-
-                icon_pixbuf = None
-                if desktop_app:
-                    icon_pixbuf = apps.icon_pixbuf(desktop_app, icon_size)
-
-                if not icon_pixbuf:
-                    icon_pixbuf = self.icon_resolver.get_icon_pixbuf(app_id, icon_size)
-
-                if not icon_pixbuf and "-" in app_id:
-                    base_app_id = app_id.split("-")[0]
-                    icon_pixbuf = self.icon_resolver.get_icon_pixbuf(
-                        base_app_id, icon_size
-                    )
-
-                if icon_pixbuf:
-                    self.window_icon.set_from_pixbuf(icon_pixbuf)
-                else:
-                    try:
-                        self.window_icon.set_from_icon_name(
-                            "application-x-executable", 20
-                        )
-                    except:
-                        self.window_icon.set_from_icon_name(
-                            "application-x-executable-symbolic", 20
-                        )
-            except Exception as e:
-                print(f"Error updating window icon: {e}")
-                try:
-                    self.window_icon.set_from_icon_name("application-x-executable", 20)
-                except:
-                    self.window_icon.set_from_icon_name(
-                        "application-x-executable-symbolic", 20
-                    )
+        app_id = self._get_current_window_class()
+        icon_pixbuf = self._app_icon_pixbuf(app_id, 20) if app_id else None
+        if icon_pixbuf:
+            self.window_icon.set_from_pixbuf(icon_pixbuf)
         else:
-            try:
-                self.window_icon.set_from_icon_name("application-x-executable", 20)
-            except:
-                self.window_icon.set_from_icon_name(
-                    "application-x-executable-symbolic", 20
-                )
+            self.window_icon.set_from_icon_name("application-x-executable", 20)
+
+    def _app_icon_pixbuf(self, app_id: str, size: int):
+        """The app's icon: its desktop entry, else the icon theme by class
+        (and by the part before a "-", for classes like "app-beta")."""
+        try:
+            desktop_app = self.find_app(app_id)
+            pixbuf = apps.icon_pixbuf(desktop_app, size) if desktop_app else None
+            if not pixbuf:
+                pixbuf = self.icon_resolver.get_icon_pixbuf(app_id, size)
+            if not pixbuf and "-" in app_id:
+                pixbuf = self.icon_resolver.get_icon_pixbuf(app_id.split("-")[0], size)
+            return pixbuf
+        except Exception as e:
+            print(f"Error updating window icon: {e}")
+            return None
 
     def _check_occlusion(self):
         """
@@ -1099,7 +764,6 @@ class Notch(Window):
     
     def restore_from_occlusion(self):
         """Restore notch from occlusion mode."""
-        import config.data as data
         self._forced_occlusion = False
         if data.PANEL_THEME == "Notch":
             if data.BAR_POSITION == "Top":
@@ -1108,19 +772,14 @@ class Notch(Window):
                 self._prevent_occlusion = False
 
     def _get_current_window_class(self):
-        """Get the class of the currently active window"""
+        """The active window's initial class (else its class); "" without one."""
         try:
             from fabric.hyprland.widgets import get_hyprland_connection
 
             conn = get_hyprland_connection()
             if conn:
-                import json
-
-                active_window_json = conn.send_command("j/activewindow").reply.decode()
-                active_window_data = json.loads(active_window_json)
-                return active_window_data.get(
-                    "initialClass", ""
-                ) or active_window_data.get("class", "")
+                window = json.loads(conn.send_command("j/activewindow").reply.decode())
+                return window.get("initialClass", "") or window.get("class", "")
         except Exception as e:
             print(f"Error getting window class: {e}")
         return ""

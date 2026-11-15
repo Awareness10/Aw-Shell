@@ -79,16 +79,29 @@ class AudioSource(LevelSource):
     def toggle_mute(self) -> None:
         self.stream.muted = not self.stream.muted
 
-    def watch(self, callback) -> None:
-        """Calls callback() when the stream changes or another one takes over."""
-        def on_new_stream(*_):
-            if self.stream:
-                self._connect(self.stream, "changed", lambda *_: callback())
-                callback()
+    def watch(self, callback, on_new_stream=None) -> None:
+        """Calls callback() when the stream changes, and on_new_stream()
+        (default: callback) when another stream takes over; the previous
+        stream is no longer followed."""
+        stream_handler = []
 
-        self._connect(self.audio, f"notify::{self.kind}", on_new_stream)
-        if self.stream:
-            self._connect(self.stream, "changed", lambda *_: callback())
+        def follow_stream():
+            for obj, handler in stream_handler:
+                if obj.handler_is_connected(handler):
+                    obj.disconnect(handler)
+            stream_handler.clear()
+            if self.stream:
+                handler = self.stream.connect("changed", lambda *_: callback())
+                stream_handler.append((self.stream, handler))
+                self._handlers.append((self.stream, handler))
+
+        def new_stream(*_):
+            follow_stream()
+            if self.stream:
+                (on_new_stream or callback)()
+
+        self._connect(self.audio, f"notify::{self.kind}", new_stream)
+        follow_stream()
 
 
 class SpeakerSource(AudioSource):

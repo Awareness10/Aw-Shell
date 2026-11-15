@@ -263,6 +263,6 @@ def test_public_attribute_paths(notch):
                  "notch_complete", "notch_wrap", "hover_eventbox", "corner_left",
                  "corner_right", "launcher", "overview", "emoji", "power", "tools", "tmux",
                  "cliphist", "applet_stack", "nhistory", "btdevices", "nwconnections",
-                 "active_window", "active_window_box", "window_icon", "window_label",
+                 "active_window", "active_window_box", "window_icon",
                  "player_small", "user_label", "audio", "volume_box", "mic_box"):
         assert hasattr(notch, name), name
