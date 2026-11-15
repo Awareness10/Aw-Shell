@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 
 def test_import_without_upower(no_upower):
     # modules.metrics builds its provider at import time, which the bar
@@ -151,3 +153,47 @@ def test_failed_gpu_update_does_not_stop_later_ones(sandbox, monkeypatch):
     provider._gpu_update_running = True
     provider._run_nvtop_in_thread()
     assert provider._gpu_update_running is False
+
+
+def _hover(widget, kind):
+    from gi.repository import Gdk
+
+    event = Gdk.Event.new(Gdk.EventType.ENTER_NOTIFY if kind == "enter" else Gdk.EventType.LEAVE_NOTIFY)
+    widget.emit(f"{kind}-notify-event", event)
+
+
+@pytest.mark.parametrize("make, revealers", [
+    ("MetricsSmall", lambda w: [m.revealer for m in (w.cpu, w.ram, *w.disk)]),
+    ("Battery", lambda w: [w.bat_revealer]),
+])
+def test_hover_reveals_levels_and_hides_them_after_leaving(make, revealers, run_pending):
+    import time
+
+    import modules.metrics as metrics
+
+    widget = getattr(metrics, make)()
+    shown = lambda: [r.get_reveal_child() for r in revealers(widget)]  # noqa: E731
+    try:
+        assert not any(shown())
+        _hover(widget, "enter")
+        _hover(widget, "enter")  # nested (a child's crossing event)
+        assert all(shown())
+        _hover(widget, "leave")
+        run_pending()
+        assert all(shown())  # one hover still active
+        _hover(widget, "leave")
+        time.sleep(0.3)
+        run_pending()
+        assert all(shown())  # hides 500 ms after leaving
+        _hover(widget, "enter")  # back in time: no hide
+        time.sleep(0.4)
+        run_pending()
+        assert all(shown())
+        _hover(widget, "leave")
+        time.sleep(0.6)
+        run_pending()
+        assert not any(shown())
+        assert widget.hide_timer is None and widget.hover_counter == 0
+    finally:
+        widget.destroy()
+        run_pending()

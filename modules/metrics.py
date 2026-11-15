@@ -306,6 +306,55 @@ class Metrics(Box):
                 gpu.usage.value = gpus[i] / 100.0
         return True
 
+def _percent(value: int) -> str:
+    return f"{value}%"
+
+
+class HoverReveal:
+    """Shows _hover_revealers() while the pointer is over the widget
+    (horizontal bars), and hides them HIDE_DELAY_MS after it leaves."""
+
+    HIDE_DELAY_MS = 500
+
+    def _init_hover(self):
+        self.hide_timer = None
+        self.hover_counter = 0
+        self.connect("enter-notify-event", self.on_mouse_enter)
+        self.connect("leave-notify-event", self.on_mouse_leave)
+
+    def _hover_revealers(self):
+        raise NotImplementedError
+
+    def _reveal(self, shown: bool):
+        for revealer in self._hover_revealers():
+            revealer.set_reveal_child(shown)
+
+    def on_mouse_enter(self, widget, event):
+        if not data.VERTICAL:
+            self.hover_counter += 1
+            if self.hide_timer is not None:
+                GLib.source_remove(self.hide_timer)
+                self.hide_timer = None
+            self._reveal(True)
+            return False
+
+    def on_mouse_leave(self, widget, event):
+        if not data.VERTICAL:
+            if self.hover_counter > 0:
+                self.hover_counter -= 1
+            if self.hover_counter == 0:
+                if self.hide_timer is not None:
+                    GLib.source_remove(self.hide_timer)
+                self.hide_timer = GLib.timeout_add(self.HIDE_DELAY_MS, self.hide_revealer)
+            return False
+
+    def hide_revealer(self):
+        if not data.VERTICAL:
+            self._reveal(False)
+            self.hide_timer = None
+            return False
+
+
 class SingularMetricSmall:
     def __init__(self, id, name, icon):
         self.name_markup = name
@@ -342,7 +391,7 @@ class SingularMetricSmall:
     def markup(self):
         return f"{self.icon_markup} {self.name_markup}" if not data.VERTICAL else f"{self.icon_markup} {self.name_markup}: {self.level.get_label()}"
 
-class MetricsSmall(Button):
+class MetricsSmall(HoverReveal, Button):
     def __init__(self, **kwargs):
         super().__init__(name="metrics-small", **kwargs)
 
@@ -375,13 +424,9 @@ class MetricsSmall(Button):
 
         self.add(main_box)
 
-        self.hide_timer = None
-        self.hover_counter = 0
+        self._init_hover()
         if visible.get('gpu', True):
             _when_gpu_info_while_alive(self, self._add_gpus)
-
-        self.connect("enter-notify-event", self.on_mouse_enter)
-        self.connect("leave-notify-event", self.on_mouse_leave)
 
         _repeat_while_alive(self, GLib.timeout_add_seconds(2, self.update_metrics))
 
@@ -397,65 +442,29 @@ class MetricsSmall(Button):
             gpu.box.show_all()
             gpu.revealer.set_reveal_child(self.hover_counter > 0)
 
-    def _format_percentage(self, value: int) -> str:
-        """Formato natural del porcentaje sin forzar ancho fijo."""
-        return f"{value}%"
-
-    def on_mouse_enter(self, widget, event):
-        if not data.VERTICAL:
-            self.hover_counter += 1
-            if self.hide_timer is not None:
-                GLib.source_remove(self.hide_timer)
-                self.hide_timer = None
-
-            if self.cpu: self.cpu.revealer.set_reveal_child(True)
-            if self.ram: self.ram.revealer.set_reveal_child(True)
-            for disk in self.disk:
-                disk.revealer.set_reveal_child(True)
-            for gpu in self.gpu:
-                gpu.revealer.set_reveal_child(True)
-            return False
-
-    def on_mouse_leave(self, widget, event):
-        if not data.VERTICAL:
-            if self.hover_counter > 0:
-                self.hover_counter -= 1
-            if self.hover_counter == 0:
-                if self.hide_timer is not None:
-                    GLib.source_remove(self.hide_timer)
-                self.hide_timer = GLib.timeout_add(500, self.hide_revealer)
-            return False
-
-    def hide_revealer(self):
-        if not data.VERTICAL:
-            if self.cpu: self.cpu.revealer.set_reveal_child(False)
-            if self.ram: self.ram.revealer.set_reveal_child(False)
-            for disk in self.disk:
-                disk.revealer.set_reveal_child(False)
-            for gpu in self.gpu:
-                gpu.revealer.set_reveal_child(False)
-            self.hide_timer = None
-            return False
+    def _hover_revealers(self):
+        metrics = [self.cpu, self.ram, *self.disk, *self.gpu]
+        return [m.revealer for m in metrics if m]
 
     def update_metrics(self):
         cpu, mem, disks, gpus = shared_provider.get_metrics()
 
         if self.cpu:
             self.cpu.circle.set_value(cpu / 100.0)
-            self.cpu.level.set_label(self._format_percentage(int(cpu)))
+            self.cpu.level.set_label(_percent(int(cpu)))
         if self.ram:
             self.ram.circle.set_value(mem / 100.0)
-            self.ram.level.set_label(self._format_percentage(int(mem)))
+            self.ram.level.set_label(_percent(int(mem)))
         for i, disk in enumerate(self.disk):
 
             if i < len(disks):
                 disk.circle.set_value(disks[i] / 100.0)
-                disk.level.set_label(self._format_percentage(int(disks[i])))
+                disk.level.set_label(_percent(int(disks[i])))
         for i, gpu in enumerate(self.gpu):
 
             if i < len(gpus):
                 gpu.circle.set_value(gpus[i] / 100.0)
-                gpu.level.set_label(self._format_percentage(int(gpus[i])))
+                gpu.level.set_label(_percent(int(gpus[i])))
 
         tooltip_metrics = []
         if self.disk: tooltip_metrics.extend(self.disk)
@@ -466,7 +475,7 @@ class MetricsSmall(Button):
 
         return True
 
-class Battery(Button):
+class Battery(HoverReveal, Button):
     def __init__(self, **kwargs):
         super().__init__(name="metrics-small", **kwargs)
 
@@ -508,8 +517,7 @@ class Battery(Button):
 
         self.add(main_box)
 
-        self.connect("enter-notify-event", self.on_mouse_enter)
-        self.connect("leave-notify-event", self.on_mouse_leave)
+        self._init_hover()
 
         self.batt_fabricator = Fabricator(
             poll_from=lambda v: shared_provider.get_battery(),
@@ -522,38 +530,8 @@ class Battery(Button):
         self.connect("destroy", lambda *_: self.batt_fabricator.stop())
         GLib.idle_add(self.update_battery, None, shared_provider.get_battery())
 
-        self.hide_timer = None
-        self.hover_counter = 0
-
-    def _format_percentage(self, value: int) -> str:
-        """Formato natural del porcentaje sin forzar ancho fijo."""
-        return f"{value}%"
-
-    def on_mouse_enter(self, widget, event):
-        if not data.VERTICAL:
-            self.hover_counter += 1
-            if self.hide_timer is not None:
-                GLib.source_remove(self.hide_timer)
-                self.hide_timer = None
-
-            self.bat_revealer.set_reveal_child(True)
-            return False
-
-    def on_mouse_leave(self, widget, event):
-        if not data.VERTICAL:
-            if self.hover_counter > 0:
-                self.hover_counter -= 1
-            if self.hover_counter == 0:
-                if self.hide_timer is not None:
-                    GLib.source_remove(self.hide_timer)
-                self.hide_timer = GLib.timeout_add(500, self.hide_revealer)
-            return False
-
-    def hide_revealer(self):
-        if not data.VERTICAL:
-            self.bat_revealer.set_reveal_child(False)
-            self.hide_timer = None
-            return False
+    def _hover_revealers(self):
+        return [self.bat_revealer]
 
     def update_battery(self, sender, battery_data):
         value, charging, time = battery_data
@@ -563,7 +541,7 @@ class Battery(Button):
             self.set_visible(True)
             self.bat_circle.set_value(value / 100)
         percentage = int(value)
-        self.bat_level.set_label(self._format_percentage(percentage))
+        self.bat_level.set_label(_percent(percentage))
 
         if percentage <= 15:
             self.bat_icon.add_style_class("alert")
