@@ -19,6 +19,8 @@ from gi.repository import Gdk, GLib, Gtk
 import config.data as data
 import utils.apps as apps
 from modules.corners import MyCorner
+from utils.dock_layout import dock_hidden, dock_layout
+from utils.dock_model import app_entry, plan_dock
 from utils.icon_resolver import IconResolver
 from widgets.wayland import WaylandWindow as Window
 
@@ -39,14 +41,7 @@ def read_config():
             for app_id in old_pinned:
                 app = app_map.get(app_id)
                 if app:
-                    app_data_obj = {
-                        "name": app.name,
-                        "display_name": app.display_name,
-                        "window_class": app.window_class,
-                        "executable": app.executable,
-                        "command_line": app.command_line
-                    }
-                    config_data["pinned_apps"].append(app_data_obj)
+                    config_data["pinned_apps"].append(app_entry(app))
                 else:
                     config_data["pinned_apps"].append({"name": app_id})
                 
@@ -79,80 +74,29 @@ class Dock(Window):
         self.effective_occlusion_size = 36 + self.icon_size
         self.always_show = data.DOCK_ALWAYS_SHOW if not self.integrated_mode else False
 
-        anchor_to_set: str
-        revealer_transition_type: str
-
-        self.actual_dock_is_horizontal: bool 
-        main_box_orientation_val: Gtk.Orientation
-        main_box_h_align_val: str
-        dock_wrapper_orientation_val: Gtk.Orientation
-
+        self.layout = dock_layout(integrated_mode, data.BAR_POSITION, data.DOCK_THEME)
+        self.actual_dock_is_horizontal = self.layout.horizontal
         if not self.integrated_mode:
-
-            self.actual_dock_is_horizontal = not data.VERTICAL
-
-            if self.actual_dock_is_horizontal:
-                anchor_to_set = "bottom"
-                revealer_transition_type = "slide-up"
-                main_box_orientation_val = Gtk.Orientation.VERTICAL
-                main_box_h_align_val = "center"
-                dock_wrapper_orientation_val = Gtk.Orientation.HORIZONTAL
-            else:
-
-                if data.BAR_POSITION == "Left":
-                    anchor_to_set = "right"
-                    revealer_transition_type = "slide-left"
-                elif data.BAR_POSITION == "Right":
-                    anchor_to_set = "left"
-                    revealer_transition_type = "slide-right"
-                else:
-                    anchor_to_set = "right"
-                    revealer_transition_type = "slide-left"
-
-                main_box_orientation_val = Gtk.Orientation.HORIZONTAL
-                main_box_h_align_val = "end" if anchor_to_set == "right" else "start"
-                dock_wrapper_orientation_val = Gtk.Orientation.VERTICAL
-
             super().__init__(
                 name="dock-window",
                 layer="top",
-                anchor=anchor_to_set,
+                anchor=self.layout.anchor,
                 margin="0px 0px 0px 0px",
                 exclusivity="auto" if self.always_show else "none",
                 monitor=monitor_id,
                 **kwargs,
             )
             Dock._instances.append(self)
-        else:
-            self.actual_dock_is_horizontal = True
-            dock_wrapper_orientation_val = Gtk.Orientation.HORIZONTAL
-
-            anchor_to_set = "bottom"
-            revealer_transition_type = "slide-up"
-            main_box_orientation_val = Gtk.Orientation.VERTICAL
-            main_box_h_align_val = "center"
-
-        if not self.integrated_mode:
-            match data.BAR_POSITION:
-                case "Top":
-                    self.set_margin("-8px 0px 0px 0px")
-                case "Bottom":
-                    self.set_margin("0px 0px 0px 0px")
-                case "Left":
-                    self.set_margin("0px 0px 0px -8px")
-                case "Right":
-                    self.set_margin("0px -8px 0px 0px")
-                case _:
-                    self.set_margin("0px 0px 0px 0px")
+            self.set_margin(self.layout.margin)
 
         self.config = read_config()
         self.conn = get_hyprland_connection()
-        self.icon_resolver = IconResolver() 
+        self.icon_resolver = IconResolver()
         self.pinned = self.config.get("pinned_apps", [])
         self.app_map = {}
         self._all_apps = apps.desktop_apps()
         self.app_identifiers = apps.app_identifiers()
-        
+
         self.hide_id = None
         self._arranger_handler = None
         self._drag_in_progress = False
@@ -160,149 +104,133 @@ class Dock(Window):
         self._prevent_occlusion = False
         self._forced_occlusion = False
 
-        self.view = Box(name="viewport", spacing=4)
-        self.wrapper = Box(name="dock", children=[self.view], style_classes=["left"] if data.BAR_POSITION == "Right" else [])
-
-        self.wrapper.set_orientation(dock_wrapper_orientation_val)
-        self.view.set_orientation(dock_wrapper_orientation_val)
-
-        if self.integrated_mode:
-            self.wrapper.add_style_class("integrated")
-        else:
-
-            if dock_wrapper_orientation_val == Gtk.Orientation.VERTICAL:
-                self.wrapper.add_style_class("vertical")
-            else:
-                self.wrapper.remove_style_class("vertical") 
-
-            match data.DOCK_THEME:
-                case "Pills":
-                    self.wrapper.add_style_class("pills")
-                case "Dense":
-                    self.wrapper.add_style_class("dense")
-                case "Edge":
-                    self.wrapper.add_style_class("edge")
-                case _:
-                    self.wrapper.add_style_class("pills")
-
+        orientation = (
+            Gtk.Orientation.VERTICAL if self.layout.orientation == "v"
+            else Gtk.Orientation.HORIZONTAL
+        )
+        self.view = Box(name="viewport", spacing=4, orientation=orientation)
+        self.wrapper = Box(
+            name="dock", children=[self.view], orientation=orientation,
+            style_classes=list(self.layout.classes),
+        )
         if not self.integrated_mode:
-            self.dock_eventbox = EventBox()
-            self.dock_eventbox.add(self.wrapper)
-            self.dock_eventbox.connect("enter-notify-event", self._on_dock_enter)
-            self.dock_eventbox.connect("leave-notify-event", self._on_dock_leave)
+            self._build_window()
 
-            self.corner_left = Box()
-            self.corner_right = Box()
-            self.corner_top = Box()
-            self.corner_bottom = Box()
+        self._set_up_drag(self.view)
+        self._connect_hyprland()
+        GLib.timeout_add_seconds(2, self.check_config_change)
 
-            if self.actual_dock_is_horizontal: 
-                self.corner_left = Box(
-                    name="dock-corner-left", orientation=Gtk.Orientation.VERTICAL, h_align="start",
-                    children=[Box(v_expand=True, v_align="fill"), MyCorner("bottom-right")]
-                )
-                self.corner_right = Box(
-                    name="dock-corner-right", orientation=Gtk.Orientation.VERTICAL, h_align="end",
-                    children=[Box(v_expand=True, v_align="fill"), MyCorner("bottom-left")]
-                )
-                self.dock_full = Box(
-                    name="dock-full", orientation=Gtk.Orientation.HORIZONTAL, h_expand=True, h_align="fill",
-                    children=[self.corner_left, self.dock_eventbox, self.corner_right]
-                )
-            else:
+    def _corner_box(self, name, corner, filler_first, vertical_strip):
+        """A dock corner: the rounded piece pushed to one end of a strip."""
+        if vertical_strip:
+            filler = Box(v_expand=True, v_align="fill")
+            align = {"h_align": "start" if name.endswith("left") else "end"}
+            orientation = Gtk.Orientation.VERTICAL
+        else:
+            filler = Box(h_expand=True, h_align="fill")
+            align = {"v_align": "start" if name.endswith("top") else "end"}
+            orientation = Gtk.Orientation.HORIZONTAL
+        children = [filler, MyCorner(corner)] if filler_first else [MyCorner(corner), filler]
+        return Box(name=name, orientation=orientation, children=children, **align)
 
-                
+    def _build_window(self):
+        """The standalone dock: corners, hover strip and auto-hide revealer."""
+        self.dock_eventbox = EventBox()
+        self.dock_eventbox.add(self.wrapper)
+        self.dock_eventbox.connect("enter-notify-event", self._on_dock_enter)
+        self.dock_eventbox.connect("leave-notify-event", self._on_dock_leave)
 
-                
-                if anchor_to_set == "right":
-                    self.corner_top = Box(
-                        name="dock-corner-top", orientation=Gtk.Orientation.HORIZONTAL, v_align="start",
-                        children=[Box(h_expand=True, h_align="fill"), MyCorner("bottom-right")]
-                    )
-                    self.corner_bottom = Box(
-                        name="dock-corner-bottom", orientation=Gtk.Orientation.HORIZONTAL, v_align="end",
-                        children=[Box(h_expand=True, h_align="fill"), MyCorner("top-right")]
-                    )
-                else:
-                    self.corner_top = Box(
-                        name="dock-corner-top", orientation=Gtk.Orientation.HORIZONTAL, v_align="start",
-                        children=[MyCorner("bottom-left"), Box(h_expand=True, h_align="fill")]
-                    )
-                    self.corner_bottom = Box(
-                        name="dock-corner-bottom", orientation=Gtk.Orientation.HORIZONTAL, v_align="end",
-                        children=[MyCorner("top-left"), Box(h_expand=True, h_align="fill")]
-                    )
-
-                self.dock_full = Box(
-                    name="dock-full", orientation=Gtk.Orientation.VERTICAL, v_expand=True, v_align="fill",
-                    children=[self.corner_top, self.dock_eventbox, self.corner_bottom]
-                )
-
-            self.dock_revealer = Revealer(
-                name="dock-revealer",
-                transition_type=revealer_transition_type,
-                transition_duration=250,
-                child_revealed=False, 
-                child=self.dock_full
+        self.corner_left = Box()
+        self.corner_right = Box()
+        self.corner_top = Box()
+        self.corner_bottom = Box()
+        if self.actual_dock_is_horizontal:
+            self.corner_left = self._corner_box("dock-corner-left", "bottom-right", True, True)
+            self.corner_right = self._corner_box("dock-corner-right", "bottom-left", True, True)
+            self.dock_full = Box(
+                name="dock-full", orientation=Gtk.Orientation.HORIZONTAL, h_expand=True,
+                h_align="fill", children=[self.corner_left, self.dock_eventbox, self.corner_right]
+            )
+        else:
+            on_right = self.layout.anchor == "right"
+            self.corner_top = self._corner_box(
+                "dock-corner-top", "bottom-right" if on_right else "bottom-left", on_right, False
+            )
+            self.corner_bottom = self._corner_box(
+                "dock-corner-bottom", "top-right" if on_right else "top-left", on_right, False
+            )
+            self.dock_full = Box(
+                name="dock-full", orientation=Gtk.Orientation.VERTICAL, v_expand=True,
+                v_align="fill", children=[self.corner_top, self.dock_eventbox, self.corner_bottom]
             )
 
-            self.hover_activator = EventBox()
-
-            self.hover_activator.set_size_request(-1 if self.actual_dock_is_horizontal else 1, 1 if self.actual_dock_is_horizontal else -1)
-            self.hover_activator.connect("enter-notify-event", self._on_hover_enter)
-            self.hover_activator.connect("leave-notify-event", self._on_hover_leave)
-
-            self.main_box = Box(
-                orientation=main_box_orientation_val,
-                children=[self.hover_activator, self.dock_revealer] if data.BAR_POSITION != "Right" else [self.dock_revealer, self.hover_activator],
-                h_align=main_box_h_align_val,
-            )
-            self.add(self.main_box) 
-            
-            if data.DOCK_THEME in ["Edge", "Dense"]:
-                for corner in [self.corner_left, self.corner_right, self.corner_top, self.corner_bottom]:
-                    corner.set_visible(False)
-            
-
-            # Hide normal dock when it should be embedded in the bar OR when dock is disabled
-            should_be_embedded = (data.BAR_POSITION == "Bottom") or (data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Top", "Bottom"])
-            if should_be_embedded or not data.DOCK_ENABLED:
-                self.set_visible(False) 
-            
-            if self.always_show: 
-                self.dock_full.add_style_class("occluded")
-
-        self.view.drag_source_set(
-            Gdk.ModifierType.BUTTON1_MASK,
-            [Gtk.TargetEntry.new("text/plain", Gtk.TargetFlags.SAME_APP, 0)],
-            Gdk.DragAction.MOVE
+        self.dock_revealer = Revealer(
+            name="dock-revealer",
+            transition_type=self.layout.transition,
+            transition_duration=250,
+            child_revealed=False,
+            child=self.dock_full
         )
-        self.view.drag_dest_set(
-            Gtk.DestDefaults.ALL,
-            [Gtk.TargetEntry.new("text/plain", Gtk.TargetFlags.SAME_APP, 0)],
-            Gdk.DragAction.MOVE
-        )
-        self.view.connect("drag-data-get", self.on_drag_data_get)
-        self.view.connect("drag-data-received", self.on_drag_data_received)
-        self.view.connect("drag-begin", self.on_drag_begin)
-        self.view.connect("drag-end", self.on_drag_end)
 
+        self.hover_activator = EventBox()
+        horizontal = self.actual_dock_is_horizontal
+        self.hover_activator.set_size_request(-1 if horizontal else 1, 1 if horizontal else -1)
+        self.hover_activator.connect("enter-notify-event", self._on_hover_enter)
+        self.hover_activator.connect("leave-notify-event", self._on_hover_leave)
+
+        self.main_box = Box(
+            orientation=(
+                Gtk.Orientation.VERTICAL if self.layout.main_orientation == "v"
+                else Gtk.Orientation.HORIZONTAL
+            ),
+            children=(
+                [self.hover_activator, self.dock_revealer] if self.layout.activator_first
+                else [self.dock_revealer, self.hover_activator]
+            ),
+            h_align=self.layout.main_h_align,
+        )
+        self.add(self.main_box)
+
+        if self.layout.hide_corners:
+            for corner in [self.corner_left, self.corner_right, self.corner_top,
+                           self.corner_bottom]:
+                corner.set_visible(False)
+
+        if dock_hidden(data.BAR_POSITION, data.PANEL_THEME, data.DOCK_ENABLED):
+            self.set_visible(False)
+
+        if self.always_show:
+            self.dock_full.add_style_class("occluded")
+
+    def _set_up_drag(self, widget):
+        """Buttons (and the view) can be dragged and dropped to reorder."""
+        target = [Gtk.TargetEntry.new("text/plain", Gtk.TargetFlags.SAME_APP, 0)]
+        widget.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, target, Gdk.DragAction.MOVE)
+        widget.drag_dest_set(Gtk.DestDefaults.ALL, target, Gdk.DragAction.MOVE)
+        widget.connect("drag-data-get", self.on_drag_data_get)
+        widget.connect("drag-data-received", self.on_drag_data_received)
+        widget.connect("drag-begin", self.on_drag_begin)
+        widget.connect("drag-end", self.on_drag_end)
+
+    def _connect_hyprland(self):
         if self.conn.ready:
             self.update_dock()
-            if not self.integrated_mode: GLib.timeout_add(500, self.check_occlusion_state)
+            if not self.integrated_mode:
+                GLib.timeout_add(500, self.check_occlusion_state)
         else:
             self.conn.connect("event::ready", self.update_dock)
-            if not self.integrated_mode: self.conn.connect("event::ready", lambda *args: GLib.timeout_add(250, self.check_occlusion_state))
+            if not self.integrated_mode:
+                self.conn.connect(
+                    "event::ready", lambda *args: GLib.timeout_add(250, self.check_occlusion_state)
+                )
 
-        # Listen to window events to update dock when apps open/close
+        # Apps opening and closing change the buttons
         self.conn.connect("event::openwindow", self.update_dock)
         self.conn.connect("event::closewindow", self.update_dock)
-        
+
         if not self.integrated_mode:
             self.conn.connect("event::workspace", self.check_hide)
-        
-        GLib.timeout_add_seconds(2, self.check_config_change)
-            
+
     def _normalize_window_class(self, class_name):
         return apps.normalize_window_class(class_name)
 
@@ -310,47 +238,44 @@ class Dock(Window):
         self._drag_in_progress = True
         Gtk.drag_set_icon_surface(drag_context, createSurfaceFromWidget(widget))
 
-    def _on_hover_enter(self, *args):
-        if self.integrated_mode: return 
+    def _pointer_entered(self):
         self.is_mouse_over_dock_area = True
-        if self.hide_id:
-            GLib.source_remove(self.hide_id)
-            self.hide_id = None
+        self._cancel_hide()
         self.dock_revealer.set_reveal_child(True)
         if not self.always_show:
             self.dock_full.remove_style_class("occluded")
 
-    def _on_hover_leave(self, *args):
-        if self.integrated_mode: return 
+    def _pointer_left(self):
         self.is_mouse_over_dock_area = False
         if self._forced_occlusion:
             self.dock_revealer.set_reveal_child(False)
         else:
             self.delay_hide()
 
-    def _on_dock_enter(self, widget, event):
-        if self.integrated_mode: return True 
-        self.is_mouse_over_dock_area = True
+    def _cancel_hide(self):
         if self.hide_id:
             GLib.source_remove(self.hide_id)
             self.hide_id = None
-        self.dock_revealer.set_reveal_child(True)
-        if not self.always_show:
-            self.dock_full.remove_style_class("occluded")
+
+    def _on_hover_enter(self, *args):
+        if not self.integrated_mode:
+            self._pointer_entered()
+
+    def _on_hover_leave(self, *args):
+        if not self.integrated_mode:
+            self._pointer_left()
+
+    def _on_dock_enter(self, widget, event):
+        if not self.integrated_mode:
+            self._pointer_entered()
         return True
 
     def _on_dock_leave(self, widget, event):
-        if self.integrated_mode: return True 
+        if self.integrated_mode:
+            return True
         if event.detail == Gdk.NotifyType.INFERIOR:
             return False
-
-        self.is_mouse_over_dock_area = False
-        
-        if self._forced_occlusion:
-            self.dock_revealer.set_reveal_child(False)
-        else:
-            self.delay_hide()
-        
+        self._pointer_left()
         if not self.always_show:
             self.dock_full.add_style_class("occluded")
         return True
@@ -400,20 +325,7 @@ class Dock(Window):
         button.instances = instances
         if instances: button.add_style_class("instance")
 
-        button.drag_source_set(
-            Gdk.ModifierType.BUTTON1_MASK,
-            [Gtk.TargetEntry.new("text/plain", Gtk.TargetFlags.SAME_APP, 0)],
-            Gdk.DragAction.MOVE
-        )
-        button.connect("drag-begin", self.on_drag_begin)
-        button.connect("drag-end", self.on_drag_end)
-        button.drag_dest_set(
-            Gtk.DestDefaults.ALL,
-            [Gtk.TargetEntry.new("text/plain", Gtk.TargetFlags.SAME_APP, 0)],
-            Gdk.DragAction.MOVE
-        )
-        button.connect("drag-data-get", self.on_drag_data_get)
-        button.connect("drag-data-received", self.on_drag_data_received)
+        self._set_up_drag(button)
         button.connect("enter-notify-event", self._on_child_enter)
         return button
 
@@ -437,14 +349,19 @@ class Dock(Window):
             focused = self.get_focused()
             idx = next((i for i, inst in enumerate(instances) if inst["address"] == focused), -1)
             next_inst = instances[(idx + 1) % len(instances)]
-            exec_shell_command(f"hyprctl dispatch 'hl.dsp.focus({{ window = \"address:{next_inst['address']}\" }})'")
+            self._focus_window(next_inst["address"])
+
+    @staticmethod
+    def _focus_window(address):
+        exec_shell_command(
+            f"hyprctl dispatch 'hl.dsp.focus({{ window = \"address:{address}\" }})'"
+        )
 
     def _on_child_enter(self, widget, event):
-        if self.integrated_mode: return False 
-        self.is_mouse_over_dock_area = True 
-        if self.hide_id:
-            GLib.source_remove(self.hide_id)
-            self.hide_id = None
+        if self.integrated_mode:
+            return False
+        self.is_mouse_over_dock_area = True
+        self._cancel_hide()
         return False
 
     def delay_hide(self):
@@ -467,114 +384,38 @@ class Dock(Window):
             return 
         if self.is_mouse_over_dock_area or self._drag_in_progress or self._prevent_occlusion:
             return
+        self._apply_resting_state()
 
-        clients = self.get_clients()
-        current_ws = self.get_workspace()
-        ws_clients = [w for w in clients if w["workspace"].get("id") == current_ws]
+    def _apply_resting_state(self):
+        """Shown (always_show) or tucked away, when nothing holds it open."""
+        self._set_shown(self.always_show)
 
-        if self.always_show:
-            if not self.dock_revealer.get_reveal_child():
-                self.dock_revealer.set_reveal_child(True)
+    def _set_shown(self, shown: bool):
+        if self.dock_revealer.get_reveal_child() != shown:
+            self.dock_revealer.set_reveal_child(shown)
+        if shown:
             self.dock_full.remove_style_class("occluded")
         else:
-            if self.dock_revealer.get_reveal_child():
-                self.dock_revealer.set_reveal_child(False)
             self.dock_full.add_style_class("occluded")
 
     def update_dock(self, *args):
         self.update_app_map()
         arranger_handler = getattr(self, "_arranger_handler", None)
         if arranger_handler: remove_handler(arranger_handler)
-        clients = self.get_clients()
-        
-        running_windows = {}
-        for c in clients:
-            window_id = None
-            if class_name := c.get("initialClass", "").lower(): window_id = class_name
-            elif class_name := c.get("class", "").lower(): window_id = class_name
-            elif title := c.get("title", "").lower():
-                possible_name = title.split(" - ")[0].strip()
-                if possible_name and len(possible_name) > 1: window_id = possible_name
-                else: window_id = title
-            if not window_id: window_id = "unknown-app"
-            running_windows.setdefault(window_id, []).append(c)
-            normalized_id = self._normalize_window_class(window_id)
-            if normalized_id != window_id:
-                running_windows.setdefault(normalized_id, []).extend(running_windows[window_id])
-        
-        pinned_buttons = []
-        used_window_classes = set()
-        
-        for app_data_item in self.pinned:
-            app = self.find_app(app_data_item)
-            instances = []
-            matched_class = None
-            possible_identifiers = []
-            
-            if isinstance(app_data_item, dict):
-                for key in ["window_class", "executable", "command_line", "name", "display_name"]:
-                    if key in app_data_item and app_data_item[key]: possible_identifiers.append(app_data_item[key].lower())
-            elif isinstance(app_data_item, str): possible_identifiers.append(app_data_item.lower())
-            
-            if app:
-                if app.window_class: possible_identifiers.append(app.window_class.lower())
-                if app.executable: possible_identifiers.append(app.executable.split('/')[-1].lower())
-                if app.command_line:
-                    cmd_parts = app.command_line.split()
-                    if cmd_parts: possible_identifiers.append(cmd_parts[0].split('/')[-1].lower())
-                if app.name: possible_identifiers.append(app.name.lower())
-                if app.display_name: possible_identifiers.append(app.display_name.lower())
-            
-            possible_identifiers = list(set(possible_identifiers)) 
-            
-            for identifier in possible_identifiers:
-                if identifier in running_windows:
-                    instances = running_windows[identifier]; matched_class = identifier; break
-                normalized = self._normalize_window_class(identifier)
-                if normalized in running_windows:
-                    instances = running_windows[normalized]; matched_class = normalized; break
-                for window_class_key in running_windows: 
-                    if len(identifier) >= 3 and identifier in window_class_key:
-                        instances = running_windows[window_class_key]; matched_class = window_class_key
-                        break
-                if matched_class: break
-            
-            if matched_class:
-                used_window_classes.add(matched_class)
-                used_window_classes.add(self._normalize_window_class(matched_class))
-            
-            pinned_buttons.append(self.create_button(app_data_item, instances))
-        
-        open_buttons = []
-        for class_name, instances in running_windows.items():
-            if class_name not in used_window_classes:
-                app = None
-                app = self.app_identifiers.get(class_name)
-                if not app:
-                    norm_class = self._normalize_window_class(class_name)
-                    app = self.app_identifiers.get(norm_class)
-                if not app: app = self.find_app_by_key(class_name)
-                if not app and instances and instances[0].get("title"):
-                    title = instances[0].get("title", "")
-                    potential_name = title.split(" - ")[0].strip()
-                    if len(potential_name) > 2: app = self.find_app_by_key(potential_name)
-                
-                if app:
-                    app_data_obj = {
-                        "name": app.name, "display_name": app.display_name,
-                        "window_class": app.window_class, "executable": app.executable,
-                        "command_line": app.command_line
-                    }
-                    identifier = app_data_obj
-                else: identifier = class_name
-                open_buttons.append(self.create_button(identifier, instances))
+
+        pinned, running = plan_dock(
+            self.pinned, self.get_clients(), self.find_app, self.find_app_by_key,
+            self.app_identifiers,
+        )
+        pinned_buttons = [self.create_button(item, windows) for item, windows in pinned]
+        open_buttons = [self.create_button(item, windows) for item, windows in running]
 
         children = pinned_buttons
         separator_orientation = Gtk.Orientation.VERTICAL if self.view.get_orientation() == Gtk.Orientation.HORIZONTAL else Gtk.Orientation.HORIZONTAL
         if pinned_buttons and open_buttons:
             children += [Box(orientation=separator_orientation, v_expand=False, h_expand=False, h_align="center", v_align="center", name="dock-separator")]
         children += open_buttons
-        
+
         self.view.children = children
         if not self.integrated_mode:
             idle_add(self._update_size)
@@ -606,14 +447,7 @@ class Dock(Window):
 
         # When forced occlusion is active, only show on hover
         if self._forced_occlusion:
-            if self.is_mouse_over_dock_area:
-                if not self.dock_revealer.get_reveal_child():
-                    self.dock_revealer.set_reveal_child(True)
-                self.dock_full.remove_style_class("occluded")
-            else:
-                if self.dock_revealer.get_reveal_child():
-                    self.dock_revealer.set_reveal_child(False)
-                self.dock_full.add_style_class("occluded")
+            self._set_shown(self.is_mouse_over_dock_area)
             return True
 
         if self.is_mouse_over_dock_area or self._drag_in_progress or self._prevent_occlusion:
@@ -623,15 +457,7 @@ class Dock(Window):
                  self.dock_full.remove_style_class("occluded")
             return True
 
-        if self.always_show:
-            if not self.dock_revealer.get_reveal_child():
-                self.dock_revealer.set_reveal_child(True)
-            self.dock_full.remove_style_class("occluded")
-        else:
-            if self.dock_revealer.get_reveal_child():
-                self.dock_revealer.set_reveal_child(False)
-            self.dock_full.add_style_class("occluded")
-
+        self._apply_resting_state()
         return True
 
     def _find_drag_target(self, widget):
@@ -710,27 +536,31 @@ class Dock(Window):
                 elif instances_dragged:
                     address = instances_dragged[0].get("address")
                     if address:
-                        exec_shell_command(f"hyprctl dispatch 'hl.dsp.focus({{ window = \"address:{address}\" }})'")
+                        self._focus_window(address)
 
             self._drag_in_progress = False
             if not self.integrated_mode:
                 self.check_occlusion_state()
 
         GLib.idle_add(process_drag_end)
-    def check_config_change(self):
+    def _reload_config(self):
+        """Pick up dock.json and the always-show setting if they changed."""
         new_config = read_config()
         if not self.integrated_mode:
-            new_always_show = data.DOCK_ALWAYS_SHOW 
+            new_always_show = data.DOCK_ALWAYS_SHOW
             if self.always_show != new_always_show:
                 self.always_show = new_always_show
-                self.check_occlusion_state() 
+                self.check_occlusion_state()
 
         if new_config.get("pinned_apps", []) != self.config.get("pinned_apps", []):
             self.config = new_config
             self.pinned = self.config.get("pinned_apps", [])
             self.update_app_map()
             self.update_dock()
-        return True 
+
+    def check_config_change(self):
+        self._reload_config()
+        return True  # keep polling
 
     def update_pinned_apps_file(self):
         try:
@@ -747,14 +577,8 @@ class Dock(Window):
         for child_widget in self.view.get_children(): 
             if child_widget.get_name() == "dock-separator": break
             if hasattr(child_widget, "app_identifier"):
-                if hasattr(child_widget, "desktop_app") and child_widget.desktop_app:
-                    app = child_widget.desktop_app
-                    app_data_obj = {
-                        "name": app.name, "display_name": app.display_name,
-                        "window_class": app.window_class, "executable": app.executable,
-                        "command_line": app.command_line
-                    }
-                    pinned_children_data.append(app_data_obj)
+                if getattr(child_widget, "desktop_app", None):
+                    pinned_children_data.append(app_entry(child_widget.desktop_app))
                 else:
                     pinned_children_data.append(child_widget.app_identifier)
 
@@ -769,22 +593,9 @@ class Dock(Window):
         for dock_instance in Dock._instances: 
              GLib.idle_add(dock_instance.check_config_change_immediate)
 
-    def check_config_change_immediate(self): 
-        new_config = read_config()
-        
-        if not self.integrated_mode:
-            previous_always_show = self.always_show
-            self.always_show = data.DOCK_ALWAYS_SHOW 
-            
-            if previous_always_show != self.always_show:
-                self.check_occlusion_state() 
-        
-        if new_config.get("pinned_apps", []) != self.config.get("pinned_apps", []):
-            self.config = new_config
-            self.pinned = self.config.get("pinned_apps", [])
-            self.update_app_map()
-            self.update_dock()
-        return False 
+    def check_config_change_immediate(self):
+        self._reload_config()
+        return False  # once
 
     @staticmethod
     def update_visibility(visible):
