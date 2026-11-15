@@ -112,7 +112,8 @@ def test_double_click_opens_file(sandbox, board, tmp_path):
     before = len(sandbox.commands())
     _press(cell, 1)  # a single click does nothing
     _press(cell, 1, double=True)
-    assert pump_until(lambda: sandbox.commands()[before:] == [f"xdg-open {document}"])
+    assert pump_until(lambda: [c for c in sandbox.commands()[before:] if c.startswith("xdg-open")]
+                      == [f"xdg-open {document}"])
 
 
 def test_right_click_clears_pin(board, save_file):
@@ -129,7 +130,8 @@ def test_click_on_text_copies_it(sandbox, board):
     before = len(sandbox.commands())
     _press(cell, 1)
     assert _clipboard().wait_for_text() == "ssh me@host"
-    assert sandbox.commands()[before:] == []
+    # only xdg-open matters; the metrics widget's GPU poll may run meanwhile
+    assert not [c for c in sandbox.commands()[before:] if "xdg-open" in c]
 
 
 def test_click_on_url_copies_and_opens(sandbox, board, no_favicon_download):
@@ -139,7 +141,7 @@ def test_click_on_url_copies_and_opens(sandbox, board, no_favicon_download):
     before = len(sandbox.commands())
     _press(cell, 1)
     assert _clipboard().wait_for_text() == "https://example.com/docs"
-    assert pump_until(lambda: sandbox.commands()[before:] == ["xdg-open https://example.com/docs"])
+    assert pump_until(lambda: "xdg-open https://example.com/docs" in sandbox.commands()[before:])
 
 
 def test_ctrl_click_on_url_only_copies(sandbox, board):
@@ -149,7 +151,8 @@ def test_ctrl_click_on_url_only_copies(sandbox, board):
     _press(cell, 1, state=Gdk.ModifierType.CONTROL_MASK)
     assert _clipboard().wait_for_text() == "https://example.com"
     pump_until(lambda: False, timeout=0.3)  # give a wrongly spawned xdg-open time to log
-    assert sandbox.commands()[before:] == []
+    # only xdg-open matters; the metrics widget's GPU poll may run meanwhile
+    assert not [c for c in sandbox.commands()[before:] if "xdg-open" in c]
 
 
 class _FakeNotch(Gtk.Window):
