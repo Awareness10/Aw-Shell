@@ -449,8 +449,10 @@ class Toolbox(Box):
         """Update gamemode UI from main thread"""
         if enabled:
             self.btn_gamemode.get_child().set_markup(icons.gamemode_off)
+            self.btn_gamemode.add_style_class("gamemode")
         else:
             self.btn_gamemode.get_child().set_markup(icons.gamemode)
+            self.btn_gamemode.remove_style_class("gamemode")
         return False
 
     def colorpicker(self, button, event):
