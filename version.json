@@ -1,7 +1,25 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "pkg_update": true,
   "releases": [
+    {
+      "version": "1.4.0",
+      "changes": [
+        "<b>feat:</b> The system tray is built in: there's no separate tray library (Gray) to build or install any more, and tray menus work as before",
+        "<b>feat:</b> The toolbox's Game Mode button lights up while game mode is on",
+        "<b>feat:</b> Aw-Shell's Hyprland config loads with require(), the way Hyprland's example config splits files (existing setups keep working)",
+        "<b>fix:</b> A notification whose image file is missing shows up instead of failing",
+        "<b>fix:</b> A notification closed in the history stays gone after a restart",
+        "<b>fix:</b> The notch finds apps installed while the shell is running",
+        "<b>fix:</b> With the bar hidden, the dock stays hidden until you hover it, even when it's set to always show",
+        "<b>fix:</b> Pins keep their large icons with the Notch theme after you've used the Panel theme at the start or end",
+        "<b>fix:</b> Shell colors (installer option) work in new terminals on a fresh Arch install: the installer puts uv's tool folder on PATH in ~/.bashrc",
+        "<b>fix:</b> The calculator says a bare function name (\"sin\") isn't a result",
+        "<b>fix:</b> The shell no longer writes what you type in the launcher, the tmux manager and conversions to its output",
+        "<b>update:</b> Six fewer dependencies (requests, numpy, ijson, toml, dbus-python, watchdog), so installs are smaller",
+        "<b>update:</b> Large internal cleanup with the look and behaviour unchanged; lint and type checks now run on every change"
+      ]
+    },
     {
       "version": "1.3.0",
       "changes": [
@@ -253,14 +271,18 @@
     }
   ],
   "changelog": [
-    "<b>feat:</b> The launcher converts crypto prices (BTC to NOK, NOK to BTC, DOGE), with rates from CoinGecko",
-    "<b>feat:</b> A failed conversion says why: bad format, no rate, rate limit or no connection",
-    "<b>feat:</b> The battery rings in the bar stand apart from the knobs (own color, full ring, divider)",
-    "<b>fix:</b> Currency conversion works again: the result replaces \"Loading\" and rates are read correctly",
-    "<b>fix:</b> Conversion accepts a number glued to its unit (10km to miles) and no amount at all (usd to nok means 1 USD)",
-    "<b>fix:</b> Lowercase min, mph and lbs convert as units, not as currency codes",
-    "<b>fix:</b> Conversion results below 1 keep four significant digits",
-    "<b>fix:</b> App icons are sharp at every size, not scaled from the first size loaded",
-    "<b>fix:</b> Pins show website icons for links"
+    "<b>feat:</b> The system tray is built in: there's no separate tray library (Gray) to build or install any more, and tray menus work as before",
+    "<b>feat:</b> The toolbox's Game Mode button lights up while game mode is on",
+    "<b>feat:</b> Aw-Shell's Hyprland config loads with require(), the way Hyprland's example config splits files (existing setups keep working)",
+    "<b>fix:</b> A notification whose image file is missing shows up instead of failing",
+    "<b>fix:</b> A notification closed in the history stays gone after a restart",
+    "<b>fix:</b> The notch finds apps installed while the shell is running",
+    "<b>fix:</b> With the bar hidden, the dock stays hidden until you hover it, even when it's set to always show",
+    "<b>fix:</b> Pins keep their large icons with the Notch theme after you've used the Panel theme at the start or end",
+    "<b>fix:</b> Shell colors (installer option) work in new terminals on a fresh Arch install: the installer puts uv's tool folder on PATH in ~/.bashrc",
+    "<b>fix:</b> The calculator says a bare function name (\"sin\") isn't a result",
+    "<b>fix:</b> The shell no longer writes what you type in the launcher, the tmux manager and conversions to its output",
+    "<b>update:</b> Six fewer dependencies (requests, numpy, ijson, toml, dbus-python, watchdog), so installs are smaller",
+    "<b>update:</b> Large internal cleanup with the look and behaviour unchanged; lint and type checks now run on every change"
   ]
 }
