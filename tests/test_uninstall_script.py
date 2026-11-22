@@ -79,6 +79,19 @@ def test_removes_the_home_based_hyprland_line_too(home):
     assert hypr.read_text() == 'hl.monitor("x")\n'
 
 
+def test_removes_the_require_lines(home):
+    hypr = home / ".config/hypr/hyprland.lua"
+    hypr.write_text('hl.monitor("x")\n'
+                    'package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/aw-shell/config/hypr/?.lua"\n'
+                    'require("aw-shell")\n'
+                    'package.path = package.path .. ";/opt/mine/?.lua"\n'
+                    'require("mine")\n')
+    _uninstall(home, "y\nn\nn\nn\n")
+    assert hypr.read_text() == ('hl.monitor("x")\n'
+                                'package.path = package.path .. ";/opt/mine/?.lua"\n'
+                                'require("mine")\n')
+
+
 def test_symlinked_hyprland_config_stays_a_symlink(home):
     dotfiles = home / "dotfiles"
     dotfiles.mkdir()

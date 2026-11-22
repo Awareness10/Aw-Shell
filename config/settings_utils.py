@@ -100,10 +100,12 @@ def get_available_monitors() -> list:
     return [{"id": 0, "name": "default"}]
 
 
-# A dofile() of aw-shell.lua, however the path is written (a literal, or
-# os.getenv("HOME") .. "..."); not one that's commented out
-_AW_LUA_DOFILE = re.compile(
-    rf"""^[ \t]*dofile\b.*/{re.escape(APP_NAME)}/config/hypr/{re.escape(APP_NAME)}\.lua["']""",
+# hyprland.lua loading aw-shell.lua, not commented out: a require() of the
+# module (the current way), or a dofile() of its path, however the path is
+# written (configs from before the switch to require())
+_AW_LUA_LOAD = re.compile(
+    rf"""^[ \t]*(?:local\b.*=\s*)?require\s*\(?\s*["']{re.escape(APP_NAME)}["']"""
+    rf"""|^[ \t]*dofile\b.*/{re.escape(APP_NAME)}/config/hypr/{re.escape(APP_NAME)}\.lua["']""",
     re.MULTILINE,
 )
 
@@ -112,21 +114,30 @@ def lua_str(s: str) -> str:
     return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def aw_lua_dofile(aw_lua: Path, home: Path | None = None) -> str:
-    """The line hyprland.lua loads aw-shell.lua with: from $HOME when it's in
-    there, so the user's config has no user name in it."""
+def aw_lua_require(aw_lua: Path, home: Path | None = None) -> str:
+    """The lines hyprland.lua loads aw-shell.lua with: its folder appended to
+    package.path (appended, so its colors.lua can't shadow a user's module),
+    then require(), the way Hyprland's example config splits files. The
+    folder is from $HOME when it's in there, so the user's config has no
+    user name in it."""
     home = Path.home() if home is None else home
+    pattern = aw_lua.parent / "?.lua"
     try:
-        relative = aw_lua.relative_to(home)
+        relative = pattern.relative_to(home)
     except ValueError:
-        return f"dofile({lua_str(aw_lua)})"
-    return f'dofile(os.getenv("HOME") .. {lua_str("/" + relative.as_posix())})'
+        search = lua_str(pattern.as_posix())
+    else:
+        search = f'os.getenv("HOME") .. {lua_str("/" + relative.as_posix())}'
+    return (
+        f'package.path = package.path .. ";" .. {search}\n'
+        f"require({lua_str(aw_lua.stem)})"
+    )
 
 
 def loads_aw_lua(hyprland_lua: str) -> bool:
     """Whether hyprland.lua already loads aw-shell.lua. A second load doubles
     every shell bind, and toggle binds then cancel themselves out."""
-    return bool(_AW_LUA_DOFILE.search(hyprland_lua))
+    return bool(_AW_LUA_LOAD.search(hyprland_lua))
 
 
 def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) -> None:
@@ -162,7 +173,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
 
     if get_bind_var("auto_append_hyprland"):
         hypr_path = CONFIG_DIR / "hypr" / "hyprland.lua"
-        dofile_string = aw_lua_dofile(AW_CONFIG_DIR / "hypr" / f"{APP_NAME}.lua")
+        load_lines = aw_lua_require(AW_CONFIG_DIR / "hypr" / f"{APP_NAME}.lua")
         try:
             needs_append = True
             if hypr_path.exists():
@@ -172,7 +183,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
                 hypr_path.parent.mkdir(parents=True, exist_ok=True)
             if needs_append:
                 with open(hypr_path, "a") as f:
-                    f.write("\n" + dofile_string + "\n")
+                    f.write("\n" + load_lines + "\n")
         except Exception as e:
             print(f"Error updating hyprland.lua: {e}")
 

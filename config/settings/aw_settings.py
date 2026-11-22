@@ -702,7 +702,7 @@ class AwShellSettings(FramelessMainWindow):
 
         self.auto_append_cb = QCheckBox("Auto-append to hyprland.lua")
         self.auto_append_cb.setChecked(get_bind_var("auto_append_hyprland", True))
-        self.auto_append_cb.setToolTip("Automatically append the Aw-Shell dofile() line to hyprland.lua")
+        self.auto_append_cb.setToolTip("Automatically append the Aw-Shell require() lines to hyprland.lua")
         section_layout.addWidget(self.auto_append_cb)
 
         layout.addWidget(section)

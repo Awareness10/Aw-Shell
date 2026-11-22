@@ -11,7 +11,7 @@ import pytest
 from config.paths import SCRIPTS_DIR
 from config.settings_constants import APP_NAME_CAP, DEFAULTS
 from config.settings_utils import (
-    aw_lua_dofile,
+    aw_lua_require,
     loads_aw_lua,
     APPLY_COLORS_FN,
     HYPRIDLE_HEADER,
@@ -419,6 +419,10 @@ def _dofile_lines(path):
     return sum(line.lstrip("- ").startswith("dofile") for line in path.read_text().splitlines())
 
 
+def _require_lines(path):
+    return sum(line.strip() == 'require("aw-shell")' for line in path.read_text().splitlines())
+
+
 class TestApplyAndRestart:
 
     @pytest.fixture
@@ -540,8 +544,11 @@ class TestApplyAndRestart:
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
         content = hypr_path.read_text()
-        assert "dofile(" in content
-        assert "aw-shell.lua" in content
+        assert "dofile(" not in content
+        assert "/aw-shell/config/hypr/?.lua" in content
+        assert _require_lines(hypr_path) == 1
+        # package.path has to be set before the require runs
+        assert content.index("package.path") < content.index('require("aw-shell")')
 
     def test_no_duplicate_append(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -558,14 +565,52 @@ class TestApplyAndRestart:
                     apply_and_restart()
         assert hypr_path.read_text().count("dofile(") == 1
 
-    def test_appended_dofile_has_no_user_name_under_home(self, tmp_path):
-        line = aw_lua_dofile(tmp_path / ".config/aw-shell/config/hypr/aw-shell.lua", home=tmp_path)
-        assert line == 'dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")'
-        assert loads_aw_lua(line)
+    def test_appended_require_has_no_user_name_under_home(self, tmp_path):
+        lines = aw_lua_require(tmp_path / ".config/aw-shell/config/hypr/aw-shell.lua", home=tmp_path)
+        assert lines == (
+            'package.path = package.path .. ";" .. os.getenv("HOME") .. "/.config/aw-shell/config/hypr/?.lua"\n'
+            'require("aw-shell")'
+        )
+        assert loads_aw_lua(lines)
 
-    def test_appended_dofile_outside_home_is_absolute(self, tmp_path):
+    def test_appended_require_outside_home_is_absolute(self, tmp_path):
         path = tmp_path / "elsewhere/aw-shell/config/hypr/aw-shell.lua"
-        assert aw_lua_dofile(path, home=tmp_path / "home") == f'dofile("{path}")'
+        assert aw_lua_require(path, home=tmp_path / "home") == (
+            f'package.path = package.path .. ";" .. "{path.parent}/?.lua"\n'
+            'require("aw-shell")'
+        )
+
+    @pytest.mark.parametrize("text,loaded", [
+        ('require("aw-shell")', True),
+        ("  require 'aw-shell'  -- shell", True),
+        ('local aw = require("aw-shell")', True),
+        ('-- require("aw-shell")', False),
+        ('require("aw-shell-extras")', False),
+    ])
+    def test_loads_aw_lua_require_spellings(self, text, loaded):
+        assert loads_aw_lua(text) is loaded
+
+    def test_legacy_dofile_install_gets_no_require(self, ar_env):
+        """Configs from before the switch to require() keep their dofile line;
+        appending a require too would load aw-shell.lua twice and double binds."""
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", True)
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
+        hypr_path.parent.mkdir(parents=True, exist_ok=True)
+        hypr_path.write_text('dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")\n')
+        self._apply(aw_config_dir, config_dir, config_file)
+        assert _require_lines(hypr_path) == 0
+        assert _dofile_lines(hypr_path) == 1
+
+    def test_no_duplicate_require_append(self, ar_env):
+        tmp_path, aw_config_dir, config_dir, config_file = ar_env
+        set_bind_var("auto_append_hyprland", True)
+        hypr_path = config_dir / "hypr" / "hyprland.lua"
+        hypr_path.parent.mkdir(parents=True, exist_ok=True)
+        self._apply(aw_config_dir, config_dir, config_file)
+        self._apply(aw_config_dir, config_dir, config_file)
+        assert _require_lines(hypr_path) == 1
+        assert sum(line.startswith("package.path") for line in hypr_path.read_text().splitlines()) == 1
 
     @pytest.mark.parametrize("line", [
         'dofile(os.getenv("HOME") .. "/.config/aw-shell/config/hypr/aw-shell.lua")',
@@ -600,8 +645,9 @@ class TestApplyAndRestart:
             with patch("config.settings_utils.subprocess.run"):
                 with patch("config.settings_utils.subprocess.Popen", mock_popen):
                     apply_and_restart()
-        # the commented-out line, plus the appended one
-        assert _dofile_lines(hypr_path) == 2
+        # the commented-out line stays, and the require is appended
+        assert _dofile_lines(hypr_path) == 1
+        assert _require_lines(hypr_path) == 1
 
     def test_creates_hyprland_conf_if_missing(self, ar_env):
         tmp_path, aw_config_dir, config_dir, config_file = ar_env
@@ -614,7 +660,7 @@ class TestApplyAndRestart:
                     apply_and_restart()
         hypr_path = config_dir / "hypr" / "hyprland.lua"
         assert hypr_path.exists()
-        assert "dofile(" in hypr_path.read_text()
+        assert _require_lines(hypr_path) == 1
 
     def test_restart_uses_venv_python_not_bare(self, ar_env):
         """Regression: apply_and_restart must use .venv/bin/python, not bare 'python'.
