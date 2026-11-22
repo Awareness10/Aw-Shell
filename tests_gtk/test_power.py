@@ -25,8 +25,14 @@ def menu(run_pending):
 ])
 def test_button_runs_command(sandbox, menu, button, command):
     before = len(sandbox.commands())
+
+    def new():
+        return sandbox.commands()[before:]
+
     getattr(menu, button).clicked()
-    assert pump_until(lambda: sandbox.commands()[before:] == [command]), sandbox.commands()[before:]
+    # Only this command: background polls (metrics' GPU reading) share the log
+    assert pump_until(lambda: command in new()), new()
+    assert new().count(command) == 1
     menu.notch.close_notch.assert_called_once_with()
 
 
@@ -39,5 +45,6 @@ def test_logout_exits_hyprland(sandbox, menu):
         return sandbox.hyprland.hyprctl_calls()[before:]
 
     menu.btn_logout.clicked()
-    assert pump_until(lambda: calls() == ["dispatch hl.dsp.exit()"]), calls()
+    assert pump_until(lambda: "dispatch hl.dsp.exit()" in calls()), calls()
+    assert calls().count("dispatch hl.dsp.exit()") == 1
     menu.notch.close_notch.assert_called_once_with()
