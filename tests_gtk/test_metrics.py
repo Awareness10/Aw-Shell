@@ -71,6 +71,7 @@ def test_gpu_info_asked_once_in_the_background(sandbox, monkeypatch):
     """nvtop takes ~0.2 s with an NVIDIA card; every metrics widget (bar and
     dashboard, on each monitor) used to ask it again while the shell started,
     and then waited for it."""
+    import threading
     import time
 
     from conftest import pump_until
@@ -85,7 +86,10 @@ def test_gpu_info_asked_once_in_the_background(sandbox, monkeypatch):
     def check_output(cmd, **kwargs):
         if cmd[0] != "nvtop":  # check_output is shared by every module
             return real(cmd, **kwargs)
-        calls.append(cmd)
+        # Only the one-time lookup: providers left from earlier tests poll
+        # nvtop every 10 s on other threads
+        if threading.current_thread().name == "nvtop-info":
+            calls.append(cmd)
         time.sleep(0.3)
         return '[{"device_name": "RTX", "gpu_util": "5%"}]'
 
