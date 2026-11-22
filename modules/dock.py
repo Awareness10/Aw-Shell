@@ -374,15 +374,18 @@ class Dock(Window):
     def delay_hide(self):
         if self.integrated_mode:
             return
-        if self.hide_id:
-            GLib.source_remove(self.hide_id)
+        self._cancel_hide()
         self.hide_id = GLib.timeout_add(250, self.hide_dock_if_not_hovered)
+
+    def _held_open(self) -> bool:
+        """The pointer, a drag or a notch request keeps the dock out."""
+        return self.is_mouse_over_dock_area or self._drag_in_progress or self._prevent_occlusion
 
     def hide_dock_if_not_hovered(self):
         if self.integrated_mode:
             return False 
         self.hide_id = None 
-        if not self.is_mouse_over_dock_area and not self._drag_in_progress and not self._prevent_occlusion:
+        if not self._held_open():
             if not self.always_show:
                 self.dock_revealer.set_reveal_child(False)
         return False
@@ -390,7 +393,7 @@ class Dock(Window):
     def check_hide(self, *args):
         if self.integrated_mode:
             return 
-        if self.is_mouse_over_dock_area or self._drag_in_progress or self._prevent_occlusion:
+        if self._held_open():
             return
         self._apply_resting_state()
 
@@ -466,7 +469,7 @@ class Dock(Window):
             self._set_shown(self.is_mouse_over_dock_area)
             return True
 
-        if self.is_mouse_over_dock_area or self._drag_in_progress or self._prevent_occlusion:
+        if self._held_open():
             if not self.dock_revealer.get_reveal_child():
                 self.dock_revealer.set_reveal_child(True)
             if not self.always_show:
