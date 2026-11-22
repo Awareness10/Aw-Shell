@@ -72,10 +72,7 @@ class Dashboard(Box):
         self.add(self.switcher)
         self.add(self.stack)
 
-        if settings.panel_theme == "Panel" and (
-            settings.bar_position in ["Left", "Right"]
-            or settings.panel_position in ["Start", "End"]
-        ):
+        if settings.vertical_panel:
             GLib.idle_add(self._setup_switcher_icons)
 
         # Close on right click if the event isn't handled

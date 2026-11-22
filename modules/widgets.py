@@ -28,10 +28,7 @@ class Widgets(Box):
         )
 
         vertical_layout = False
-        if settings.panel_theme == "Panel" and (
-            settings.bar_position in ["Left", "Right"]
-            or settings.panel_position in ["Start", "End"]
-        ):
+        if settings.vertical_panel:
             vertical_layout = True
 
         calendar_view_mode = "week" if vertical_layout else "month"

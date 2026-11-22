@@ -15,7 +15,7 @@ from loguru import logger
 import modules.icons as icons
 from config.shell_settings import settings
 
-vertical_mode = settings.panel_theme == "Panel" and (settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"])
+vertical_mode = settings.vertical_panel
 
 emoji_rows = 3 if not vertical_mode else 9
 emoji_columns = 9 if not vertical_mode else 5

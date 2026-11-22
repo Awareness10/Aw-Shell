@@ -470,9 +470,7 @@ class Pins(Gtk.Box):
         scrolled_window.set_valign(Gtk.Align.FILL)
         self.pack_start(scrolled_window, True, True, 0)
 
-        side_panel = settings.panel_theme == "Panel" and (
-            settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]
-        )
+        side_panel = settings.vertical_panel
         self._grid = grid
         self._columns = 3 if side_panel else 5
         self.connect("map", lambda *_: self._build_cells())

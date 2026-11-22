@@ -397,7 +397,7 @@ class Kanban(Gtk.Box):
         
         self.columns = [KanbanColumn(self.store, title) for title in COLUMNS]
 
-        vertical_mode = True if settings.panel_theme == "Panel" and (settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]) else False
+        vertical_mode = settings.vertical_panel
         
         for i, column in enumerate(self.columns):
             if not vertical_mode:

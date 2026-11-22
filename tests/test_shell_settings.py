@@ -140,3 +140,16 @@ def test_read_config_file(monkeypatch, tmp_path, logs):
     path.write_text("{not json")
     assert shell_settings.read_config_file() == {}
     assert any("Error loading config" in m for m in logs)
+
+
+@pytest.mark.parametrize("panel_theme", ["Panel", "Notch"])
+@pytest.mark.parametrize("bar_position", ["Top", "Bottom", "Left", "Right"])
+@pytest.mark.parametrize("panel_position", ["Start", "Center", "End"])
+def test_vertical_panel_matches_the_old_check(panel_theme, bar_position, panel_position):
+    """The expression ten modules repeated before vertical_panel."""
+    old = panel_theme == "Panel" and (
+        bar_position in ["Left", "Right"] or panel_position in ["Start", "End"]
+    )
+    s = Settings.from_config({"panel_theme": panel_theme, "bar_position": bar_position,
+                              "panel_position": panel_position})
+    assert s.vertical_panel == old

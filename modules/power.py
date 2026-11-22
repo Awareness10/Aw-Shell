@@ -17,10 +17,7 @@ tooltip_shutdown = "Shutdown"
 class PowerMenu(Box):
     def __init__(self, **kwargs):
         orientation = "h"
-        if settings.panel_theme == "Panel" and (
-            settings.bar_position in ["Left", "Right"]
-            or settings.panel_position in ["Start", "End"]
-        ):
+        if settings.vertical_panel:
             orientation = "v"
 
         super().__init__(

@@ -92,6 +92,14 @@ class Settings:
         """The bar runs down a side of the screen."""
         return self.bar_position in ["Left", "Right"]
 
+    @property
+    def vertical_panel(self) -> bool:
+        """The Panel theme laid out as a column: next to a side bar, or at the
+        start or end of the bar."""
+        return self.panel_theme == "Panel" and (
+            self.bar_position in ["Left", "Right"] or self.panel_position in ["Start", "End"]
+        )
+
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> "Settings":
         """Settings from a config.json dict, with defaults for missing keys."""
