@@ -1,24 +1,27 @@
 """Notification history: what ends up in it, and what survives a restart."""
 
 import json
+import os
 from datetime import datetime, timedelta
 
 import pytest
 from conftest import close_notification, notify, pump, pump_until
 from gi.repository import Gio
 
+import modules.notification_box as notification_box
+import modules.notification_history_view as history_view
 import modules.notifications as notifications
 
 
 @pytest.fixture
 def history_file(sandbox):
-    path = notifications.PERSISTENT_HISTORY_FILE
+    path = notification_box.PERSISTENT_HISTORY_FILE
     assert path.startswith(str(sandbox.runtime))  # the sandbox's XDG_RUNTIME_DIR, not /tmp
-    if notifications.os.path.exists(path):
-        notifications.os.remove(path)
+    if os.path.exists(path):
+        os.remove(path)
     yield path
-    if notifications.os.path.exists(path):
-        notifications.os.remove(path)
+    if os.path.exists(path):
+        os.remove(path)
 
 
 @pytest.fixture
@@ -93,7 +96,7 @@ def test_dismissed_notification_is_not_kept(shell, history_file):
     assert pump_until(lambda: container.notifications == [])
     pump()
     assert history.containers == []
-    assert not notifications.os.path.exists(history_file)
+    assert not os.path.exists(history_file)
 
 
 def test_do_not_disturb_goes_straight_to_history(shell):
@@ -106,7 +109,7 @@ def test_do_not_disturb_goes_straight_to_history(shell):
 
 def test_ignored_app_is_not_kept(shell, monkeypatch):
     container, history = shell
-    monkeypatch.setattr(notifications, "get_history_ignored_apps", lambda: ["spam"])
+    monkeypatch.setattr(history_view, "get_history_ignored_apps", lambda: ["spam"])
     history.do_not_disturb_enabled = True
     notify("Buy now", app_name="spam")
     notify("Real one", app_name="mail")
@@ -152,7 +155,7 @@ def test_clear_history_deletes_file(shell, history_file):
     assert pump_until(lambda: len(history.containers) == 1)
     history.clear_history()
     assert history.containers == []
-    assert not notifications.os.path.exists(history_file)
+    assert not os.path.exists(history_file)
 
 
 def _image_boxes(widget):
@@ -166,7 +169,7 @@ def _image_boxes(widget):
     return found
 
 
-ICON = str(notifications.os.path.abspath("assets/default.png"))
+ICON = str(os.path.abspath("assets/default.png"))
 
 
 def test_no_image_leaves_no_gap(shell, history_file):

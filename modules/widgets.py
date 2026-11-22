@@ -11,7 +11,7 @@ from modules.calendar import Calendar
 from modules.controls import ControlSliders
 from modules.metrics import Metrics
 from modules.network import NetworkConnections
-from modules.notifications import NotificationHistory
+from modules.notification_history_view import NotificationHistory
 from modules.player import Player
 
 

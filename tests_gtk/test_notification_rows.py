@@ -3,22 +3,24 @@ this session and for one restored from the history file, and what its close
 button does."""
 
 import json
+import os
 
 import pytest
 from conftest import _call_notifications, notify, pump, pump_until
 from gi.repository import GLib
 
+import modules.notification_box as notification_box
 import modules.notifications as notifications
 
 
 @pytest.fixture
 def history_file(sandbox):
-    path = notifications.PERSISTENT_HISTORY_FILE
-    if notifications.os.path.exists(path):
-        notifications.os.remove(path)
+    path = notification_box.PERSISTENT_HISTORY_FILE
+    if os.path.exists(path):
+        os.remove(path)
     yield path
-    if notifications.os.path.exists(path):
-        notifications.os.remove(path)
+    if os.path.exists(path):
+        os.remove(path)
 
 
 @pytest.fixture
