@@ -567,14 +567,9 @@ class Dock(Window):
 
         GLib.idle_add(process_drag_end)
     def _reload_config(self):
-        """Pick up dock.json and the always-show setting if they changed."""
+        """Pick up dock.json if it changed. (Settings only change with a
+        restart; re-reading always_show here undid force_occlusion.)"""
         new_config = read_config()
-        if not self.integrated_mode:
-            new_always_show = settings.dock_always_show
-            if self.always_show != new_always_show:
-                self.always_show = new_always_show
-                self.check_occlusion_state()
-
         if new_config.get("pinned_apps", []) != self.config.get("pinned_apps", []):
             self.config = new_config
             self.pinned = self.config.get("pinned_apps", [])

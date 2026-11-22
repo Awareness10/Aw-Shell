@@ -235,3 +235,27 @@ def test_hover_shows_the_dock_and_leaving_hides_it(monkeypatch, run_pending, doc
         Dock._instances.remove(dock)
         dock.destroy()
         run_pending()
+
+
+def test_forced_occlusion_survives_the_config_poll(monkeypatch, run_pending, dock_file):
+    """Hiding the bar forces the always-shown dock into hover mode; the
+    2-second dock.json poll used to put always_show back."""
+    from modules.dock import Dock
+
+    for name, value in (DEFAULTS | LAYOUTS["always-show"]).items():
+        monkeypatch.setattr(shell_settings, name.lower(), value)
+    dock = Dock(monitor_id=0)
+    run_pending()
+    try:
+        assert dock.always_show
+        dock.force_occlusion()
+        dock.check_config_change()
+        assert not dock.always_show
+        dock.check_hide()
+        assert not dock.dock_revealer.get_reveal_child()
+        dock.restore_from_occlusion()
+        assert dock.always_show
+    finally:
+        Dock._instances.remove(dock)
+        dock.destroy()
+        run_pending()
