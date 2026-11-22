@@ -1,4 +1,3 @@
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -26,6 +25,7 @@ from modules.player import PlayerSmall
 from modules.power import PowerMenu
 from modules.tmux import TmuxManager
 from modules.tools import Toolbox
+from services import hyprland
 from utils.icon_resolver import IconResolver
 from utils.monitor_manager import get_monitor_manager
 from utils.notch_layout import notch_layout
@@ -775,12 +775,8 @@ class Notch(Window):
     def _get_current_window_class(self):
         """The active window's initial class (else its class); "" without one."""
         try:
-            from fabric.hyprland.widgets import get_hyprland_connection
-
-            conn = get_hyprland_connection()
-            if conn:
-                window = json.loads(conn.send_command("j/activewindow").reply.decode())
-                return window.get("initialClass", "") or window.get("class", "")
+            window = hyprland.query("activewindow")
+            return window.get("initialClass", "") or window.get("class", "")
         except Exception as e:
             print(f"Error getting window class: {e}")
         return ""

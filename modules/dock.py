@@ -2,9 +2,7 @@ import json
 import logging
 
 import cairo
-from fabric.hyprland.widgets import get_hyprland_connection
 from fabric.utils import (
-    exec_shell_command,
     exec_shell_command_async,
     idle_add,
     remove_handler,
@@ -20,6 +18,7 @@ import utils.apps as apps
 from config.paths import DOCK_FILE
 from config.shell_settings import settings
 from modules.corners import MyCorner
+from services import hyprland
 from utils.dock_layout import dock_hidden, dock_layout
 from utils.dock_model import app_entry, plan_dock
 from utils.icon_resolver import IconResolver
@@ -91,7 +90,7 @@ class Dock(Window):
             self.set_margin(self.layout.margin)
 
         self.config = read_config()
-        self.conn = get_hyprland_connection()
+        self.conn = hyprland.connection()
         self.icon_resolver = IconResolver()
         self.pinned = self.config.get("pinned_apps", [])
         self.app_map = {}
@@ -354,9 +353,7 @@ class Dock(Window):
 
     @staticmethod
     def _focus_window(address):
-        exec_shell_command(
-            f"hyprctl dispatch 'hl.dsp.focus({{ window = \"address:{address}\" }})'"
-        )
+        hyprland.focus_window(address)
 
     def _on_child_enter(self, widget, event):
         if self.integrated_mode:
@@ -431,16 +428,16 @@ class Dock(Window):
         return False
 
     def get_clients(self):
-        try: return json.loads(self.conn.send_command("j/clients").reply.decode())
-        except json.JSONDecodeError: return []
+        try: return hyprland.query("clients")
+        except ValueError: return []
 
     def get_focused(self):
-        try: return json.loads(self.conn.send_command("j/activewindow").reply.decode()).get("address", "")
-        except json.JSONDecodeError: return ""
+        try: return hyprland.query("activewindow").get("address", "")
+        except ValueError: return ""
 
     def get_workspace(self):
-        try: return json.loads(self.conn.send_command("j/activeworkspace").reply.decode()).get("id", 0)
-        except json.JSONDecodeError: return 0
+        try: return hyprland.query("activeworkspace").get("id", 0)
+        except ValueError: return 0
 
     def check_occlusion_state(self):
         if self.integrated_mode:

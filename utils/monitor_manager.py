@@ -347,14 +347,7 @@ class MonitorManager:
             Monitor ID where the workspace is, or None if not found
         """
         try:
-            result = subprocess.run(
-                ["hyprctl", "workspaces", "-j"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            workspaces = json.loads(result.stdout)
-            for ws in workspaces:
+            for ws in _hyprctl_json("workspaces"):
                 if ws.get('id') == workspace_id:
                     # Find our monitor by name
                     ws_monitor = ws.get('monitor', '')

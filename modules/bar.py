@@ -4,7 +4,6 @@ import os
 from fabric.hyprland.service import HyprlandEvent
 from fabric.hyprland.widgets import HyprlandLanguage as Language
 from fabric.hyprland.widgets import WorkspaceButton, get_hyprland_connection
-from fabric.utils.helpers import exec_shell_command_async
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.centerbox import CenterBox
@@ -24,6 +23,7 @@ from modules.recording_indicator import RecordingIndicator
 from modules.systemprofiles import Systemprofiles
 from modules.systemtray import SystemTray
 from modules.weather import Weather
+from services import hyprland
 from utils.bar_layout import bar_layout
 from widgets.hyprland import HyprlandWorkspaces as Workspaces
 from widgets.wayland import WaylandWindow as Window
@@ -382,7 +382,7 @@ class Bar(Window):
             # Ensure notch is above bar when bar is shown
             if self.notch:
                 # Focus the notch window to bring it to front
-                GLib.idle_add(lambda: exec_shell_command_async("hyprctl dispatch 'hl.dsp.focus({ window = \"class:notch\" })'") if self.notch else None)
+                GLib.idle_add(lambda: hyprland.dispatch('hl.dsp.focus({ window = "class:notch" })') if self.notch else None)
 
     def runic_numbers(self):
         if settings.bar_workspace_use_runes:

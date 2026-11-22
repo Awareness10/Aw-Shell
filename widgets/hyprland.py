@@ -6,16 +6,16 @@ workspace, so the bar crashed on startup while the scratchpad was open.
 Special workspaces never get a button, so they're skipped.
 """
 
-import json
-
 from fabric.hyprland.widgets import HyprlandWorkspaces as FabricWorkspaces
 from loguru import logger
+
+from services import hyprland
 
 
 class HyprlandWorkspaces(FabricWorkspaces):
     def on_ready(self, *_):
-        workspaces = json.loads(self.connection.send_command("j/workspaces").reply.decode())
-        active = json.loads(self.connection.send_command("j/activeworkspace").reply.decode())
+        workspaces = hyprland.query("workspaces")
+        active = hyprland.query("activeworkspace")
         for workspace in workspaces:
             if (workspace_id := workspace.get("id")) is None:
                 continue
@@ -26,7 +26,7 @@ class HyprlandWorkspaces(FabricWorkspaces):
     def on_urgent(self, _, event):
         if len(event.data) != 1:
             return
-        clients = json.loads(self.connection.send_command("j/clients").reply.decode())
+        clients = hyprland.query("clients")
         client = next((c for c in clients if c["address"] == "0x" + event.data[0]), {})
         if not (workspace := client.get("workspace")):
             return logger.warning(

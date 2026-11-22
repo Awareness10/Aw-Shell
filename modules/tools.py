@@ -1,9 +1,7 @@
-import json
 import os
 import re
 
 import psutil
-from fabric.hyprland.service import Hyprland
 from fabric.utils.helpers import exec_shell_command_async, get_relative_path
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -13,6 +11,7 @@ from loguru import logger
 
 import modules.icons as icons
 from config.shell_settings import settings
+from services import hyprland
 
 SCREENSHOT_SCRIPT = get_relative_path("../scripts/screenshot.sh")
 POMODORO_SCRIPT = get_relative_path("../scripts/pomodoro.sh")
@@ -124,7 +123,7 @@ class ToolsStatusMonitor:
     def _gamemode_enabled() -> bool:
         # Game mode disables animations. Newer Hyprland reports the option
         # as "bool", older as "int"
-        option = json.loads(Hyprland.send_command("j/getoption animations:enabled").reply.decode())
+        option = hyprland.query("getoption animations:enabled")
         return not option.get("bool", option.get("int", 1))
 
     def _publish(self, status, recording_since=None) -> bool:
