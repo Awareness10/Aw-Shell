@@ -315,3 +315,19 @@ def test_favicon_download_reports_the_saved_file(monkeypatch):
     assert fetched == ["https://example.org/favicon.ico"]
     assert results[0].endswith(".ico")
     os.remove(results[0])
+
+
+@pytest.mark.parametrize("panel_theme", ["Notch", "Panel"])
+@pytest.mark.parametrize("bar_position", ["Top", "Bottom", "Left", "Right"])
+@pytest.mark.parametrize("panel_position", ["Start", "Center", "End"])
+def test_icon_size_follows_the_grid(panel_theme, bar_position, panel_position):
+    """Small icons exactly when the grid has the side panel's 3 columns. A
+    Start/End position left over from the Panel theme used to shrink them
+    under the Notch theme too."""
+    from config.shell_settings import Settings
+
+    s = Settings.from_config({"panel_theme": panel_theme, "bar_position": bar_position,
+                              "panel_position": panel_position})
+    side_panel = panel_theme == "Panel" and (
+        bar_position in ("Left", "Right") or panel_position in ("Start", "End"))
+    assert pins._icon_size(s) == (36 if side_panel else 80)

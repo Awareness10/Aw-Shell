@@ -25,9 +25,14 @@ from utils.portal import pick_file
 SAVE_FILE = str(PINS_FILE)
 SLOTS = 30  # 6 rows of 5, or 10 of 3 in a side panel
 
-icon_size = 80
-if settings.panel_theme == "Panel" and settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]:
-    icon_size = 36
+
+def _icon_size(shell_settings) -> int:
+    """Small icons in the side panel's 3-column grid, large in the 5-column one
+    (the same check as the grid's columns)."""
+    return 36 if shell_settings.vertical_panel else 80
+
+
+icon_size = _icon_size(settings)
 
 def createSurfaceFromWidget(widget: Gtk.Widget) -> cairo.ImageSurface:
     alloc = widget.get_allocation()
