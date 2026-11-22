@@ -323,7 +323,8 @@ class Dock(Window):
         button.app_identifier = app_identifier
         button.desktop_app = desktop_app
         button.instances = instances
-        if instances: button.add_style_class("instance")
+        if instances:
+            button.add_style_class("instance")
 
         self._set_up_drag(button)
         button.connect("enter-notify-event", self._on_child_enter)
@@ -331,20 +332,28 @@ class Dock(Window):
 
     def handle_app(self, app_identifier, instances, desktop_app=None):
         if not instances:
-            if not desktop_app: desktop_app = self.find_app(app_identifier)
+            if not desktop_app:
+                desktop_app = self.find_app(app_identifier)
             if desktop_app:
                 launch_success = desktop_app.launch()
                 if not launch_success:
-                    if desktop_app.command_line: exec_shell_command_async(f"nohup {desktop_app.command_line} &")
-                    elif desktop_app.executable: exec_shell_command_async(f"nohup {desktop_app.executable} &")
+                    if desktop_app.command_line:
+                        exec_shell_command_async(f"nohup {desktop_app.command_line} &")
+                    elif desktop_app.executable:
+                        exec_shell_command_async(f"nohup {desktop_app.executable} &")
             else:
                 cmd_to_run = None
                 if isinstance(app_identifier, dict):
-                    if "command_line" in app_identifier and app_identifier["command_line"]: cmd_to_run = app_identifier['command_line']
-                    elif "executable" in app_identifier and app_identifier["executable"]: cmd_to_run = app_identifier['executable']
-                    elif "name" in app_identifier and app_identifier["name"]: cmd_to_run = app_identifier['name']
-                elif isinstance(app_identifier, str): cmd_to_run = app_identifier
-                if cmd_to_run: exec_shell_command_async(f"nohup {cmd_to_run} &")
+                    if "command_line" in app_identifier and app_identifier["command_line"]:
+                        cmd_to_run = app_identifier['command_line']
+                    elif "executable" in app_identifier and app_identifier["executable"]:
+                        cmd_to_run = app_identifier['executable']
+                    elif "name" in app_identifier and app_identifier["name"]:
+                        cmd_to_run = app_identifier['name']
+                elif isinstance(app_identifier, str):
+                    cmd_to_run = app_identifier
+                if cmd_to_run:
+                    exec_shell_command_async(f"nohup {cmd_to_run} &")
         else:
             focused = self.get_focused()
             idx = next((i for i, inst in enumerate(instances) if inst["address"] == focused), -1)
@@ -363,7 +372,8 @@ class Dock(Window):
         return False
 
     def delay_hide(self):
-        if self.integrated_mode: return 
+        if self.integrated_mode:
+            return
         if self.hide_id:
             GLib.source_remove(self.hide_id)
         self.hide_id = GLib.timeout_add(250, self.hide_dock_if_not_hovered)
@@ -399,7 +409,8 @@ class Dock(Window):
     def update_dock(self, *args):
         self.update_app_map()
         arranger_handler = getattr(self, "_arranger_handler", None)
-        if arranger_handler: remove_handler(arranger_handler)
+        if arranger_handler:
+            remove_handler(arranger_handler)
 
         pinned, running = plan_dock(
             self.pinned, self.get_clients(), self.find_app, self.find_app_by_key,
@@ -422,22 +433,29 @@ class Dock(Window):
             self.check_occlusion_state()
 
     def _update_size(self):
-        if self.integrated_mode: return False 
+        if self.integrated_mode:
+            return False
         width, _ = self.view.get_preferred_width()
         self.set_size_request(width, -1) 
         return False
 
     def get_clients(self):
-        try: return hyprland.query("clients")
-        except ValueError: return []
+        try:
+            return hyprland.query("clients")
+        except ValueError:
+            return []
 
     def get_focused(self):
-        try: return hyprland.query("activewindow").get("address", "")
-        except ValueError: return ""
+        try:
+            return hyprland.query("activewindow").get("address", "")
+        except ValueError:
+            return ""
 
     def get_workspace(self):
-        try: return hyprland.query("activeworkspace").get("id", 0)
-        except ValueError: return 0
+        try:
+            return hyprland.query("activeworkspace").get("id", 0)
+        except ValueError:
+            return 0
 
     def check_occlusion_state(self):
         if self.integrated_mode:
@@ -472,19 +490,25 @@ class Dock(Window):
 
     def on_drag_data_received(self, widget, drag_context, x, y, data_obj, info, time):
         target = self._find_drag_target(widget.get_parent() if isinstance(widget, Box) else widget)
-        if target is None: return
-        try: source_index = int(data_obj.get_text())
-        except (TypeError, ValueError): return
+        if target is None:
+            return
+        try:
+            source_index = int(data_obj.get_text())
+        except (TypeError, ValueError):
+            return
 
         children = self.view.get_children()
-        try: target_index = children.index(target)
-        except ValueError: return
+        try:
+            target_index = children.index(target)
+        except ValueError:
+            return
 
         if source_index != target_index:
             separator_index = -1
             for i, child_item_loop in enumerate(children): 
                 if child_item_loop.get_name() == "dock-separator":
-                    separator_index = i; break
+                    separator_index = i
+                    break
             cross_section_drag = (separator_index != -1 and
                                  ((source_index < separator_index and target_index > separator_index) or
                                   (source_index > separator_index and target_index < separator_index)))
@@ -493,7 +517,8 @@ class Dock(Window):
             children.insert(target_index, child_item_to_move)
             self.view.children = children
             self.update_pinned_apps(skip_update=not cross_section_drag)
-            if cross_section_drag: GLib.idle_add(self.update_dock)
+            if cross_section_drag:
+                GLib.idle_add(self.update_dock)
 
     def on_drag_end(self, widget, drag_context):
         if not self._drag_in_progress:
@@ -573,7 +598,8 @@ class Dock(Window):
     def update_pinned_apps(self, skip_update=False):
         pinned_children_data = [] 
         for child_widget in self.view.get_children(): 
-            if child_widget.get_name() == "dock-separator": break
+            if child_widget.get_name() == "dock-separator":
+                break
             if hasattr(child_widget, "app_identifier"):
                 if getattr(child_widget, "desktop_app", None):
                     pinned_children_data.append(app_entry(child_widget.desktop_app))

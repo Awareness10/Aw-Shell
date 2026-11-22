@@ -7,6 +7,15 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # The ruff locked in uv.lock (dev group); rules in pyproject.toml
+      - name: Ruff
+        run: uv run --frozen --only-group dev ruff check .
+
   test:
     runs-on: ubuntu-latest
     permissions:

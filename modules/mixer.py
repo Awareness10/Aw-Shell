@@ -112,10 +112,6 @@ class MixerSection(Box):
             self.content_box.remove(child)
 
         for stream in streams:
-            label_text = stream.description
-            if hasattr(stream, "type") and "application" in stream.type.lower():
-                label_text = getattr(stream, "name", stream.description)
-
             stream_container = Box(
                 orientation="v",
                 spacing=4,

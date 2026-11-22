@@ -96,7 +96,7 @@ class Wifi(Service):
         return
 
     @Property(bool, "read-write", default_value=False)
-    def enabled(self) -> bool:  # type: ignore
+    def enabled(self) -> bool:  # type: ignore  # noqa: F811  (replaces the signal above; kept as it was)
         return bool(self._client.wireless_get_enabled())
 
     @enabled.setter
@@ -258,7 +258,7 @@ class Ethernet(Service):
             "speed",
             "state",
         ):
-            self._device.connect(f"notify::{pn}", lambda *_: self.notifier(pn))
+            self._device.connect(f"notify::{pn}", lambda *_, pn=pn: self.notifier(pn))
 
         self._device.connect("notify::speed", lambda *_: logger.debug(str(_)))
 

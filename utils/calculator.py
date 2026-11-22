@@ -14,7 +14,7 @@ class _Array(list):
             if len(other) != len(self):
                 raise ValueError(f"operands could not be broadcast together with lengths "
                                  f"{len(self)} and {len(other)}")
-            return _Array(op(a, b) for a, b in zip(self, other))
+            return _Array(op(a, b) for a, b in zip(self, other, strict=False))
         return _Array(op(a, other) for a in self)
 
     def __neg__(self):

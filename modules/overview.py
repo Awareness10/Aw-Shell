@@ -273,14 +273,6 @@ class Overview(Box):
             pass
         
         # Get monitor dimensions
-        monitor_width = CURRENT_WIDTH
-        monitor_height = CURRENT_HEIGHT
-        
-        if self.monitor_manager:
-            monitor_info = self.monitor_manager.get_monitor_by_id(monitor_id)
-            if monitor_info:
-                monitor_width = monitor_info['width']
-                monitor_height = monitor_info['height']
         # Initialize as a Box instead of a PopupWindow.
         super().__init__(name="overview", orientation="v", spacing=8, **kwargs)
         self.workspace_boxes: dict[int, Box] = {}

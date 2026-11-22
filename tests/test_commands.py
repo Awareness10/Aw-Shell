@@ -14,9 +14,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import utils.commands as commands
-from config.shell_settings import settings
 from config.settings_constants import DEFAULTS
 from config.settings_utils import bind_vars, generate_hyprlua
+from config.shell_settings import settings
 from utils.commands import NOTCH_VIEWS, ShellCommands, install_legacy_aliases
 
 MAIN_PY = Path(__file__).resolve().parent.parent / "main.py"

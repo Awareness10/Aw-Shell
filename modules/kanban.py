@@ -400,7 +400,7 @@ class Kanban(Gtk.Box):
         vertical_mode = True if settings.panel_theme == "Panel" and (settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]) else False
         
         for i, column in enumerate(self.columns):
-            if vertical_mode == False:
+            if not vertical_mode:
                 self.grid.attach(column, i, 0, 1, 1)
             else:
                 self.grid.attach(column, 0, i, 1, 1)

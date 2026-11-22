@@ -88,7 +88,7 @@ def download_favicon(url, callback):
             if temp_file and os.path.exists(temp_file):
                 try:
                     os.remove(temp_file)
-                except:
+                except Exception:
                     pass
             GLib.idle_add(callback, None)
 

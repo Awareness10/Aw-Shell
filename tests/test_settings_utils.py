@@ -11,12 +11,11 @@ import pytest
 from config.paths import SCRIPTS_DIR
 from config.settings_constants import APP_NAME_CAP, DEFAULTS
 from config.settings_utils import (
-    aw_lua_require,
-    loads_aw_lua,
     APPLY_COLORS_FN,
     HYPRIDLE_HEADER,
     HYPRIDLE_START,
     apply_and_restart,
+    aw_lua_require,
     backup_and_replace,
     bind_vars,
     ensure_current_wallpaper,
@@ -27,6 +26,7 @@ from config.settings_utils import (
     get_available_monitors,
     get_bind_var,
     load_bind_vars,
+    loads_aw_lua,
     reset_to_defaults,
     save_bind_vars,
     set_all_bind_vars,
@@ -165,13 +165,13 @@ class TestGenerateHyprlua:
         set_bind_var("suffix_bluetooth", unset)
         set_bind_var("suffix_restart", unset)
         conf = generate_hyprlua()
-        bind_lines = [l for l in conf.splitlines() if l.startswith("hl.bind(")]
-        assert not any("-- Bluetooth" in l for l in bind_lines)
-        assert not any(l.endswith(f"-- Reload {APP_NAME_CAP}") for l in bind_lines)
-        assert not any(l.split(",")[0].rstrip('" ').endswith("+") for l in bind_lines)
+        bind_lines = [line for line in conf.splitlines() if line.startswith("hl.bind(")]
+        assert not any("-- Bluetooth" in line for line in bind_lines)
+        assert not any(line.endswith(f"-- Reload {APP_NAME_CAP}") for line in bind_lines)
+        assert not any(line.split(",")[0].rstrip('" ').endswith("+") for line in bind_lines)
         # Other binds are unaffected
-        assert any("-- Pins" in l for l in bind_lines)
-        assert any("-- Dashboard" in l for l in bind_lines)
+        assert any("-- Pins" in line for line in bind_lines)
+        assert any("-- Dashboard" in line for line in bind_lines)
 
     def test_screenshot_keybinds(self):
         """Print shoots a screen, SHIFT+Print a region, with no menu to wait for."""

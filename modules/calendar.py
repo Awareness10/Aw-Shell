@@ -211,7 +211,8 @@ class Calendar(Gtk.Box):
                 # Pasar self.current_shown_date directamente a create_week_view
                 view_widget = self.create_week_view(self.current_shown_date)
         
-        if new_key is None: return
+        if new_key is None:
+            return
 
         if new_key > self.previous_key:
             self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)

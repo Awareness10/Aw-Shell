@@ -261,12 +261,17 @@ class Metrics(Box):
         self.gpu = []
 
         self.scales = []
-        if self.disk: self.scales.extend([v.box for v in self.disk])
-        if self.ram: self.scales.append(self.ram.box)
-        if self.cpu: self.scales.append(self.cpu.box)
+        if self.disk:
+            self.scales.extend([v.box for v in self.disk])
+        if self.ram:
+            self.scales.append(self.ram.box)
+        if self.cpu:
+            self.scales.append(self.cpu.box)
 
-        if self.cpu: self.cpu.usage.set_sensitive(False)
-        if self.ram: self.ram.usage.set_sensitive(False)
+        if self.cpu:
+            self.cpu.usage.set_sensitive(False)
+        if self.ram:
+            self.ram.usage.set_sensitive(False)
         for disk in self.disk:
             disk.usage.set_sensitive(False)
 
@@ -466,10 +471,14 @@ class MetricsSmall(HoverReveal, Button):
                 gpu.level.set_label(_percent(int(gpus[i])))
 
         tooltip_metrics = []
-        if self.disk: tooltip_metrics.extend(self.disk)
-        if self.ram: tooltip_metrics.append(self.ram)
-        if self.cpu: tooltip_metrics.append(self.cpu)
-        if self.gpu: tooltip_metrics.extend(self.gpu)
+        if self.disk:
+            tooltip_metrics.extend(self.disk)
+        if self.ram:
+            tooltip_metrics.append(self.ram)
+        if self.cpu:
+            tooltip_metrics.append(self.cpu)
+        if self.gpu:
+            tooltip_metrics.extend(self.gpu)
         self.set_tooltip_markup((" - " if not settings.vertical else "\n").join([v.markup() for v in tooltip_metrics]))
 
         return True
@@ -556,19 +565,19 @@ class Battery(HoverReveal, Button):
         else:
             time_status = f"{int(time / 60 / 60)}h"
 
-        if percentage == 100 and charging == False:
+        if percentage == 100 and charging is False:
             self.bat_icon.set_markup(icons.battery)
             charging_status = f"{icons.bat_full} Fully Charged - {time_status} left"
-        elif percentage == 100 and charging == True:
+        elif percentage == 100 and charging is True:
             self.bat_icon.set_markup(icons.battery)
             charging_status = f"{icons.bat_full} Fully Charged"
-        elif charging == True:
+        elif charging is True:
             self.bat_icon.set_markup(icons.charging)
             charging_status = f"{icons.bat_charging} Charging - {time_status} left"
-        elif percentage <= 15 and charging == False:
+        elif percentage <= 15 and charging is False:
             self.bat_icon.set_markup(icons.alert)
             charging_status = f"{icons.bat_low} Low Battery - {time_status} left"
-        elif charging == False:
+        elif charging is False:
             self.bat_icon.set_markup(icons.discharging)
             charging_status = f"{icons.bat_discharging} Discharging - {time_status} left"
         else:

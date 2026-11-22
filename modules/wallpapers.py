@@ -565,7 +565,7 @@ class WallpaperSelector(Box):
         self.selected_index = new_index
 
     def _start_thumbnail_thread(self):
-        thread = GLib.Thread.new("thumbnail-loader", self._preload_thumbnails, None)
+        GLib.Thread.new("thumbnail-loader", self._preload_thumbnails, None)
 
     def _preload_thumbnails(self, _data):
         try:
@@ -691,7 +691,7 @@ class WallpaperSelector(Box):
         # Set visibility based on the loaded state when the widget becomes visible
         self.custom_color_selector_box.set_visible(not self.matugen_enabled)
 
-    def hsl_to_rgb_hex(self, h: float, s: float = 1.0, l: float = 0.5) -> str:
+    def hsl_to_rgb_hex(self, h: float, s: float = 1.0, l: float = 0.5) -> str:  # noqa: E741  (HSL)
         """Converts HSL color value to RGB HEX string."""
         # colorsys uses HLS, not HSL, and expects values between 0.0 and 1.0
         hue = h / 360.0

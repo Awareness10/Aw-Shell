@@ -276,7 +276,7 @@ def toggle_updater_disabled() -> bool:
             print("Updater enabled.")
             return False
         else:
-            with open(disable_path, "w") as f:
+            with open(disable_path, "w"):
                 pass
             print("Updater disabled.")
             return True
