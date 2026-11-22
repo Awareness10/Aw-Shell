@@ -881,8 +881,6 @@ class Notch(Window):
             GLib.timeout_add(50, self._ensure_no_text_selection)
             GLib.timeout_add(100, self._ensure_no_text_selection)
 
-            logger.debug(f"Applied buffered text: '{self._typed_chars_buffer}'")
-
             self._typed_chars_buffer = ""
 
         self._launcher_transitioning = False
@@ -928,9 +926,6 @@ class Notch(Window):
             keychar = self._typed_char(event.keyval)
             if keychar:
                 self._typed_chars_buffer += keychar
-                logger.debug(
-                    f"Buffered character: {keychar}, buffer now: '{self._typed_chars_buffer}'"
-                )
                 return True
 
         # Typing on the dashboard's widgets section opens the launcher
@@ -940,8 +935,6 @@ class Notch(Window):
         ):
             keychar = self._typed_char(event.keyval)
             if keychar:
-                logger.debug(f"Notch received keypress: {keychar}")
-
                 self.open_launcher_with_text(keychar)
                 return True
 

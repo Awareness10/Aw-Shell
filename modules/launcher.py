@@ -512,7 +512,6 @@ class AppLauncher(Box):
         self.update_calculator_viewport()
 
     def evaluate_conversion_expression(self, text: str):
-        logger.debug(f"Evaluating conversion expression: {text}")
         expr = text.lstrip(";").strip()
         if not expr:
             return

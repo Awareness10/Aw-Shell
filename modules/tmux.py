@@ -470,21 +470,16 @@ class TmuxManager(Box):
     # Add new method to handle key presses on session slots
     def on_slot_key_press(self, button, event, session_name, label, entry):
         """Handle key presses on session buttons"""
-        # Print debugging info
-        logger.debug(f"Key pressed: {event.keyval}, State: {event.state}")
-        
         # Check if 'r' key was pressed for renaming
         if event.keyval == Gdk.KEY_r:
             self.start_rename(button, session_name, label, entry)
             return True
         # Check for 'K' (capital K) which indicates Shift is pressed
         elif event.keyval == Gdk.KEY_K:
-            logger.debug("Shift+K detected - killing session without confirmation")
             self.kill_session(session_name)
             return True
         # Check for lowercase 'k'
         elif event.keyval == Gdk.KEY_k:
-            logger.debug("Regular k detected - showing confirmation")
             self.show_kill_confirmation_menu(button, session_name)
             return True
         # Check if Delete key was pressed for killing session
