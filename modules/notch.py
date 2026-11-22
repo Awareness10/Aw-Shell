@@ -102,7 +102,7 @@ class Notch(Window):
         self._forced_occlusion = False
 
         self.icon_resolver = IconResolver()
-        self.app_identifiers = apps.app_identifiers()
+        apps.app_identifiers()  # scan the desktop apps now, not on first use
 
     def _build_views(self):
         """The dashboard and the other views the notch opens."""
@@ -692,8 +692,9 @@ class Notch(Window):
             self.update_window_icon()
 
     def find_app(self, app_id: str):
-        """Exact match on the identifier map (no substring fallback, unlike the dock)."""
-        return self.app_identifiers.get(app_id.lower())
+        """Exact match on the identifier map (no substring fallback, unlike the dock).
+        The shared map, so apps installed after startup are found too."""
+        return apps.app_identifiers().get(app_id.lower())
 
     def update_window_icon(self, *args):
         """Update the window icon based on the current active window title"""
