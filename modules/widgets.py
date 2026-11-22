@@ -4,7 +4,7 @@ gi.require_version("Gtk", "3.0")
 from fabric.widgets.box import Box
 from fabric.widgets.stack import Stack
 
-import config.data as data
+from config.shell_settings import settings
 from modules.bluetooth import BluetoothConnections
 from modules.buttons import Buttons
 from modules.calendar import Calendar
@@ -28,9 +28,9 @@ class Widgets(Box):
         )
 
         vertical_layout = False
-        if data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"]
-            or data.PANEL_POSITION in ["Start", "End"]
+        if settings.panel_theme == "Panel" and (
+            settings.bar_position in ["Left", "Right"]
+            or settings.panel_position in ["Start", "End"]
         ):
             vertical_layout = True
 

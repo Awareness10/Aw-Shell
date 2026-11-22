@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-import config.data as data
+from config.shell_settings import settings as shell_settings
 
 LAYOUTS = {
     "bottom-bar-pills": dict(BAR_POSITION="Top", DOCK_THEME="Pills"),
@@ -29,7 +29,7 @@ PINNED = ["kitty", "ghost-app"]  # old format: read_config migrates it
 def dock_file(tmp_path, monkeypatch):
     path = tmp_path / "dock.json"
     path.write_text(json.dumps({"pinned_apps": PINNED}))
-    monkeypatch.setattr(data, "DOCK_FILE", path)
+    monkeypatch.setattr("modules.dock.DOCK_FILE", path)
     return path
 
 
@@ -199,8 +199,7 @@ def test_layout(layout, monkeypatch, run_pending, dock_file):
 
     settings = DEFAULTS | LAYOUTS[layout]
     for name, value in settings.items():
-        monkeypatch.setattr(data, name, value)
-    monkeypatch.setattr(data, "VERTICAL", settings["BAR_POSITION"] in ["Left", "Right"])
+        monkeypatch.setattr(shell_settings, name.lower(), value)
     dock = Dock(monitor_id=0)
     run_pending()
     try:
@@ -216,8 +215,7 @@ def test_hover_shows_the_dock_and_leaving_hides_it(monkeypatch, run_pending, doc
     from modules.dock import Dock
 
     for name, value in (DEFAULTS | LAYOUTS["bottom-bar-pills"]).items():
-        monkeypatch.setattr(data, name, value)
-    monkeypatch.setattr(data, "VERTICAL", False)
+        monkeypatch.setattr(shell_settings, name.lower(), value)
     dock = Dock(monitor_id=0)
     run_pending()
     try:

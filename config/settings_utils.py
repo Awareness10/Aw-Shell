@@ -10,27 +10,25 @@ from pathlib import Path
 from fabric.utils.helpers import exec_shell_command_async
 
 from . import terminal, toml_writer
-from .data import (
+from .paths import (
+    APP_DIR,
     AW_CONFIG_DIR,
-    CONFIG_DIR,
     CONFIG_FILE,
+    CSS_COLORS,
     DEFAULT_FACE_ICON,
     DEFAULT_WALLPAPER,
     FACE_ICON,
     HOME_DIR,
-    USERNAME,
-    get_default,
-)
-from .paths import (
-    APP_DIR,
-    CSS_COLORS,
     HYPR_DIR,
     HYPRLOCK_TEMPLATE,
     MATUGEN_TEMPLATES,
     SCRIPTS_DIR,
+    USERNAME,
     launch_command,
 )
+from .paths import CONFIG_HOME as CONFIG_DIR  # $XDG_CONFIG_HOME: hypr, matugen
 from .settings_constants import APP_NAME, APP_NAME_CAP, DEFAULTS  # noqa: E402
+from .shell_settings import get_default
 
 CURRENT_WALL = HOME_DIR / ".current.wall"
 HYPR_COLORS = HYPR_DIR / "colors.conf"

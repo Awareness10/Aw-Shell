@@ -16,11 +16,12 @@ from fabric import Application
 from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
 
-from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE
 from config.legacy import move_legacy_files
 from config.migrate import fix_hyprlock_config, old_install_notice
-from config.paths import APP_DIR, USER_DIR, self_updatable
+from config.paths import APP_DIR, CACHE_DIR, CONFIG_FILE, USER_DIR, self_updatable
+from config.settings_constants import APP_NAME
 from config.settings_utils import ensure_current_wallpaper
+from config.shell_settings import settings
 from modules.bar import Bar
 from modules.corners import Corners
 from modules.dock import Dock
@@ -78,11 +79,6 @@ if __name__ == "__main__":
 
     ensure_current_wallpaper()
 
-    # Load configuration
-    from config.data import load_config
-
-    config = load_config()
-
     def _launch_updater(force=False):
         """Launch the PySide6 updater in a separate process."""
         cmd = [sys.executable, "-m", "modules.updater"]
@@ -101,7 +97,7 @@ if __name__ == "__main__":
     # Multi-monitor services
     monitor_manager = get_monitor_manager()
     init_global_keybind_objects()
-    monitors = select_monitors(monitor_manager.get_monitors(), config.get("selected_monitors", []))
+    monitors = select_monitors(monitor_manager.get_monitors(), settings.selected_monitors)
 
     # The main monitor holds workspace 1; notifications start there
     primary_monitor_id = monitor_manager.get_primary_monitor_id()
@@ -110,7 +106,7 @@ if __name__ == "__main__":
     notches = {}
     for monitor in monitors:
         components = build_monitor_components(
-            monitor["id"], monitor_manager, config.get("corners_visible", True))
+            monitor["id"], monitor_manager, settings.corners_visible)
         app_components.extend(components[name] for name in ("corners", "bar", "notch", "dock"))
         notches[monitor["id"]] = components["notch"]
 

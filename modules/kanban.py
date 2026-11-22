@@ -7,9 +7,9 @@ from fabric.widgets.centerbox import CenterBox
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 
-import config.data as data
 import modules.icons as icons
 from config.paths import KANBAN_FILE, ensure_dir
+from config.shell_settings import settings
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gdk, GLib, GObject, Gtk
@@ -396,7 +396,7 @@ class Kanban(Gtk.Box):
         
         self.columns = [KanbanColumn(self.store, title) for title in COLUMNS]
 
-        vertical_mode = True if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]) else False
+        vertical_mode = True if settings.panel_theme == "Panel" and (settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]) else False
         
         for i, column in enumerate(self.columns):
             if vertical_mode == False:

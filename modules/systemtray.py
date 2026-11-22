@@ -7,7 +7,7 @@ import os
 from fabric.widgets.box import Box
 from gi.repository import DbusmenuGtk3, Gdk, GdkPixbuf, GLib, Gtk
 
-import config.data as data
+from config.shell_settings import settings
 from services.status_notifier import Item, Watcher, pick_pixmap, pixmap_to_pixbuf
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def _get_menu(item: Item) -> DbusmenuGtk3.Menu | None:
 
 class SystemTray(Box):
     def __init__(self, pixel_size: int = 20, **kwargs) -> None:
-        orientation = Gtk.Orientation.HORIZONTAL if not data.VERTICAL else Gtk.Orientation.VERTICAL
+        orientation = Gtk.Orientation.HORIZONTAL if not settings.vertical else Gtk.Orientation.VERTICAL
         super().__init__(
             name="systray",
             orientation=orientation,

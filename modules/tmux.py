@@ -9,8 +9,8 @@ from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GLib, Gtk
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 from config.terminal import default_terminal_command
 
 
@@ -395,7 +395,7 @@ class TmuxManager(Box):
     def get_terminal_command(self, cmd):
         """The configured terminal, or the one found on this system when that
         one isn't installed"""
-        configured = data.TERMINAL_COMMAND
+        configured = settings.terminal_command
         if configured and shutil.which(configured.split()[0]):
             return f"{configured} {cmd}"
         return f"{default_terminal_command()} {cmd}"

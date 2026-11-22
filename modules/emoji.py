@@ -11,10 +11,10 @@ from fabric.widgets.label import Label
 from fabric.widgets.stack import Stack
 from gi.repository import Gdk
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 
-vertical_mode = data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"])
+vertical_mode = settings.panel_theme == "Panel" and (settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"])
 
 emoji_rows = 3 if not vertical_mode else 9
 emoji_columns = 9 if not vertical_mode else 5

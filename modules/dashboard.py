@@ -4,7 +4,7 @@ from fabric.widgets.box import Box
 from fabric.widgets.label import Label
 from fabric.widgets.stack import Stack
 
-import config.data as data
+from config.shell_settings import settings
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
@@ -72,9 +72,9 @@ class Dashboard(Box):
         self.add(self.switcher)
         self.add(self.stack)
 
-        if data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"]
-            or data.PANEL_POSITION in ["Start", "End"]
+        if settings.panel_theme == "Panel" and (
+            settings.bar_position in ["Left", "Right"]
+            or settings.panel_position in ["Start", "End"]
         ):
             GLib.idle_add(self._setup_switcher_icons)
 

@@ -12,9 +12,9 @@ from fabric.widgets.label import Label
 from fabric.widgets.overlay import Overlay
 from loguru import logger
 
-import config.data as data
 import modules.icons as icons
 import utils.apps as apps
+from config.shell_settings import settings
 
 # WIP icon resolver (app_id to guessing the icon name)
 from utils.icon_resolver import IconResolver
@@ -416,7 +416,7 @@ class Overview(Box):
             workspace.destroy()
         self.workspace_boxes.clear()
 
-        if data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Left", "Right"]:
+        if settings.panel_theme == "Panel" and settings.bar_position in ["Left", "Right"]:
             rows = 5
             cols = 2
         else:

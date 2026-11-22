@@ -132,16 +132,15 @@ def test_update_on_package_install_points_to_package_manager(launcher, run, monk
 
 
 def test_pinning_writes_dock_json_to_the_user_folder(launcher, monkeypatch):
-    import config.data as data
-    from config.paths import APP_DIR
+    from config.paths import APP_DIR, DOCK_FILE
 
     monkeypatch.setattr(launcher_module.Dock, "notify_config_change", lambda: None)
-    data.DOCK_FILE.unlink(missing_ok=True)
+    DOCK_FILE.unlink(missing_ok=True)
     _search(launcher, "firefox")
     launcher.selected_index = 0
     launcher.add_selected_app_to_dock()
-    assert not data.DOCK_FILE.is_relative_to(APP_DIR)
-    pinned = json.loads(data.DOCK_FILE.read_text())["pinned_apps"]
+    assert not DOCK_FILE.is_relative_to(APP_DIR)
+    pinned = json.loads(DOCK_FILE.read_text())["pinned_apps"]
     assert [app["name"] for app in pinned] == ["firefox"]
 
 

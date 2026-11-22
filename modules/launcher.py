@@ -21,19 +21,20 @@ from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GLib
 
-import config.data as data
 import modules.icons as icons
 import utils.apps as apps
 from config.paths import (
     APP_DIR,
     CALC_HISTORY,
     CONVERSION_HISTORY,
+    DOCK_FILE,
     ensure_dir,
     self_updatable,
 )
+from config.settings_constants import APP_NAME_CAP
 from modules.dock import Dock
 
-tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"
+tooltip_settings = f"<b>Open {APP_NAME_CAP} Settings</b>"
 # The shell's own interpreter: a bare `python` is the system one, which
 # lacks the settings window's dependencies (PySide6, glaze)
 SETTINGS_COMMAND = shlex.join(
@@ -301,7 +302,7 @@ class AppLauncher(Box):
                     )
                 else:
                     exec_shell_command_async(shlex.join([
-                        "notify-send", data.APP_NAME_CAP,
+                        "notify-send", APP_NAME_CAP,
                         "Updates come from your package manager",
                     ]))
             case ":settings":
@@ -434,7 +435,7 @@ class AppLauncher(Box):
             "icon_name": selected_app.icon_name
         }.items() if v is not None}
 
-        dock_file = data.DOCK_FILE
+        dock_file = DOCK_FILE
         try:
             with open(dock_file, "r") as file:
                 pins = json.load(file)

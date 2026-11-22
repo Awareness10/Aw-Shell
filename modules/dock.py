@@ -16,8 +16,9 @@ from fabric.widgets.image import Image
 from fabric.widgets.revealer import Revealer
 from gi.repository import Gdk, GLib, Gtk
 
-import config.data as data
 import utils.apps as apps
+from config.paths import DOCK_FILE
+from config.shell_settings import settings
 from modules.corners import MyCorner
 from utils.dock_layout import dock_hidden, dock_layout
 from utils.dock_model import app_entry, plan_dock
@@ -28,7 +29,7 @@ from widgets.wayland import WaylandWindow as Window
 def read_config():
     """Read and return the full configuration from the JSON file, handling missing file."""
     try:
-        with open(data.DOCK_FILE, "r") as file:
+        with open(DOCK_FILE, "r") as file:
             config_data = json.load(file)
             
         if "pinned_apps" in config_data and config_data["pinned_apps"] and isinstance(config_data["pinned_apps"][0], str):
@@ -70,11 +71,11 @@ class Dock(Window):
         self.monitor_id = monitor_id
 
         self.integrated_mode = integrated_mode
-        self.icon_size = 20 if self.integrated_mode else data.DOCK_ICON_SIZE
+        self.icon_size = 20 if self.integrated_mode else settings.dock_icon_size
         self.effective_occlusion_size = 36 + self.icon_size
-        self.always_show = data.DOCK_ALWAYS_SHOW if not self.integrated_mode else False
+        self.always_show = settings.dock_always_show if not self.integrated_mode else False
 
-        self.layout = dock_layout(integrated_mode, data.BAR_POSITION, data.DOCK_THEME)
+        self.layout = dock_layout(integrated_mode, settings.bar_position, settings.dock_theme)
         self.actual_dock_is_horizontal = self.layout.horizontal
         if not self.integrated_mode:
             super().__init__(
@@ -196,7 +197,7 @@ class Dock(Window):
                            self.corner_bottom]:
                 corner.set_visible(False)
 
-        if dock_hidden(data.BAR_POSITION, data.PANEL_THEME, data.DOCK_ENABLED):
+        if dock_hidden(settings.bar_position, settings.panel_theme, settings.dock_enabled):
             self.set_visible(False)
 
         if self.always_show:
@@ -547,7 +548,7 @@ class Dock(Window):
         """Pick up dock.json and the always-show setting if they changed."""
         new_config = read_config()
         if not self.integrated_mode:
-            new_always_show = data.DOCK_ALWAYS_SHOW
+            new_always_show = settings.dock_always_show
             if self.always_show != new_always_show:
                 self.always_show = new_always_show
                 self.check_occlusion_state()
@@ -564,8 +565,8 @@ class Dock(Window):
 
     def update_pinned_apps_file(self):
         try:
-            data.DOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(data.DOCK_FILE, "w") as file:
+            DOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(DOCK_FILE, "w") as file:
                 json.dump(self.config, file, indent=4)
             return True
         except Exception as e:

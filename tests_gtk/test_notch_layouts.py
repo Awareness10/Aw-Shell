@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import config.data as data
+from config.shell_settings import settings as shell_settings
 
 LAYOUTS = {
     # name: (panel_theme, bar_position, panel_position, bar_theme)
@@ -191,11 +191,10 @@ def test_layout(layout, monkeypatch, run_pending):
     from modules.notch import Notch
 
     panel_theme, bar_position, panel_position, bar_theme = LAYOUTS[layout]
-    monkeypatch.setattr(data, "PANEL_THEME", panel_theme)
-    monkeypatch.setattr(data, "BAR_POSITION", bar_position)
-    monkeypatch.setattr(data, "VERTICAL", bar_position in ["Left", "Right"])
-    monkeypatch.setattr(data, "PANEL_POSITION", panel_position)
-    monkeypatch.setattr(data, "BAR_THEME", bar_theme)
+    monkeypatch.setattr(shell_settings, "panel_theme", panel_theme)
+    monkeypatch.setattr(shell_settings, "bar_position", bar_position)
+    monkeypatch.setattr(shell_settings, "panel_position", panel_position)
+    monkeypatch.setattr(shell_settings, "bar_theme", bar_theme)
 
     notch = Notch(monitor_id=0)
     run_pending()

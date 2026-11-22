@@ -6,7 +6,7 @@ refactor (wave 2); the bar must still come out the same.
 
 import pytest
 
-import config.data as data
+from config.shell_settings import settings as shell_settings
 
 LAYOUTS = {
     # name: settings
@@ -454,8 +454,7 @@ def test_layout(layout, monkeypatch, run_pending):
 
     settings = DEFAULTS | LAYOUTS[layout]
     for name, value in settings.items():
-        monkeypatch.setattr(data, name, value)
-    monkeypatch.setattr(data, "VERTICAL", settings["BAR_POSITION"] in ["Left", "Right"])
+        monkeypatch.setattr(shell_settings, name.lower(), value)
     bar = Bar(monitor_id=0)
     run_pending()
     try:

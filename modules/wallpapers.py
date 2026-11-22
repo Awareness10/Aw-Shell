@@ -15,18 +15,21 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
 from PIL import Image
 
-import config.data as data
 import modules.icons as icons
+from config.paths import CACHE_DIR as APP_CACHE_DIR
+from config.paths import MATUGEN_SCHEME_FILE, MATUGEN_STATE_FILE
+from config.settings_constants import APP_NAME_CAP
+from config.shell_settings import settings
 
 
 class WallpaperSelector(Box):
-    CACHE_DIR = f"{data.CACHE_DIR}/thumbs"  # Changed from wallpapers to thumbs
+    CACHE_DIR = f"{APP_CACHE_DIR}/thumbs"  # Changed from wallpapers to thumbs
     SCHEME_APPLY_DELAY_MS = 400
     DEFAULT_SCHEME = "scheme-tonal-spot"
 
     def __init__(self, **kwargs):
         # Delete the old cache directory if it exists
-        old_cache_dir = f"{data.CACHE_DIR}/wallpapers"
+        old_cache_dir = f"{APP_CACHE_DIR}/wallpapers"
         if os.path.exists(old_cache_dir):
             shutil.rmtree(old_cache_dir)
 
@@ -114,7 +117,7 @@ class WallpaperSelector(Box):
         # Load matugen state from the dedicated file
         self.matugen_enabled = True  # Default to True
         try:
-            with open(data.MATUGEN_STATE_FILE, "r") as f:
+            with open(MATUGEN_STATE_FILE, "r") as f:
                 content = f.read().strip().lower()
                 if content == "false":
                     self.matugen_enabled = False
@@ -223,14 +226,14 @@ class WallpaperSelector(Box):
         # Process old wallpapers: use os.scandir for efficiency and only loop
         # over image files that actually need renaming (they're not already lowercase
         # and with hyphens instead of spaces)
-        with os.scandir(data.WALLPAPERS_DIR) as entries:
+        with os.scandir(settings.wallpapers_dir) as entries:
             for entry in entries:
                 if entry.is_file() and self._is_image(entry.name):
                     # Check if the file needs renaming: file should be lowercase and have hyphens instead of spaces
                     if entry.name != entry.name.lower() or " " in entry.name:
                         new_name = entry.name.lower().replace(" ", "-")
-                        full_path = os.path.join(data.WALLPAPERS_DIR, entry.name)
-                        new_full_path = os.path.join(data.WALLPAPERS_DIR, new_name)
+                        full_path = os.path.join(settings.wallpapers_dir, entry.name)
+                        new_full_path = os.path.join(settings.wallpapers_dir, new_name)
                         try:
                             os.rename(full_path, new_full_path)
                             print(
@@ -243,7 +246,7 @@ class WallpaperSelector(Box):
                         yield True
 
         # Process files in small batches to keep UI responsive
-        file_list = os.listdir(data.WALLPAPERS_DIR)
+        file_list = os.listdir(settings.wallpapers_dir)
         batch_size = 20
 
         # Process files in batches
@@ -293,7 +296,7 @@ class WallpaperSelector(Box):
             return
 
         file_name = random.choice(self.files)
-        full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
+        full_path = os.path.join(settings.wallpapers_dir, file_name)
         selected_scheme = self.scheme_dropdown.get_active_id()
         current_wall = os.path.expanduser("~/.current.wall")
 
@@ -316,13 +319,13 @@ class WallpaperSelector(Box):
 
         if external:
             exec_shell_command_async(
-                f"notify-send '🎲 Wallpaper' 'Setting a random wallpaper 🎨' -a '{data.APP_NAME_CAP}' -i '{full_path}' -e"
+                f"notify-send '🎲 Wallpaper' 'Setting a random wallpaper 🎨' -a '{APP_NAME_CAP}' -i '{full_path}' -e"
             )
 
         self.randomize_dice_icon()
 
     def setup_file_monitor(self):
-        gfile = Gio.File.new_for_path(data.WALLPAPERS_DIR)
+        gfile = Gio.File.new_for_path(settings.wallpapers_dir)
         self.file_monitor = gfile.monitor_directory(Gio.FileMonitorFlags.NONE, None)
         self.file_monitor.connect("changed", self.on_directory_changed)
 
@@ -338,8 +341,8 @@ class WallpaperSelector(Box):
             if self._is_image(file_name):
                 # Convert filename to lowercase and replace spaces with "-"
                 new_name = file_name.lower().replace(" ", "-")
-                full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
-                new_full_path = os.path.join(data.WALLPAPERS_DIR, new_name)
+                full_path = os.path.join(settings.wallpapers_dir, file_name)
+                new_full_path = os.path.join(settings.wallpapers_dir, new_name)
                 if new_name != file_name:
                     try:
                         os.rename(full_path, new_full_path)
@@ -378,7 +381,7 @@ class WallpaperSelector(Box):
     def on_wallpaper_selected(self, iconview, path):
         model = iconview.get_model()
         file_name = model[path][1]
-        full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
+        full_path = os.path.join(settings.wallpapers_dir, file_name)
         selected_scheme = self.scheme_dropdown.get_active_id()
         current_wall = os.path.expanduser("~/.current.wall")
         if os.path.isfile(current_wall) or os.path.islink(current_wall):
@@ -404,14 +407,14 @@ class WallpaperSelector(Box):
 
     def _load_scheme(self) -> str:
         try:
-            scheme = data.MATUGEN_SCHEME_FILE.read_text().strip()
+            scheme = MATUGEN_SCHEME_FILE.read_text().strip()
         except OSError:
             return self.DEFAULT_SCHEME
         return scheme if scheme in self.schemes else self.DEFAULT_SCHEME
 
     def _save_scheme(self, scheme: str) -> None:
         try:
-            data.MATUGEN_SCHEME_FILE.write_text(scheme)
+            MATUGEN_SCHEME_FILE.write_text(scheme)
         except OSError as e:
             print(f"Error writing matugen scheme file: {e}")
 
@@ -583,7 +586,7 @@ class WallpaperSelector(Box):
     def _process_file(self, file_name):
         if self._destroyed:
             return
-        full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
+        full_path = os.path.join(settings.wallpapers_dir, file_name)
         cache_path = self._get_cache_path(file_name)
         if not os.path.exists(cache_path):
             try:
@@ -641,7 +644,7 @@ class WallpaperSelector(Box):
         wallpapers dir) keeps its name and can even keep an older timestamp,
         and a name-only key would serve the previous image's thumbnail forever.
         """
-        full_path = os.path.join(data.WALLPAPERS_DIR, file_name)
+        full_path = os.path.join(settings.wallpapers_dir, file_name)
         try:
             stat = os.stat(full_path)
             key = f"{file_name}:{stat.st_size}:{stat.st_mtime_ns}"
@@ -711,7 +714,7 @@ class WallpaperSelector(Box):
 
         # Save the state to the dedicated file
         try:
-            with open(data.MATUGEN_STATE_FILE, "w") as f:
+            with open(MATUGEN_STATE_FILE, "w") as f:
                 f.write(str(is_active))
         except Exception as e:
             print(f"Error writing matugen state file: {e}")

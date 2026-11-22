@@ -5,8 +5,8 @@ from fabric.widgets.button import Button
 from fabric.widgets.label import Label
 from gi.repository import GLib
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 from modules.tools import ToolsStatusMonitor, toggle_screenrecord
 
 
@@ -16,15 +16,15 @@ class RecordingIndicator(Button):
 
     def __init__(self, **kwargs):
         self.dot = Label(name="recording-dot", markup=icons.dot)
-        self.elapsed = Label(name="recording-time", label="00:00", visible=not data.VERTICAL)
-        self.elapsed.set_no_show_all(data.VERTICAL)
+        self.elapsed = Label(name="recording-time", label="00:00", visible=not settings.vertical)
+        self.elapsed.set_no_show_all(settings.vertical)
 
         super().__init__(
             name="recording-indicator",
             tooltip_markup="<b>Recording</b>\nClick to stop.",
             on_clicked=lambda *_: toggle_screenrecord(),
             child=Box(
-                orientation="v" if data.VERTICAL else "h",
+                orientation="v" if settings.vertical else "h",
                 spacing=4,
                 children=[self.dot, self.elapsed],
             ),

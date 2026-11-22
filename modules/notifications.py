@@ -14,9 +14,9 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import GdkPixbuf, GLib, Gtk
 from loguru import logger
 
-import config.data as data
 import modules.icons as icons
 from config.paths import NOTIFICATION_HISTORY, NOTIFICATIONS_DIR, ensure_dir
+from config.shell_settings import read_config_file, settings
 from utils.notification_history import (
     HISTORY_LIMIT,
     HistoryStore,
@@ -36,12 +36,12 @@ PERSISTENT_HISTORY_FILE = str(NOTIFICATION_HISTORY)
 
 # Get configurable app lists from settings
 def get_limited_apps_history():
-    config = data.load_config()
+    config = read_config_file()
     return config.get("limited_apps_history", ["Spotify"])
 
 
 def get_history_ignored_apps():
-    config = data.load_config()
+    config = read_config_file()
     return config.get("history_ignored_apps", ["Hyprshot"])
 
 
@@ -1178,13 +1178,13 @@ class NotificationContainer(Box):
 
 class NotificationPopup(Window):
     def __init__(self, **kwargs):
-        y_pos = data.NOTIF_POS.lower()
+        y_pos = settings.notif_pos.lower()
         x_pos = "right"
 
         if (
-            data.BAR_POSITION in ["Top", "Bottom"]
-            and data.PANEL_POSITION == "End"
-            or x_pos == data.BAR_POSITION.lower()
+            settings.bar_position in ["Top", "Bottom"]
+            and settings.panel_position == "End"
+            or x_pos == settings.bar_position.lower()
         ):
             x_pos = "left"
 

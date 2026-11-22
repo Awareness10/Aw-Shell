@@ -12,8 +12,9 @@ from fabric.widgets.revealer import Revealer
 from fabric.widgets.stack import Stack
 from gi.repository import Gdk, GLib, Gtk, Pango
 
-import config.data as data
 import utils.apps as apps
+from config.paths import HOSTNAME, USERNAME
+from config.shell_settings import settings
 from modules.cliphist import ClipHistory
 from modules.corners import MyCorner
 from modules.dashboard import Dashboard
@@ -54,11 +55,11 @@ class Notch(Window):
         self.monitor_id = monitor_id
         self.monitor_manager = get_monitor_manager()
         self._layout = layout = notch_layout(
-            panel_theme=data.PANEL_THEME,
-            bar_position=data.BAR_POSITION,
-            panel_position=data.PANEL_POSITION,
-            vertical=data.VERTICAL,
-            bar_theme=data.BAR_THEME,
+            panel_theme=settings.panel_theme,
+            bar_position=settings.bar_position,
+            panel_position=settings.panel_position,
+            vertical=settings.vertical,
+            bar_theme=settings.bar_theme,
         )
 
         super().__init__(
@@ -162,7 +163,7 @@ class Notch(Window):
 
         self.active_window.connect("notify::label", self.update_window_icon)
 
-        if data.PANEL_THEME == "Notch":
+        if settings.panel_theme == "Notch":
             self.active_window.connect("notify::label", self.on_active_window_changed)
 
         self.active_window.get_children()[0].set_hexpand(True)
@@ -175,7 +176,7 @@ class Notch(Window):
 
         self.player_small = PlayerSmall()
         self.user_label = Label(
-            name="compact-user", label=f"{data.USERNAME}@{data.HOSTNAME}"
+            name="compact-user", label=f"{USERNAME}@{HOSTNAME}"
         )
 
         self.player_small.mpris_manager.connect(
@@ -242,11 +243,11 @@ class Notch(Window):
             ],
         )
 
-        if data.PANEL_THEME == "Panel":
+        if settings.panel_theme == "Panel":
             self.stack.add_style_class("panel")
 
-            self.stack.add_style_class(data.BAR_POSITION.lower())
-            self.stack.add_style_class(data.PANEL_POSITION.lower())
+            self.stack.add_style_class(settings.bar_position.lower())
+            self.stack.add_style_class(settings.panel_position.lower())
 
         if self._layout.narrow_views:
             self.compact.set_size_request(260, 40)
@@ -292,7 +293,7 @@ class Notch(Window):
             end_children=self.corner_right,
         )
 
-        self.notch_box.add_style_class(data.PANEL_THEME.lower())
+        self.notch_box.add_style_class(settings.panel_theme.lower())
 
         self.notch_revealer = Revealer(
             name="notch-revealer",
@@ -338,7 +339,7 @@ class Notch(Window):
         )
 
         # Create top-level EventBox that wraps the entire notch for hover detection
-        if data.PANEL_THEME == "Notch":
+        if settings.panel_theme == "Notch":
             self.hover_eventbox = Gtk.EventBox(name="notch-hover-eventbox")
             self.hover_eventbox.add(self.notch_wrap)
             self.hover_eventbox.set_visible(True)
@@ -376,7 +377,7 @@ class Notch(Window):
             lambda widget, event: (self.open_notch("dashboard"), False)[1],
         )
 
-        if data.PANEL_THEME != "Notch":
+        if settings.panel_theme != "Notch":
             for corner in [self.corner_left, self.corner_right]:
                 corner.set_visible(False)
 
@@ -390,7 +391,7 @@ class Notch(Window):
         self._occlusion_watcher.connect(self._check_occlusion)
         GLib.timeout_add(500, self._check_occlusion)
 
-        if data.PANEL_THEME == "Notch":
+        if settings.panel_theme == "Notch":
             self.notch_revealer.set_reveal_child(True)
         else:
             self.notch_revealer.set_reveal_child(False)
@@ -459,7 +460,7 @@ class Notch(Window):
     def on_notch_hover_area_enter(self, widget, event):
         """Handle hover enter for the entire notch area"""
         self.is_hovered = True
-        if data.PANEL_THEME == "Notch" and data.BAR_POSITION != "Top":
+        if settings.panel_theme == "Notch" and settings.bar_position != "Top":
             self.notch_revealer.set_reveal_child(True)
         return False
 
@@ -486,10 +487,10 @@ class Notch(Window):
         self.applet_stack.set_visible_child(self.nhistory)
         self._is_notch_open = False
         self.stack.set_visible_child(self.compact)
-        if data.PANEL_THEME != "Notch":
+        if settings.panel_theme != "Notch":
             self.notch_revealer.set_reveal_child(False)
 
-        if self.bar and not self.bar.get_visible() and data.BAR_POSITION == "Top":
+        if self.bar and not self.bar.get_visible() and settings.bar_position == "Top":
             self.set_margin(self._layout.hidden_bar_margin)
 
     def open_notch(self, widget_name: str):
@@ -639,7 +640,7 @@ class Notch(Window):
             self.bar.revealer_right.set_reveal_child(not view.hide_bar_revealers)
             self.bar.revealer_left.set_reveal_child(not view.hide_bar_revealers)
 
-        if self.bar and not self.bar.get_visible() and data.BAR_POSITION == "Top":
+        if self.bar and not self.bar.get_visible() and settings.bar_position == "Top":
             self.set_margin("0px 8px 8px 8px")
 
         self._is_notch_open = True
@@ -759,14 +760,14 @@ class Notch(Window):
         self._prevent_occlusion = False
         self.notch_revealer.set_reveal_child(False)
         # Start occlusion check timer if in vertical mode (left/right)
-        if data.BAR_POSITION in ["Left", "Right"]:
+        if settings.bar_position in ["Left", "Right"]:
             GLib.timeout_add(100, self._check_occlusion)
     
     def restore_from_occlusion(self):
         """Restore notch from occlusion mode."""
         self._forced_occlusion = False
-        if data.PANEL_THEME == "Notch":
-            if data.BAR_POSITION == "Top":
+        if settings.panel_theme == "Notch":
+            if settings.bar_position == "Top":
                 self.notch_revealer.set_reveal_child(True)
             else:
                 self._prevent_occlusion = False
@@ -790,7 +791,7 @@ class Notch(Window):
         to make the notch visible momentarily.
         """
 
-        if data.PANEL_THEME != "Notch":
+        if settings.panel_theme != "Notch":
             return
 
         new_window_class = self._get_current_window_class()

@@ -64,10 +64,10 @@ class ShellCommands:
 
     def apply_gtk_theme(self) -> None:
         """GTK apps in the shell's colors (or the user's files back when off)."""
-        from config.data import GTK_THEMING
         from config.gtk_theme import apply_gtk_theme
+        from config.shell_settings import settings
 
-        apply_gtk_theme(GTK_THEMING)
+        apply_gtk_theme(settings.gtk_theming)
 
 
 def install_legacy_aliases(app, shell: ShellCommands) -> None:

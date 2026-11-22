@@ -13,7 +13,8 @@ import types
 from unittest.mock import MagicMock
 
 # ── Temporary HOME ──
-# config.data resolves paths and reads config.json from HOME at import time;
+# config.paths and config.shell_settings resolve paths and read config.json
+# from HOME at import time;
 # without this the tests read the developer's own shell config and create
 # directories in their real HOME
 _TEST_HOME = tempfile.mkdtemp(prefix="aw-unit-tests-")
@@ -44,7 +45,7 @@ if "fabric" not in sys.modules:
     sys.modules["fabric.utils"] = _mock_fabric_utils
     sys.modules["fabric.utils.helpers"] = _mock_fabric_helpers
 
-# ── Mock gi / GTK / GLib (used by config.data, utils/functions, utils/monitor_manager) ──
+# ── Mock gi / GTK / GLib (used by utils/functions, utils/monitor_manager) ──
 if "gi" not in sys.modules:
     _mock_gi = types.ModuleType("gi")
     _mock_gi.require_version = lambda *a: None

@@ -11,8 +11,8 @@ from fabric.widgets.label import Label
 from gi.repository import Gdk, GLib
 from loguru import logger
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 
 SCREENSHOT_SCRIPT = get_relative_path("../scripts/screenshot.sh")
 POMODORO_SCRIPT = get_relative_path("../scripts/pomodoro.sh")
@@ -153,7 +153,7 @@ def toggle_screenrecord(monitor: str | None = None) -> None:
 class Toolbox(Box):
     def __init__(self, **kwargs):
         orientation = "h"
-        if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]):
+        if settings.panel_theme == "Panel" and (settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]):
             orientation = "v"
 
         super().__init__(

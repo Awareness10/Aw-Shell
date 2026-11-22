@@ -6,8 +6,8 @@ from fabric.widgets.label import Label
 from gi.repository import GLib
 
 gi.require_version("Gtk", "3.0")
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 
 
 class Weather(Button):
@@ -59,7 +59,7 @@ class Weather(Button):
     def _fetch_weather_thread(self, user_data):
         url = (
             "https://wttr.in/?format=%c+%t"
-            if not data.VERTICAL
+            if not settings.vertical
             else "https://wttr.in/?format=%c"
         )
 

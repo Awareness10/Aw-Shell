@@ -7,19 +7,19 @@ from fabric.widgets.button import Button
 from fabric.widgets.label import Label
 from gi.repository import GLib
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 
 
 class Systemprofiles(Box):
     def __init__(self, **kwargs):
         super().__init__(
             name="systemprofiles",
-            orientation="h" if not data.VERTICAL else "v",
+            orientation="h" if not settings.vertical else "v",
             spacing=3,
         )
 
-        if data.BAR_THEME == "Dense" or data.BAR_THEME == "Edge":
+        if settings.bar_theme == "Dense" or settings.bar_theme == "Edge":
             self.add_style_class("invert")
 
         self.bat_save = None
@@ -101,7 +101,7 @@ class Systemprofiles(Box):
         self.add(
             Box(
                 name="power-mode-switcher",
-                orientation="h" if not data.VERTICAL else "v",
+                orientation="h" if not settings.vertical else "v",
                 spacing=4,
                 children=children,
             )

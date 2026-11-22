@@ -10,14 +10,14 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
-import config.data as data
+from config.shell_settings import settings
 
 vertical_mode = (
     True
-    if data.PANEL_THEME == "Panel"
+    if settings.panel_theme == "Panel"
     and (
-        data.BAR_POSITION in ["Left", "Right"]
-        or data.PANEL_POSITION in ["Start", "End"]
+        settings.bar_position in ["Left", "Right"]
+        or settings.panel_position in ["Start", "End"]
     )
     else False
 )

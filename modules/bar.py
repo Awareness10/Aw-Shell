@@ -13,8 +13,10 @@ from fabric.widgets.label import Label
 from fabric.widgets.revealer import Revealer
 from gi.repository import Gdk, GLib, Gtk
 
-import config.data as data
 import modules.icons as icons
+from config.paths import CONFIG_FILE
+from config.settings_constants import APP_NAME_CAP
+from config.shell_settings import settings
 from modules.controls import ControlSmall
 from modules.dock import Dock
 from modules.metrics import Battery, MetricsSmall, NetworkApplet
@@ -39,7 +41,7 @@ tooltip_apps = f"""<b><u>Launcher</u></b>
   e.g. ";100 USD to EUR", ";10 km to miles"
 
 <b>• Special Commands [Prefix ":"]:</b>
-  :update - Open {data.APP_NAME_CAP}'s updater.
+  :update - Open {APP_NAME_CAP}'s updater.
   :d - Open Dashboard.
   :w - Open Wallpapers."""
 
@@ -69,7 +71,7 @@ class Bar(Window):
         )
 
         self.layout = bar_layout(
-            data.BAR_POSITION, data.CENTERED_BAR, data.BAR_THEME, data.PANEL_THEME
+            settings.bar_position, settings.centered_bar, settings.bar_theme, settings.panel_theme
         )
         self.anchor_var = self.layout.anchor
         self.margin_var = self.layout.margin
@@ -77,7 +79,7 @@ class Bar(Window):
         self.set_margin(self.margin_var)
 
         self.notch = kwargs.get("notch", None)
-        self.component_visibility = data.BAR_COMPONENTS_VISIBILITY
+        self.component_visibility = settings.bar_components_visibility
 
         self.dock_instance = None
         self.integrated_dock_widget = None
@@ -115,7 +117,7 @@ class Bar(Window):
             ],
             buttons_factory=(
                 None
-                if data.BAR_HIDE_SPECIAL_WORKSPACE
+                if settings.bar_hide_special_workspace
                 else Workspaces.default_buttons_factory
             ),
         )
@@ -133,7 +135,7 @@ class Bar(Window):
 
     def _build_widgets(self):
         vertical = self.layout.vertical
-        runes = data.BAR_WORKSPACE_USE_RUNES
+        runes = settings.bar_workspace_use_runes
         self.workspaces = self._workspaces(
             "workspaces", 8, lambda i: None, ["vertical"] if vertical else None
         )
@@ -145,7 +147,7 @@ class Bar(Window):
         self.ws_container = Box(
             name="workspaces-container",
             children=(
-                self.workspaces_num if data.BAR_WORKSPACE_SHOW_NUMBER else self.workspaces
+                self.workspaces_num if settings.bar_workspace_show_number else self.workspaces
             ),
         )
 
@@ -165,7 +167,7 @@ class Bar(Window):
         self.on_language_switch()
         self.connection.connect("event::activelayout", self.on_language_switch)
 
-        if data.DATETIME_12H_FORMAT:
+        if settings.datetime_12h_format:
             time_format = "%I\n%M\n%p" if vertical else "%I:%M %p"
         else:
             time_format = "%H\n%M" if vertical else "%H:%M"
@@ -317,7 +319,7 @@ class Bar(Window):
         self.component_visibility[component_name] = visible
         getattr(self, component_name).set_visible(visible)
 
-        config_file = data.CONFIG_FILE
+        config_file = CONFIG_FILE
         if os.path.exists(config_file):
             try:
                 with open(config_file, "r") as f:
@@ -365,7 +367,7 @@ class Bar(Window):
         except json.JSONDecodeError:
             lang_data = "UNK"  # Fallback to default language label
         self.language.set_tooltip_text(lang_data)
-        if not data.VERTICAL:
+        if not settings.vertical:
             self.lang_label.set_label(lang_data[:3].upper())
         else:
             self.lang_label.add_style_class("icon")
@@ -383,7 +385,7 @@ class Bar(Window):
                 GLib.idle_add(lambda: exec_shell_command_async("hyprctl dispatch 'hl.dsp.focus({ window = \"class:notch\" })'") if self.notch else None)
 
     def runic_numbers(self):
-        if data.BAR_WORKSPACE_USE_RUNES:
+        if settings.bar_workspace_use_runes:
             self.workspaces_num.add_style_class("runic")
         else:
             self.workspaces_num.remove_style_class("runic")

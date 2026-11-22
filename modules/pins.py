@@ -1,7 +1,7 @@
 import gi
 
-import config.data as data
 from config.paths import PINS_FILE, ensure_dir
+from config.shell_settings import settings
 
 gi.require_version('Gtk', '3.0')
 import json
@@ -25,7 +25,7 @@ SAVE_FILE = str(PINS_FILE)
 SLOTS = 30  # 6 rows of 5, or 10 of 3 in a side panel
 
 icon_size = 80
-if data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]:
+if settings.panel_theme == "Panel" and settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]:
     icon_size = 36
 
 def createSurfaceFromWidget(widget: Gtk.Widget) -> cairo.ImageSurface:
@@ -297,7 +297,7 @@ class Cell(Gtk.EventBox):
             self.favicon_temp_path = favicon_path
             
 
-            if data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Left", "Right"]:
+            if settings.panel_theme == "Panel" and settings.bar_position in ["Left", "Right"]:
 
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                     favicon_path, width=36, height=36, preserve_aspect_ratio=True)
@@ -469,8 +469,8 @@ class Pins(Gtk.Box):
         scrolled_window.set_valign(Gtk.Align.FILL)
         self.pack_start(scrolled_window, True, True, 0)
 
-        side_panel = data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]
+        side_panel = settings.panel_theme == "Panel" and (
+            settings.bar_position in ["Left", "Right"] or settings.panel_position in ["Start", "End"]
         )
         self._grid = grid
         self._columns = 3 if side_panel else 5

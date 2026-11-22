@@ -13,9 +13,9 @@ from fabric.widgets.overlay import Overlay
 from fabric.widgets.scale import Scale
 from gi.repository import Gdk, Gio, GLib
 
-import config.data as data
 import modules.hidpp as hidpp
 import modules.icons as icons
+from config.shell_settings import settings
 from modules.level_sources import BrightnessSource, MicrophoneSource, SpeakerSource
 from modules.upower.upower import UPowerManager
 from services.brightness import Brightness
@@ -665,7 +665,7 @@ class ControlSmall(Box):
         children = [VolumeSmall(), MicSmall(), divider, *batteries]
         super().__init__(
             name="control-small",
-            orientation="h" if not data.VERTICAL else "v",
+            orientation="h" if not settings.vertical else "v",
             spacing=4,
             children=children,
             **kwargs,

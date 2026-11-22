@@ -376,9 +376,9 @@ class TestPackageUpdateInTerminal:
         assert window.update_btn.isEnabled()
 
     def test_terminal_command_falls_back_when_configured_one_is_missing(self, monkeypatch):
-        import config.data
+        from config.shell_settings import settings
         from modules.updater import _terminal_command
-        monkeypatch.setattr(config.data, "TERMINAL_COMMAND", "missing-term -e")
+        monkeypatch.setattr(settings, "terminal_command", "missing-term -e")
         monkeypatch.setattr("modules.updater.shutil.which", lambda name: None)
         assert _terminal_command() == "kitty -e"  # conftest pins the fallback
 

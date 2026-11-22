@@ -87,12 +87,11 @@ def get_disable_file_path() -> str:
 
 def _terminal_command() -> str:
     """The configured terminal, or the one found on this system when that one
-    isn't installed (as modules/tmux.py does). Imported here: config.data
-    loads gi, which the updater otherwise doesn't need."""
-    import config.data as data
+    isn't installed (as modules/tmux.py does)."""
+    from config.shell_settings import settings
     from config.terminal import default_terminal_command
 
-    configured = data.TERMINAL_COMMAND
+    configured = settings.terminal_command
     if configured and shutil.which(shlex.split(configured)[0]):
         return configured
     return default_terminal_command()

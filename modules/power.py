@@ -3,8 +3,8 @@ from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.label import Label
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 
 tooltip_lock = "Lock"
 tooltip_suspend = "Suspend"
@@ -16,9 +16,9 @@ tooltip_shutdown = "Shutdown"
 class PowerMenu(Box):
     def __init__(self, **kwargs):
         orientation = "h"
-        if data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"]
-            or data.PANEL_POSITION in ["Start", "End"]
+        if settings.panel_theme == "Panel" and (
+            settings.bar_position in ["Left", "Right"]
+            or settings.panel_position in ["Start", "End"]
         ):
             orientation = "v"
 

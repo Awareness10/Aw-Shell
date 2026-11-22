@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import utils.commands as commands
+from config.shell_settings import settings
 from config.settings_constants import DEFAULTS
 from config.settings_utils import bind_vars, generate_hyprlua
 from utils.commands import NOTCH_VIEWS, ShellCommands, install_legacy_aliases
@@ -100,7 +101,7 @@ def test_reload_css_sets_built_stylesheet(graph):
 
 @pytest.mark.parametrize("enabled", [True, False])
 def test_apply_gtk_theme_follows_setting(graph, enabled):
-    with patch("config.data.GTK_THEMING", enabled), \
+    with patch.object(settings, "gtk_theming", enabled), \
             patch("config.gtk_theme.apply_gtk_theme") as apply:
         ShellCommands(*graph).apply_gtk_theme()
     apply.assert_called_once_with(enabled)

@@ -93,7 +93,7 @@ class TestThumbnailCacheInvalidation:
         # sys.modules (as patch.dict does) would also evict packages imported
         # during the block, e.g. PIL, leaving this module with a PIL.Image
         # whose plugins are registered on a different copy of the package.
-        reimport = ("config", "config.config", "config.data", "modules.wallpapers")
+        reimport = ("config", "config.config", "config.shell_settings", "modules.wallpapers")
         saved = {key: sys.modules.get(key) for key in (*stubs, *reimport)}
         try:
             sys.modules.update(stubs)
@@ -116,8 +116,8 @@ class TestThumbnailCacheInvalidation:
         cache = tmp_path / "thumbs"
         walls.mkdir()
         cache.mkdir()
-        # Patch the config.data object this module actually holds a reference to.
-        monkeypatch.setattr(wallpapers.data, "WALLPAPERS_DIR", str(walls))
+        # Patch the settings object this module actually holds a reference to.
+        monkeypatch.setattr(wallpapers.settings, "wallpapers_dir", str(walls))
 
         selector_cls = wallpapers.WallpaperSelector
 
@@ -237,7 +237,7 @@ class TestSchemeChangeApplies:
         wall.write_bytes(b"png")
         (tmp_path / ".current.wall").symlink_to(wall)
 
-        monkeypatch.setattr(wallpapers.data, "MATUGEN_SCHEME_FILE", tmp_path / "matugen-scheme")
+        monkeypatch.setattr(wallpapers, "MATUGEN_SCHEME_FILE", tmp_path / "matugen-scheme")
         cls = wallpapers.WallpaperSelector
 
         class Stub:

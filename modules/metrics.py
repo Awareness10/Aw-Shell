@@ -15,8 +15,8 @@ from fabric.widgets.revealer import Revealer
 from fabric.widgets.scale import Scale
 from gi.repository import GLib
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 from modules.upower.upower import UPowerManager
 from services.network import NetworkClient
 
@@ -59,7 +59,7 @@ class MetricsProvider:
     def _update(self):
         self.cpu = psutil.cpu_percent(interval=0)
         self.mem = psutil.virtual_memory().percent
-        self.disk = [psutil.disk_usage(path).percent for path in data.BAR_METRICS_DISKS]
+        self.disk = [psutil.disk_usage(path).percent for path in settings.bar_metrics_disks]
 
         self._gpu_update_counter += 1
         if self._gpu_update_counter >= 5:  # Update GPU every 10 seconds (5 * 2s)
@@ -252,9 +252,9 @@ class Metrics(Box):
             all_visible=True,
         )
 
-        visible = getattr(data, "METRICS_VISIBLE", {'cpu': True, 'ram': True, 'disk': True, 'gpu': True})
-        disks = [SingularMetric("disk", f"DISK ({path})" if len(data.BAR_METRICS_DISKS) != 1 else "DISK", icons.disk)
-                 for path in data.BAR_METRICS_DISKS] if visible.get('disk', True) else []
+        visible = settings.metrics_visible
+        disks = [SingularMetric("disk", f"DISK ({path})" if len(settings.bar_metrics_disks) != 1 else "DISK", icons.disk)
+                 for path in settings.bar_metrics_disks] if visible.get('disk', True) else []
 
         self.cpu = SingularMetric("cpu", "CPU", icons.cpu) if visible.get('cpu', True) else None
         self.ram = SingularMetric("ram", "RAM", icons.memory) if visible.get('ram', True) else None
@@ -330,7 +330,7 @@ class HoverReveal:
             revealer.set_reveal_child(shown)
 
     def on_mouse_enter(self, widget, event):
-        if not data.VERTICAL:
+        if not settings.vertical:
             self.hover_counter += 1
             if self.hide_timer is not None:
                 GLib.source_remove(self.hide_timer)
@@ -339,7 +339,7 @@ class HoverReveal:
             return False
 
     def on_mouse_leave(self, widget, event):
-        if not data.VERTICAL:
+        if not settings.vertical:
             if self.hover_counter > 0:
                 self.hover_counter -= 1
             if self.hover_counter == 0:
@@ -349,7 +349,7 @@ class HoverReveal:
             return False
 
     def hide_revealer(self):
-        if not data.VERTICAL:
+        if not settings.vertical:
             self._reveal(False)
             self.hide_timer = None
             return False
@@ -389,7 +389,7 @@ class SingularMetricSmall:
         )
 
     def markup(self):
-        return f"{self.icon_markup} {self.name_markup}" if not data.VERTICAL else f"{self.icon_markup} {self.name_markup}: {self.level.get_label()}"
+        return f"{self.icon_markup} {self.name_markup}" if not settings.vertical else f"{self.icon_markup} {self.name_markup}: {self.level.get_label()}"
 
 class MetricsSmall(HoverReveal, Button):
     def __init__(self, **kwargs):
@@ -398,14 +398,14 @@ class MetricsSmall(HoverReveal, Button):
         main_box = Box(
 
             spacing=0,
-            orientation="h" if not data.VERTICAL else "v",
+            orientation="h" if not settings.vertical else "v",
             visible=True,
             all_visible=True,
         )
 
-        visible = getattr(data, "METRICS_SMALL_VISIBLE", {'cpu': True, 'ram': True, 'disk': True, 'gpu': True})
-        disks = [SingularMetricSmall("disk", f"DISK ({path})" if len(data.BAR_METRICS_DISKS) != 1 else "DISK", icons.disk)
-                 for path in data.BAR_METRICS_DISKS] if visible.get('disk', True) else []
+        visible = settings.metrics_small_visible
+        disks = [SingularMetricSmall("disk", f"DISK ({path})" if len(settings.bar_metrics_disks) != 1 else "DISK", icons.disk)
+                 for path in settings.bar_metrics_disks] if visible.get('disk', True) else []
 
         self.cpu = SingularMetricSmall("cpu", "CPU", icons.cpu) if visible.get('cpu', True) else None
         self.ram = SingularMetricSmall("ram", "RAM", icons.memory) if visible.get('ram', True) else None
@@ -471,7 +471,7 @@ class MetricsSmall(HoverReveal, Button):
         if self.ram: tooltip_metrics.append(self.ram)
         if self.cpu: tooltip_metrics.append(self.cpu)
         if self.gpu: tooltip_metrics.extend(self.gpu)
-        self.set_tooltip_markup((" - " if not data.VERTICAL else "\n").join([v.markup() for v in tooltip_metrics]))
+        self.set_tooltip_markup((" - " if not settings.vertical else "\n").join([v.markup() for v in tooltip_metrics]))
 
         return True
 
@@ -576,7 +576,7 @@ class Battery(HoverReveal, Button):
             self.bat_icon.set_markup(icons.battery)
             charging_status = "Battery"
 
-        self.set_tooltip_markup(f"{charging_status}" if not data.VERTICAL else f"{charging_status}: {percentage}%")
+        self.set_tooltip_markup(f"{charging_status}" if not settings.vertical else f"{charging_status}: {percentage}%")
 
 class NetworkApplet(Button):
     def __init__(self, **kwargs):
@@ -601,15 +601,15 @@ class NetworkApplet(Button):
             children=[self.upload_label, self.upload_icon],
         )
 
-        self.download_revealer = Revealer(child=self.download_box, transition_type = "slide-right" if not data.VERTICAL else "slide-down", child_revealed=False)
-        self.upload_revealer = Revealer(child=self.upload_box, transition_type="slide-left" if not data.VERTICAL else "slide-up",child_revealed=False)
+        self.download_revealer = Revealer(child=self.download_box, transition_type = "slide-right" if not settings.vertical else "slide-down", child_revealed=False)
+        self.upload_revealer = Revealer(child=self.upload_box, transition_type="slide-left" if not settings.vertical else "slide-up",child_revealed=False)
 
         self.children = Box(
-            orientation="h" if not data.VERTICAL else "v",
+            orientation="h" if not settings.vertical else "v",
             children=[self.upload_revealer, self.wifi_label, self.download_revealer],
         )
 
-        if data.VERTICAL:
+        if settings.vertical:
             self.download_label.set_visible(False)
             self.upload_label.set_visible(False)
             self.upload_icon.set_margin_top(4)
@@ -644,8 +644,8 @@ class NetworkApplet(Button):
             else:
                 self.remove_urgent()
 
-        show_download = self.downloading or (self.is_mouse_over and not data.VERTICAL)
-        show_upload = self.uploading or (self.is_mouse_over and not data.VERTICAL)
+        show_download = self.downloading or (self.is_mouse_over and not settings.vertical)
+        show_upload = self.uploading or (self.is_mouse_over and not settings.vertical)
         self.download_revealer.set_reveal_child(show_download)
         self.upload_revealer.set_reveal_child(show_upload)
 
@@ -685,7 +685,7 @@ class NetworkApplet(Button):
             tooltip_base = "Disconnected"
             tooltip_vertical = f"SSID: Disconnected\nUpload: {upload_str}\nDownload: {download_str}"
 
-        if data.VERTICAL:
+        if settings.vertical:
             self.set_tooltip_text(tooltip_vertical)
         else:
             self.set_tooltip_text(tooltip_base)
@@ -704,7 +704,7 @@ class NetworkApplet(Button):
 
     def on_mouse_enter(self, *_):
         self.is_mouse_over = True
-        if not data.VERTICAL:
+        if not settings.vertical:
 
             self.download_revealer.set_reveal_child(True)
             self.upload_revealer.set_reveal_child(True)
@@ -712,7 +712,7 @@ class NetworkApplet(Button):
 
     def on_mouse_leave(self, *_):
         self.is_mouse_over = False
-        if not data.VERTICAL:
+        if not settings.vertical:
 
             self.download_revealer.set_reveal_child(self.downloading)
             self.upload_revealer.set_reveal_child(self.uploading)
