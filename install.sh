@@ -306,10 +306,32 @@ install_shell_colors() {
     local bin
     bin="$(uv tool dir --bin)" || return 1
     export PATH="$bin:$PATH"
+    # Before `wrp install bash`: matuwrap sources itself after the last PATH line
+    add_tool_bin_to_bashrc "$bin"
   fi
   # Writes matuwrap's shell script and sources it from ~/.bashrc (backed up);
   # a second run changes nothing
   wrp install bash || return 1
+}
+
+# uv's tool folder (where wrp is) on PATH in new terminals too: a fresh Arch
+# doesn't have ~/.local/bin there, and matuwrap's script needs wrp. Left
+# alone when ~/.bashrc already names the folder.
+add_tool_bin_to_bashrc() {
+  local bin="$1" bashrc="$HOME/.bashrc" shown="$1"
+  [[ "$bin" == "$HOME"/* ]] && shown="\$HOME/${bin#"$HOME"/}"
+  if [[ -f "$bashrc" ]]; then
+    local rel="${bin#"$HOME"/}" content form
+    content="$(<"$bashrc")"
+    for form in "$bin" "\$HOME/$rel" "\${HOME}/$rel" "~/$rel"; do
+      [[ "$content" == *"$form"* ]] && return 0
+    done
+  fi
+  {
+    echo ""
+    echo "# uv tools (matuwrap's wrp) on PATH; added by the Aw-Shell installer"
+    echo "case \":\$PATH:\" in *\":$shown:\"*) ;; *) export PATH=\"$shown:\$PATH\" ;; esac"
+  } >> "$bashrc"
 }
 
 setup_shell_colors() {
