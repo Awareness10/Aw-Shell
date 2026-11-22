@@ -11,6 +11,8 @@ The names older generated configs use (`notch`, `app.set_css()`,
 before the facade existed (see tests/test_commands.py).
 """
 
+from typing import Any
+
 from utils.global_keybinds import get_global_keybind_handler
 
 # Notch views the keybinds open (Notch.open_notch names)
@@ -38,7 +40,7 @@ class ShellCommands:
     notch itself, and the wallpaper and caffeine actions aren't per-monitor.
     """
 
-    def __init__(self, app, notch):
+    def __init__(self, app: Any, notch: Any) -> None:
         self._app = app
         self._notch = notch
 
@@ -70,7 +72,7 @@ class ShellCommands:
         apply_gtk_theme(settings.gtk_theming)
 
 
-def install_legacy_aliases(app, shell: ShellCommands) -> None:
+def install_legacy_aliases(app: Any, shell: ShellCommands) -> None:
     """Keep `app.set_css()` and `app.apply_gtk_theme()` working: keybinds and
     matugen post_hooks generated before the facade call them."""
     app.set_css = shell.reload_css

@@ -41,9 +41,9 @@ BAR_COMPONENT_KEYS = {
 }
 
 
-def read_config_file() -> dict:
+def read_config_file() -> dict[str, Any]:
     """config.json as a dict; empty when it's missing or unreadable."""
-    config = {}
+    config: dict[str, Any] = {}
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, "r") as f:
@@ -79,13 +79,13 @@ class Settings:
     panel_theme: str
     panel_position: str
     notif_pos: str
-    bar_metrics_disks: list
-    metrics_visible: dict
-    metrics_small_visible: dict
-    selected_monitors: list
+    bar_metrics_disks: list[str]
+    metrics_visible: dict[str, bool]
+    metrics_small_visible: dict[str, bool]
+    selected_monitors: list[str]
     corners_visible: bool
     # Bar component name (BAR_COMPONENT_KEYS) -> shown at startup
-    bar_components_visibility: dict
+    bar_components_visibility: dict[str, bool]
 
     @property
     def vertical(self) -> bool:
@@ -93,10 +93,10 @@ class Settings:
         return self.bar_position in ["Left", "Right"]
 
     @classmethod
-    def from_config(cls, config: dict) -> "Settings":
+    def from_config(cls, config: dict[str, Any]) -> "Settings":
         """Settings from a config.json dict, with defaults for missing keys."""
 
-        def value(key):
+        def value(key: str) -> Any:
             return config.get(key, get_default(key))
 
         plain = {

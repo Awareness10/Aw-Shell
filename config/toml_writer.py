@@ -7,6 +7,7 @@ tables, arrays of tables, strings, booleans, numbers, dates and arrays.
 import datetime
 import math
 import re
+from typing import Any
 
 _BARE_KEY = re.compile(r"[A-Za-z0-9_-]+")
 _ESCAPES = {"\\": "\\\\", '"': '\\"', "\b": "\\b", "\t": "\\t", "\n": "\\n",
@@ -29,7 +30,7 @@ def _key(key: str) -> str:
     return key if _BARE_KEY.fullmatch(key) else _string(key)
 
 
-def _value(value) -> str:
+def _value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, str):
@@ -51,11 +52,11 @@ def _value(value) -> str:
     raise TypeError(f"Can't write {type(value).__name__} to TOML")
 
 
-def _is_table_array(value) -> bool:
+def _is_table_array(value: Any) -> bool:
     return isinstance(value, list) and bool(value) and all(isinstance(v, dict) for v in value)
 
 
-def _table(table: dict, path: list[str], lines: list[str], header: str | None) -> None:
+def _table(table: dict[str, Any], path: list[str], lines: list[str], header: str | None) -> None:
     """Append table's keys to lines: its plain values under header, then its
     sub-tables and arrays of tables, each under its own header."""
     plain = {k: v for k, v in table.items()
@@ -79,7 +80,7 @@ def _table(table: dict, path: list[str], lines: list[str], header: str | None) -
                 _table(item, sub_path, lines, None)
 
 
-def dumps(data: dict) -> str:
+def dumps(data: dict[str, Any]) -> str:
     """data as a TOML document."""
     lines: list[str] = []
     _table(data, [], lines, None)

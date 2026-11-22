@@ -35,7 +35,8 @@ class BarLayout:
     embed_dock: bool
 
 
-def bar_layout(bar_position, centered_bar, bar_theme, panel_theme) -> BarLayout:
+def bar_layout(bar_position: str, centered_bar: bool, bar_theme: str,
+               panel_theme: str) -> BarLayout:
     vertical = bar_position in _SIDE_ANCHORS
     if vertical:
         centered_anchor, full_anchor = _SIDE_ANCHORS[bar_position]

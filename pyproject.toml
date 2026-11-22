@@ -35,6 +35,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.0",
+    "mypy>=2.4.1",
 ]
 
 [tool.ruff]
@@ -53,6 +54,38 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # The old dock code, copied verbatim as the test oracle
 "tests/test_dock_model.py" = ["E701", "E702"]
+
+[tool.mypy]
+# GTK-free modules only: fabric and gi ship no type information. Add a module
+# here once it passes; `uv run --only-group dev mypy` checks the list.
+python_version = "3.14"
+strict = true
+files = [
+    "config/legacy.py",
+    "config/gtk_theme.py",
+    "config/migrate.py",
+    "config/paths.py",
+    "config/shell_settings.py",
+    "config/terminal.py",
+    "config/toml_writer.py",
+    "utils/bar_layout.py",
+    "utils/calculator.py",
+    "utils/commands.py",
+    "utils/conversion.py",
+    "utils/dock_layout.py",
+    "utils/dock_model.py",
+    "utils/notch_layout.py",
+    "utils/notification_history.py",
+    "utils/stylesheet.py",
+    "utils/wifi.py",
+]
+# Imported modules outside the list are read for types but not reported on
+follow_imports = "silent"
+
+[[tool.mypy.overrides]]
+# No type information (or not installed in the dev-only environment)
+module = ["fabric.*", "gi.*", "loguru.*", "PySide6.*", "glaze.*", "psutil.*", "setproctitle.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -3,13 +3,18 @@
 import math
 import operator
 import re
+from collections.abc import Callable
+from typing import Any
+
+# Calculator values: numbers, or (nested) lists of them
+Op = Callable[[Any, Any], Any]
 
 
-class _Array(list):
+class _Array(list[Any]):
     """A list whose arithmetic works element by element (arange(3)*2 is
     [0 2 4], not the list repeated), with a scalar or a same-length list."""
 
-    def _apply(self, other, op):
+    def _apply(self, other: Any, op: Op) -> "_Array":
         if isinstance(other, (list, tuple)):
             if len(other) != len(self):
                 raise ValueError(f"operands could not be broadcast together with lengths "
@@ -17,17 +22,17 @@ class _Array(list):
             return _Array(op(a, b) for a, b in zip(self, other, strict=False))
         return _Array(op(a, other) for a in self)
 
-    def __neg__(self):
+    def __neg__(self) -> "_Array":
         return _Array(-a for a in self)
 
-    def __pos__(self):
+    def __pos__(self) -> "_Array":
         return self
 
-    def __abs__(self):
+    def __abs__(self) -> "_Array":
         return _Array(abs(a) for a in self)
 
 
-def _binary(op):
+def _binary(op: Op) -> tuple[Callable[[_Array, Any], _Array], Callable[[_Array, Any], _Array]]:
     return (lambda self, other: self._apply(other, op),
             lambda self, other: self._apply(other, lambda a, b: op(b, a)))
 
@@ -40,11 +45,11 @@ for _name, _op in {"add": operator.add, "sub": operator.sub, "mul": operator.mul
     setattr(_Array, f"__r{_name}__", _reflected)
 
 
-def _elementwise(function):
+def _elementwise(function: Callable[[Any], Any]) -> Callable[[Any], Any]:
     """function on a number, or on each element of a list; results outside
     the real numbers are nan or ±inf, not errors (sqrt(-1) is nan, ln(0)
     is -inf)."""
-    def apply(x):
+    def apply(x: Any) -> Any:
         if isinstance(x, (list, tuple)):
             return _Array(apply(v) for v in x)
         try:
@@ -57,7 +62,7 @@ def _elementwise(function):
     return apply
 
 
-def arange(start, stop=None, step=1):
+def arange(start: Any, stop: Any = None, step: Any = 1) -> _Array:
     """[start, stop) in steps; whole numbers stay whole."""
     if stop is None:
         start, stop = 0, start
@@ -69,7 +74,7 @@ def arange(start, stop=None, step=1):
     return _Array(float(start + i * step) for i in range(count))
 
 
-def linspace(start, stop, num=50, endpoint=True):
+def linspace(start: Any, stop: Any, num: Any = 50, endpoint: bool = True) -> _Array:
     """num evenly spaced numbers from start to stop."""
     num = operator.index(num)
     if num < 0:
@@ -83,7 +88,7 @@ def linspace(start, stop, num=50, endpoint=True):
     return values
 
 
-def array(values):
+def array(values: Any) -> Any:
     """values (nested lists or tuples) as an array."""
     if isinstance(values, (list, tuple)):
         return _Array(array(v) for v in values)
@@ -109,13 +114,13 @@ def to_python(expr: str) -> str:
     return expr.translate(str.maketrans("[]{}", "()()"))
 
 
-def _shape(values) -> tuple:
+def _shape(values: Any) -> tuple[int, ...]:
     if not isinstance(values, list):
         return ()
     return (len(values),) + (_shape(values[0]) if values else ())
 
 
-def format_result(result) -> str:
+def format_result(result: Any) -> str:
     if isinstance(result, list):
         size = math.prod(_shape(result))
         if size > 10:

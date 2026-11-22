@@ -52,7 +52,8 @@ def top_margin(bar_theme: str) -> str:
     return _TOP_MARGINS.get(bar_theme, _DEFAULT_TOP_MARGIN)
 
 
-def _anchor(panel_theme, bar_position, panel_position, is_panel_vertical):
+def _anchor(panel_theme: str, bar_position: str, panel_position: str,
+            is_panel_vertical: bool) -> tuple[str, str]:
     if panel_theme == "Panel":
         edge = _PANEL_EDGES.get((bool(is_panel_vertical), bar_position))
         if edge is not None:

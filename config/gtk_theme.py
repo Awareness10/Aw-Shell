@@ -29,7 +29,7 @@ FALLBACK_YELLOW = "#cd9309"
 DARK_TEXT = "rgba(0, 0, 0, 0.8)"
 
 
-def gtk_palette(c: dict) -> dict:
+def gtk_palette(c: dict[str, str]) -> dict[str, str]:
     """libadwaita color names for a matugen palette (dark mode)."""
     fg = c["on_surface"]
     border = c["outline_variant"]
@@ -88,15 +88,15 @@ def gtk_palette(c: dict) -> dict:
     return palette
 
 
-def _named_colors(palette: dict) -> str:
+def _named_colors(palette: dict[str, str]) -> str:
     return "\n".join(f"@define-color {name} {value};" for name, value in palette.items())
 
 
-def render_gtk3_css(colors: dict) -> str:
+def render_gtk3_css(colors: dict[str, str]) -> str:
     return f"{MARKER}\n\n{_named_colors(gtk_palette(colors))}\n"
 
 
-def render_gtk4_css(colors: dict) -> str:
+def render_gtk4_css(colors: dict[str, str]) -> str:
     # libadwaita 1.6+ reads CSS variables; plain GTK 4 themes the named colors
     palette = gtk_palette(colors)
     variables = "\n".join(

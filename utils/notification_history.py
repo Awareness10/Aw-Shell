@@ -8,7 +8,9 @@ The file is a JSON list of notes, newest first:
 import json
 import locale
 import os
+from collections.abc import Iterable
 from datetime import datetime, timedelta
+from typing import Any
 
 from loguru import logger
 
@@ -48,7 +50,7 @@ def image_file_name(note_id: str) -> str:
     return f"{IMAGE_PREFIX}{note_id}{IMAGE_SUFFIX}"
 
 
-def orphan_images(file_names, note_ids) -> list[str]:
+def orphan_images(file_names: Iterable[str], note_ids: Iterable[object]) -> list[str]:
     """Cached image files (notification_<id>.png) whose note isn't in the
     history any more; other files are left alone."""
     keep = {str(i) for i in note_ids if i}
@@ -59,7 +61,7 @@ def orphan_images(file_names, note_ids) -> list[str]:
     ]
 
 
-def parse_timestamp(text) -> datetime:
+def parse_timestamp(text: Any) -> datetime:
     """A note's arrival time; now when it's missing or unreadable."""
     try:
         return datetime.fromisoformat(text)
@@ -72,9 +74,9 @@ class HistoryStore:
 
     def __init__(self, path: str):
         self.path = path
-        self.notes: list[dict] = []
+        self.notes: list[dict[str, Any]] = []
 
-    def load(self) -> list[dict]:
+    def load(self) -> list[dict[str, Any]]:
         """Read the file; a missing or broken file is an empty history."""
         self.notes = []
         if os.path.exists(self.path):
@@ -94,11 +96,11 @@ class HistoryStore:
         except OSError as e:
             logger.error(f"Error saving persistent history: {e}")
 
-    def add(self, note: dict) -> None:
+    def add(self, note: dict[str, Any]) -> None:
         self.notes = [note, *self.notes][:HISTORY_LIMIT]
         self.save()
 
-    def remove(self, note_ids) -> bool:
+    def remove(self, note_ids: Iterable[object]) -> bool:
         """Drop the notes with these ids (compared as text); True if any went."""
         ids = {str(i) for i in note_ids}
         kept = [n for n in self.notes if str(n.get("id")) not in ids]

@@ -28,14 +28,14 @@ class DockLayout:
     # Window margin; None in the bar
     margin: str | None
     # Style classes on the dock box, in order
-    classes: tuple
+    classes: tuple[str, ...]
     # The hover strip comes before the dock (after it for a right bar)
     activator_first: bool
     # Corners hidden (Edge and Dense themes)
     hide_corners: bool
 
 
-def dock_layout(integrated, bar_position, dock_theme) -> DockLayout:
+def dock_layout(integrated: bool, bar_position: str, dock_theme: str) -> DockLayout:
     base_classes = ("left",) if bar_position == "Right" else ()
     if integrated:
         return DockLayout(True, "bottom", "slide-up", "v", "center", "h", None,
@@ -55,7 +55,7 @@ def dock_layout(integrated, bar_position, dock_theme) -> DockLayout:
                       bar_position != "Right", dock_theme in ("Edge", "Dense"))
 
 
-def dock_hidden(bar_position, panel_theme, dock_enabled) -> bool:
+def dock_hidden(bar_position: str, panel_theme: str, dock_enabled: bool) -> bool:
     """The standalone dock stays hidden when the bar carries it or it's off."""
     embedded = bar_position == "Bottom" or (
         panel_theme == "Panel" and bar_position in ("Top", "Bottom")

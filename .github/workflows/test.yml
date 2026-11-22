@@ -15,6 +15,9 @@ jobs:
       # The ruff locked in uv.lock (dev group); rules in pyproject.toml
       - name: Ruff
         run: uv run --frozen --only-group dev ruff check .
+      # The GTK-free modules listed under [tool.mypy] in pyproject.toml
+      - name: Mypy
+        run: uv run --frozen --only-group dev mypy
 
   test:
     runs-on: ubuntu-latest
