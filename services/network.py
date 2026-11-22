@@ -260,7 +260,7 @@ class Ethernet(Service):
         ):
             self._device.connect(f"notify::{pn}", lambda *_: self.notifier(pn))
 
-        self._device.connect("notify::speed", lambda *_: print(_))
+        self._device.connect("notify::speed", lambda *_: logger.debug(str(_)))
 
     def notifier(self, pn):
         self.notify(pn)
@@ -347,7 +347,7 @@ class NetworkClient(Service):
             if saved
             else f"nmcli device wifi connect {bssid}"
         )
-        exec_shell_command_async(command, lambda *args: print(args))
+        exec_shell_command_async(command, lambda *args: logger.info(str(args)))
 
     @Property(str, "readable")
     def primary_device(self) -> Literal["wifi", "wired"] | None:

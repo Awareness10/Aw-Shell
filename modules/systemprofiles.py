@@ -6,6 +6,7 @@ from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.label import Label
 from gi.repository import GLib
+from loguru import logger
 
 import modules.icons as icons
 from config.shell_settings import settings
@@ -140,7 +141,7 @@ class Systemprofiles(Box):
                 self.update_button_styles()
             except Exception as err:
                 # Optionally, handle errors or display a notification.
-                print(f"Error setting power mode: {err}")
+                logger.error(f"Error setting power mode: {err}")
 
     def update_button_styles(self):
         """

@@ -1,3 +1,6 @@
+from loguru import logger
+
+
 class GlobalKeybindHandler:
     """Handler for global keybinds that act on every monitor (see the
     "Toggle Bar" bind in config/settings_utils.py)."""
@@ -59,7 +62,7 @@ class GlobalKeybindHandler:
                                 dock_instance.force_occlusion()
                     
                 except Exception as e:
-                    print(f"GlobalKeybindHandler: Error toggling bar: {e}")
+                    logger.error(f"GlobalKeybindHandler: Error toggling bar: {e}")
                     return False
         
         return True

@@ -90,3 +90,14 @@ def _default_terminal(monkeypatch):
 
     monkeypatch.setattr(config.terminal, "default_terminal_command",
                         lambda: config.terminal.FALLBACK)
+
+
+@pytest.fixture
+def logs():
+    """Messages logged through loguru during the test, one string each."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(message.record["message"]), level="DEBUG")
+    yield messages
+    logger.remove(sink)

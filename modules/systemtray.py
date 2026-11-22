@@ -1,16 +1,14 @@
 import gi
 
 gi.require_version("DbusmenuGtk3", "0.4")
-import logging
 import os
 
 from fabric.widgets.box import Box
 from gi.repository import DbusmenuGtk3, Gdk, GdkPixbuf, GLib, Gtk
+from loguru import logger
 
 from config.shell_settings import settings
 from services.status_notifier import Item, Watcher, pick_pixmap, pixmap_to_pixbuf
-
-logger = logging.getLogger(__name__)
 
 _watcher = None
 _menus: dict[Item, tuple[str, DbusmenuGtk3.Menu | None]] = {}

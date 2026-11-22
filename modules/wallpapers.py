@@ -13,6 +13,7 @@ from fabric.widgets.entry import Entry
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
+from loguru import logger
 from PIL import Image
 
 import modules.icons as icons
@@ -128,7 +129,7 @@ class WallpaperSelector(Box):
             # File doesn't exist, keep default True and create it on first toggle
             pass
         except Exception as e:
-            print(f"Error reading matugen state file: {e}")
+            logger.error(f"Error reading matugen state file: {e}")
             # Keep default True on error
 
         # Create a switcher to enable/disable Matugen (enabled by default)
@@ -236,11 +237,11 @@ class WallpaperSelector(Box):
                         new_full_path = os.path.join(settings.wallpapers_dir, new_name)
                         try:
                             os.rename(full_path, new_full_path)
-                            print(
+                            logger.info(
                                 f"Renamed old wallpaper '{full_path}' to '{new_full_path}'"
                             )
                         except Exception as e:
-                            print(f"Error renaming file {full_path}: {e}")
+                            logger.error(f"Error renaming file {full_path}: {e}")
                         # True keeps the idle handler running; a bare yield
                         # returned None and stopped loading after one rename
                         yield True
@@ -292,7 +293,7 @@ class WallpaperSelector(Box):
 
     def set_random_wallpaper(self, widget, external=False):
         if not self.files:
-            print("No wallpapers available to set a random one.")
+            logger.info("No wallpapers available to set a random one.")
             return
 
         file_name = random.choice(self.files)
@@ -315,7 +316,7 @@ class WallpaperSelector(Box):
                 f'awww img "{full_path}" -t outer --transition-duration 1.5 --transition-step 255 --transition-fps 60 -f Nearest'
             )
 
-        print(f"Set random wallpaper: {file_name}")
+        logger.info(f"Set random wallpaper: {file_name}")
 
         if external:
             exec_shell_command_async(
@@ -347,9 +348,9 @@ class WallpaperSelector(Box):
                     try:
                         os.rename(full_path, new_full_path)
                         file_name = new_name
-                        print(f"Renamed file '{full_path}' to '{new_full_path}')")
+                        logger.info(f"Renamed file '{full_path}' to '{new_full_path}')")
                     except Exception as e:
-                        print(f"Error renaming file {full_path}: {e}")
+                        logger.error(f"Error renaming file {full_path}: {e}")
                 if file_name not in self.files:
                     self.files.append(file_name)
                     self.files.sort()
@@ -416,7 +417,7 @@ class WallpaperSelector(Box):
         try:
             MATUGEN_SCHEME_FILE.write_text(scheme)
         except OSError as e:
-            print(f"Error writing matugen scheme file: {e}")
+            logger.error(f"Error writing matugen scheme file: {e}")
 
     def _apply_scheme(self) -> bool:
         self._scheme_apply_id = None
@@ -601,7 +602,7 @@ class WallpaperSelector(Box):
                     img_cropped.thumbnail((96, 96), Image.Resampling.LANCZOS)
                     img_cropped.save(cache_path, "PNG")
             except Exception as e:
-                print(f"Error processing {file_name}: {e}")
+                logger.error(f"Error processing {file_name}: {e}")
                 return
         self.thumbnail_queue.append((cache_path, file_name))
         GLib.idle_add(self._process_batch)
@@ -616,7 +617,7 @@ class WallpaperSelector(Box):
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file(cache_path)
             except Exception as e:
-                print(f"Error loading thumbnail {cache_path}: {e}")
+                logger.error(f"Error loading thumbnail {cache_path}: {e}")
                 continue
             existing = next(
                 (i for i, (_, n) in enumerate(self.thumbnails) if n == file_name), None
@@ -666,13 +667,13 @@ class WallpaperSelector(Box):
                     and entry.path not in valid
                 ]
         except OSError as e:
-            print(f"Error scanning thumbnail cache: {e}")
+            logger.error(f"Error scanning thumbnail cache: {e}")
             return
         for path in stale:
             try:
                 os.remove(path)
             except OSError as e:
-                print(f"Error deleting stale cache {path}: {e}")
+                logger.error(f"Error deleting stale cache {path}: {e}")
 
     @staticmethod
     def _is_image(file_name: str) -> bool:
@@ -717,13 +718,13 @@ class WallpaperSelector(Box):
             with open(MATUGEN_STATE_FILE, "w") as f:
                 f.write(str(is_active))
         except Exception as e:
-            print(f"Error writing matugen state file: {e}")
+            logger.error(f"Error writing matugen state file: {e}")
 
     def on_apply_color_clicked(self, button):
         """Applies the color selected by the hue slider via matugen."""
         hue_value = self.hue_slider.get_value()  # Get value from 0-360
         hex_color = self.hsl_to_rgb_hex(hue_value)  # Convert HSL(hue, 1.0, 0.5) to HEX
-        print(f"Applying color from slider: H={hue_value}, HEX={hex_color}")
+        logger.info(f"Applying color from slider: H={hue_value}, HEX={hex_color}")
         selected_scheme = self.scheme_dropdown.get_active_id()
         self._custom_hex = hex_color
         # Run matugen with the chosen hex color and selected scheme

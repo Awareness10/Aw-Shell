@@ -1,5 +1,4 @@
 import json
-import logging
 
 import cairo
 from fabric.utils import (
@@ -13,6 +12,7 @@ from fabric.widgets.eventbox import EventBox
 from fabric.widgets.image import Image
 from fabric.widgets.revealer import Revealer
 from gi.repository import Gdk, GLib, Gtk
+from loguru import logger
 
 import utils.apps as apps
 from config.paths import DOCK_FILE
@@ -567,7 +567,7 @@ class Dock(Window):
                 json.dump(self.config, file, indent=4)
             return True
         except Exception as e:
-            logging.error(f"Failed to write dock config: {e}")
+            logger.error(f"Failed to write dock config: {e}")
             return False
 
     def update_pinned_apps(self, skip_update=False):

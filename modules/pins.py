@@ -17,6 +17,7 @@ from fabric.widgets.box import Box
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, GObject, Gtk
+from loguru import logger
 
 import modules.icons as icons
 from utils.portal import pick_file
@@ -42,13 +43,13 @@ def open_file(filepath):
     try:
         subprocess.Popen(["xdg-open", filepath])
     except Exception as e:
-        print("Error opening file:", e)
+        logger.error(f"Error opening file: {e}")
 
 def open_url(url):
     try:
         subprocess.Popen(["xdg-open", url])
     except Exception as e:
-        print("Error opening URL:", e)
+        logger.error(f"Error opening URL: {e}")
 
 def is_url(text):
 
@@ -82,7 +83,7 @@ def download_favicon(url, callback):
 
             GLib.idle_add(callback, temp_path)
         except Exception as e:
-            print(f"Error downloading favicon: {e}")
+            logger.error(f"Error downloading favicon: {e}")
 
             if temp_file and os.path.exists(temp_file):
                 try:
@@ -163,7 +164,7 @@ class PinStore(GObject.Object):
             monitor = Gio.File.new_for_path(folder).monitor_directory(
                 Gio.FileMonitorFlags.WATCH_MOVES, None)
         except GLib.Error as e:
-            print(f"Error watching {folder}: {e.message}")
+            logger.error(f"Error watching {folder}: {e.message}")
             return
         monitor.connect("changed", self._on_folder_changed)
         self._monitors[folder] = monitor
@@ -177,7 +178,7 @@ class PinStore(GObject.Object):
             for index, cell_data in enumerate(state[:SLOTS]):
                 self.slots[index] = (cell_data.get('content'), cell_data.get('content_type'))
         except Exception as e:
-            print("Error loading pins:", e)
+            logger.error(f"Error loading pins: {e}")
 
     def _save(self):
         state = [{'content_type': kind, 'content': content} for content, kind in self.slots]
@@ -186,7 +187,7 @@ class PinStore(GObject.Object):
             with open(SAVE_FILE, 'w') as f:
                 json.dump(state, f)
         except Exception as e:
-            print("Error saving pins:", e)
+            logger.error(f"Error saving pins: {e}")
 
 
 _store = None
@@ -245,7 +246,7 @@ class Cell(Gtk.EventBox):
                 os.remove(self.favicon_temp_path)
                 self.favicon_temp_path = None
             except Exception as e:
-                print(f"Error removing temp favicon: {e}")
+                logger.error(f"Error removing temp favicon: {e}")
         
         for child in self.box.get_children():
             self.box.remove(child)
@@ -316,7 +317,7 @@ class Cell(Gtk.EventBox):
 
             container.show_all()
         except Exception as e:
-            print(f"Error setting favicon: {e}")
+            logger.error(f"Error setting favicon: {e}")
 
 
     def get_file_preview(self, filepath):
@@ -334,7 +335,7 @@ class Cell(Gtk.EventBox):
                 pixbuf = icon_theme.load_icon("default-folder", icon_size, 0)
                 return Gtk.Image.new_from_pixbuf(pixbuf)
             except Exception:
-                print("Error loading folder icon")
+                logger.error("Error loading folder icon")
                 return Gtk.Image.new_from_icon_name("default-folder", Gtk.IconSize.DIALOG)
         
         if content_type and content_type.startswith("image/"):
@@ -343,14 +344,14 @@ class Cell(Gtk.EventBox):
                     filepath, width=icon_size, height=icon_size, preserve_aspect_ratio=True)
                 return Gtk.Image.new_from_pixbuf(pixbuf)
             except Exception as e:
-                print("Error loading image preview:", e)
+                logger.error(f"Error loading image preview: {e}")
         
         elif content_type and content_type.startswith("video/"):
             try:
                 pixbuf = icon_theme.load_icon("video-x-generic", icon_size, 0)
                 return Gtk.Image.new_from_pixbuf(pixbuf)
             except Exception:
-                print("Error loading video icon")
+                logger.error("Error loading video icon")
                 return Gtk.Image.new_from_icon_name("video-x-generic", Gtk.IconSize.DIALOG)
         else:
             icon_name = "text-x-generic"
@@ -364,7 +365,7 @@ class Cell(Gtk.EventBox):
                 pixbuf = icon_theme.load_icon(icon_name, icon_size, 0)
                 return Gtk.Image.new_from_pixbuf(pixbuf)
             except Exception:
-                print("Error loading icon", icon_name)
+                logger.error(f"Error loading icon {icon_name}")
                 return Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.DIALOG)
 
     def on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
@@ -375,7 +376,7 @@ class Cell(Gtk.EventBox):
                     filepath, _ = GLib.filename_from_uri(uris[0])
                     self.store.set(self.index, filepath, 'file')
                 except Exception as e:
-                    print("Error getting file from URI:", e)
+                    logger.error(f"Error getting file from URI: {e}")
         drag_context.finish(True, False, time)
 
     def on_drag_data_get(self, widget, drag_context, data, info, time):
@@ -511,5 +512,5 @@ class Pins(Gtk.Box):
                     filepath, _ = GLib.filename_from_uri(uri)
                     self.store.set(index, filepath, 'file')
                 except Exception as e:
-                    print("Error getting file from URI:", e)
+                    logger.error(f"Error getting file from URI: {e}")
         drag_context.finish(True, False, time)

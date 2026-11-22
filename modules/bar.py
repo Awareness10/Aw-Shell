@@ -11,6 +11,7 @@ from fabric.widgets.datetime import DateTime
 from fabric.widgets.label import Label
 from fabric.widgets.revealer import Revealer
 from gi.repository import Gdk, GLib, Gtk
+from loguru import logger
 
 import modules.icons as icons
 from config.paths import CONFIG_FILE
@@ -328,7 +329,7 @@ class Bar(Window):
                 with open(config_file, "w") as f:
                     json.dump(config, f, indent=4)
             except Exception as e:
-                print(f"Error updating config file: {e}")
+                logger.error(f"Error updating config file: {e}")
         return visible
 
     def on_button_enter(self, widget, event):

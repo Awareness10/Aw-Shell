@@ -1,5 +1,4 @@
 import json
-import logging
 import subprocess
 import threading
 import time
@@ -14,13 +13,13 @@ from fabric.widgets.label import Label
 from fabric.widgets.revealer import Revealer
 from fabric.widgets.scale import Scale
 from gi.repository import GLib
+from loguru import logger
 
 import modules.icons as icons
 from config.shell_settings import settings
 from modules.upower.upower import UPowerManager
 from services.network import NetworkClient
 
-logger = logging.getLogger(__name__)
 
 class MetricsProvider:
     """

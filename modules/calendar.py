@@ -10,6 +10,7 @@ import modules.icons as icons
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk
+from loguru import logger
 
 
 class Calendar(Gtk.Box):
@@ -100,7 +101,7 @@ class Calendar(Gtk.Box):
             # Update the first_weekday on main thread and refresh calendar if needed
             GLib.idle_add(self._update_first_weekday, new_first_weekday)
         except Exception as e:
-            print(f"Error getting locale first weekday: {e}")
+            logger.error(f"Error getting locale first weekday: {e}")
             # Keep default value (0 = Monday)
     
     def _update_first_weekday(self, new_first_weekday):

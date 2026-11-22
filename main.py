@@ -15,6 +15,7 @@ import setproctitle
 from fabric import Application
 from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
+from loguru import logger
 
 from config.legacy import move_legacy_files
 from config.migrate import fix_hyprlock_config, old_install_notice
@@ -69,7 +70,7 @@ if __name__ == "__main__":
     setproctitle.setproctitle(APP_NAME)
     move_legacy_files()  # before any widget reads kanban, pins or history
     for line in fix_hyprlock_config():  # --migrate does it too; AUR installs don't run that
-        print(line)
+        logger.info(line)
     install_tooltip_dedup()
 
     if not os.path.isfile(CONFIG_FILE):
@@ -87,7 +88,7 @@ if __name__ == "__main__":
         try:
             _sp.Popen(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
         except Exception as e:
-            print(f"Error launching updater: {e}")
+            logger.error(f"Error launching updater: {e}")
 
     # Package installs (AUR, Nix) update through their package manager
     if self_updatable():

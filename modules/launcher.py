@@ -20,6 +20,7 @@ from fabric.widgets.image import Image
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GLib
+from loguru import logger
 
 import modules.icons as icons
 import utils.apps as apps
@@ -511,7 +512,7 @@ class AppLauncher(Box):
         self.update_calculator_viewport()
 
     def evaluate_conversion_expression(self, text: str):
-        print(f"Evaluating conversion expression: {text}")
+        logger.debug(f"Evaluating conversion expression: {text}")
         expr = text.lstrip(";").strip()
         if not expr:
             return
@@ -684,7 +685,7 @@ class AppLauncher(Box):
         try:
             subprocess.run(["wl-copy"], input=copy_text.encode(), check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Clipboard copy failed: {e}")
+            logger.error(f"Clipboard copy failed: {e}")
 
     def delete_selected_calc_history(self):
         if self.selected_index != -1 and self.selected_index < len(self.calc_history):

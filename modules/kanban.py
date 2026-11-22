@@ -13,6 +13,7 @@ from config.shell_settings import settings
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gdk, GLib, GObject, Gtk
+from loguru import logger
 
 
 def createSurfaceFromWidget(widget: Gtk.Widget) -> cairo.ImageSurface:
@@ -159,7 +160,7 @@ class KanbanStore(GObject.Object):
         except FileNotFoundError:
             pass
         except Exception as e:
-            print(f"Error loading kanban: {e}")
+            logger.error(f"Error loading kanban: {e}")
 
     def _save(self):
         state = {"columns": [{"title": t, "notes": n} for t, n in self.columns.items()]}
@@ -168,7 +169,7 @@ class KanbanStore(GObject.Object):
             with open(KANBAN_FILE, "w") as f:
                 json.dump(state, f, indent=2)
         except Exception as e:
-            print(f"Error saving kanban: {e}")
+            logger.error(f"Error saving kanban: {e}")
 
 
 _store = None

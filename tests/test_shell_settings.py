@@ -131,7 +131,7 @@ def test_get_default_of_unknown_setting_is_empty_string():
     assert get_default("no_such_setting") == ""
 
 
-def test_read_config_file(monkeypatch, tmp_path, capsys):
+def test_read_config_file(monkeypatch, tmp_path, logs):
     path = tmp_path / "config.json"
     monkeypatch.setattr(shell_settings, "CONFIG_FILE", path)
     assert shell_settings.read_config_file() == {}
@@ -139,4 +139,4 @@ def test_read_config_file(monkeypatch, tmp_path, capsys):
     assert shell_settings.read_config_file() == {"bar_position": "Left"}
     path.write_text("{not json")
     assert shell_settings.read_config_file() == {}
-    assert "Error loading config" in capsys.readouterr().out
+    assert any("Error loading config" in m for m in logs)

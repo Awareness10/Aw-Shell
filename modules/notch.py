@@ -10,6 +10,7 @@ from fabric.widgets.label import Label
 from fabric.widgets.revealer import Revealer
 from fabric.widgets.stack import Stack
 from gi.repository import Gdk, GLib, Gtk, Pango
+from loguru import logger
 
 import utils.apps as apps
 from config.paths import HOSTNAME, USERNAME
@@ -496,7 +497,7 @@ class Notch(Window):
     def open_notch(self, widget_name: str):
         # Debug info for troubleshooting
         if hasattr(self, '_debug_monitor_focus') and self._debug_monitor_focus:
-            print(f"DEBUG: open_notch called on monitor {self.monitor_id} for widget '{widget_name}'")
+            logger.debug(f"open_notch called on monitor {self.monitor_id} for widget '{widget_name}'")
         
         # Handle monitor focus switching - always check real focused monitor from Hyprland
         if self.monitor_manager:
@@ -508,7 +509,7 @@ class Notch(Window):
                 # Update the monitor manager's focused monitor
                 self.monitor_manager._focused_monitor_id = real_focused_monitor_id
                 if hasattr(self, '_debug_monitor_focus') and self._debug_monitor_focus:
-                    print(f"DEBUG: Real focused monitor from Hyprland: {real_focused_monitor_id}")
+                    logger.debug(f"Real focused monitor from Hyprland: {real_focused_monitor_id}")
             
             focused_monitor_id = self.monitor_manager.get_focused_monitor_id()
             focused_notch = self.monitor_manager.get_instance(focused_monitor_id, 'notch')
@@ -726,7 +727,7 @@ class Notch(Window):
                 pixbuf = self.icon_resolver.get_icon_pixbuf(app_id.split("-")[0], size)
             return pixbuf
         except Exception as e:
-            print(f"Error updating window icon: {e}")
+            logger.error(f"Error updating window icon: {e}")
             return None
 
     def _check_occlusion(self):
@@ -778,7 +779,7 @@ class Notch(Window):
             window = hyprland.query("activewindow")
             return window.get("initialClass", "") or window.get("class", "")
         except Exception as e:
-            print(f"Error getting window class: {e}")
+            logger.error(f"Error getting window class: {e}")
         return ""
 
     def on_active_window_changed(self, *args):
@@ -880,7 +881,7 @@ class Notch(Window):
             GLib.timeout_add(50, self._ensure_no_text_selection)
             GLib.timeout_add(100, self._ensure_no_text_selection)
 
-            print(f"Applied buffered text: '{self._typed_chars_buffer}'")
+            logger.debug(f"Applied buffered text: '{self._typed_chars_buffer}'")
 
             self._typed_chars_buffer = ""
 
@@ -927,7 +928,7 @@ class Notch(Window):
             keychar = self._typed_char(event.keyval)
             if keychar:
                 self._typed_chars_buffer += keychar
-                print(
+                logger.debug(
                     f"Buffered character: {keychar}, buffer now: '{self._typed_chars_buffer}'"
                 )
                 return True
@@ -939,7 +940,7 @@ class Notch(Window):
         ):
             keychar = self._typed_char(event.keyval)
             if keychar:
-                print(f"Notch received keypress: {keychar}")
+                logger.debug(f"Notch received keypress: {keychar}")
 
                 self.open_launcher_with_text(keychar)
                 return True

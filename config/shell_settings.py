@@ -16,6 +16,8 @@ import json
 from dataclasses import dataclass, fields
 from typing import Any
 
+from loguru import logger
+
 from .paths import CONFIG_FILE
 from .settings_constants import DEFAULTS
 from .terminal import default_terminal_command
@@ -47,7 +49,7 @@ def read_config_file() -> dict:
             with open(CONFIG_FILE, "r") as f:
                 config = json.load(f)
         except Exception as e:
-            print(f"Error loading config: {e}")
+            logger.error(f"Error loading config: {e}")
     return config
 
 

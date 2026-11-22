@@ -10,6 +10,7 @@ from fabric.widgets.entry import Entry
 from fabric.widgets.label import Label
 from fabric.widgets.stack import Stack
 from gi.repository import Gdk
+from loguru import logger
 
 import modules.icons as icons
 from config.shell_settings import settings
@@ -88,7 +89,7 @@ class EmojiPicker(Box):
     def _load_emoji_data(self):
         emoji_file_path = get_relative_path("../assets/emoji.json")
         if not os.path.exists(emoji_file_path):
-            print(f"Emoji JSON file not found at: {emoji_file_path}")
+            logger.warning(f"Emoji JSON file not found at: {emoji_file_path}")
             return {}
 
         with open(emoji_file_path, 'rb') as f:
@@ -315,4 +316,4 @@ class EmojiPicker(Box):
         try:
             subprocess.run(["wl-copy"], input=emoji_char.encode('utf-8'), check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Clipboard copy failed: {e}")
+            logger.error(f"Clipboard copy failed: {e}")
