@@ -1,14 +1,18 @@
+import http.client
+import json
 import math
 import re
-
-import requests
+from typing import Any
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 # A number with its unit attached, as in "10km"
 _GLUED = re.compile(r"([-+]?(?:\d+\.?\d*|\.\d+))(\D.*)")
 
 
 class Units():
-    def __init__(self):
+    def __init__(self) -> None:
         self.WEIGHT_CHART: dict[str, tuple[float, float]] = {
             "kilogram": (1, 1),
             "kg": (1, 1),
@@ -313,6 +317,43 @@ class ConversionError(ValueError):
     """Why an expression can't be converted, worded for the launcher."""
 
 
+class _NoAnswer(Exception):
+    """The rates service couldn't be reached, or its answer was unreadable."""
+
+
+class _BadJSON(_NoAnswer, ValueError):
+    """The body isn't JSON. Also a ValueError, so a bad floatrates answer
+    still falls back to CoinGecko."""
+
+
+class _Reply:
+    """An HTTP answer: its status code and body."""
+
+    def __init__(self, status_code: int, body: bytes) -> None:
+        self.status_code = status_code
+        self.body = body
+
+    def json(self) -> Any:
+        try:
+            return json.loads(self.body)
+        except ValueError as error:
+            raise _BadJSON(str(error)) from error
+
+
+def _get(url: str, params: dict[str, str] | None = None, timeout: float = 5) -> _Reply:
+    """GET url; any HTTP status is a reply, no answer at all is _NoAnswer."""
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    try:
+        with urlopen(url, timeout=timeout) as resp:
+            return _Reply(resp.status, resp.read())
+    except HTTPError as error:  # 4xx/5xx still answered
+        error.close()
+        return _Reply(error.code, b"")
+    except (OSError, http.client.HTTPException) as error:  # DNS, refused, timeout
+        raise _NoAnswer(str(error)) from error
+
+
 def format_result(value: float) -> str:
     """Two decimals; four significant digits below 1 (0.001538 BTC, not 0.00)."""
     if value == 0 or abs(value) >= 1:
@@ -321,17 +362,19 @@ def format_result(value: float) -> str:
 
 
 class Conversion():
-    def __init__(self):
+    def __init__(self) -> None:
         self.units = Units()
         self._unit_names = {name for chart in vars(self.units).values() for name in chart}
 
-    def convert(self, value: float, from_type: str, to_type: str):
+    def convert(self, value: float, from_type: str, to_type: str) -> float:
         """
         Generalized conversion function que funciona con todas las categorías,
         incluyendo moneda via floatrates.com.
         """
         # Colección de todos los charts no-monedas
-        charts = {
+        # Temperatures map to (to_kelvin, from_kelvin) functions, weights to
+        # (to_kg, from_kg) factors, the rest to one factor
+        charts: dict[str, dict[str, Any]] = {
             "WEIGHT_CHART": self.units.WEIGHT_CHART,
             "LENGTH_CHART": self.units.LENGTH_CHART,
             "TEMPERATURE_CHART": self.units.TEMPERATURE_CHART,
@@ -363,7 +406,8 @@ class Conversion():
                         return value
                     to_kelvin = chart[from_type][0]
                     from_kelvin = chart[to_type][1]
-                    return from_kelvin(to_kelvin(value))
+                    kelvin: float = from_kelvin(to_kelvin(value))
+                    return kelvin
                 
                 # Handle WEIGHT_CHART separately (tuple values)
                 if chart_name == "WEIGHT_CHART":
@@ -371,12 +415,14 @@ class Conversion():
                         return value
                     to_kg = chart[from_type][0]
                     from_kg = chart[to_type][1]
-                    return value * to_kg * from_kg
+                    kg: float = value * to_kg * from_kg
+                    return kg
 
                 # Cualquier otro chart numérico
                 if from_type == to_type:
                     return value
-                return value * (chart[from_type] / chart[to_type])
+                factor: float = chart[from_type] / chart[to_type]
+                return value * factor
 
         # 2) Si ambos son códigos de moneda (p. ej. “USD”, “ARS”)
         #    asumimos que están en mayúsculas y tienen 3 letras.
@@ -395,28 +441,29 @@ class Conversion():
             except ValueError:
                 from_lower, to_lower = from_code.lower(), to_code.lower()
                 prices = self._coingecko_prices(from_lower, to_lower)
-        except requests.RequestException as error:
+        except _NoAnswer as error:
             raise ConversionError("Can't reach the rates service") from error
         if prices.get(from_lower, {}).get(to_lower):
-            return value * prices[from_lower][to_lower]
+            return value * float(prices[from_lower][to_lower])
         if prices.get(to_lower, {}).get(from_lower):  # fiat to crypto
-            return value / prices[to_lower][from_lower]
+            return value / float(prices[to_lower][from_lower])
         raise ConversionError(f"No rate for {from_code.upper()} to {to_code.upper()}")
 
     @staticmethod
-    def _coingecko_prices(*symbols: str) -> dict:
+    def _coingecko_prices(*symbols: str) -> dict[str, dict[str, float]]:
         """{coin: {versus: price}} between the lowercase symbols, in one
         request (the keyless API allows only a few a minute); coins and
         pairs CoinGecko doesn't have are left out."""
         both = ",".join(symbols)
-        resp = requests.get(
+        resp = _get(
             "https://api.coingecko.com/api/v3/simple/price",
             params={"symbols": both, "vs_currencies": both},
             timeout=5,
         )
         if resp.status_code == 429:
             raise ConversionError("CoinGecko rate limit reached, try again in a minute")
-        return resp.json() if resp.status_code == 200 else {}
+        prices: dict[str, dict[str, float]] = resp.json() if resp.status_code == 200 else {}
+        return prices
 
     def _convert_currency_via_floatrates(self, value: float, from_code: str, to_code: str) -> float:
         """
@@ -431,7 +478,7 @@ class Conversion():
             return value
 
         url = f"https://www.floatrates.com/daily/{from_lower}.json"
-        resp = requests.get(url, timeout=5)
+        resp = _get(url, timeout=5)
         if resp.status_code != 200:
             raise ValueError(f"Error al obtener datos de floatrates para {from_code}")
 
@@ -465,7 +512,7 @@ class Conversion():
         match = _GLUED.fullmatch(token)
         return list(match.groups()) if match else [token]
 
-    def parse_input_and_convert(self, input: str):
+    def parse_input_and_convert(self, input: str) -> tuple[float, str]:
         parts = [part for token in input.split() for part in self._split_glued(token)]
         if parts and not self._is_number(parts[0]):
             parts.insert(0, "1")  # "usd to nok" is one dollar
@@ -476,8 +523,8 @@ class Conversion():
             if len(parts) != 6:
                 raise ConversionError("Expected: 1 h and 30 min to s")
             
-            value1, from_type1, value2, from_type2, _, to_type = parts
-            value1, value2 = self._number(value1), self._number(value2)
+            text1, from_type1, text2, from_type2, _, to_type = parts
+            value1, value2 = self._number(text1), self._number(text2)
             from_type1 = self.clean_type(from_type1)
             from_type2 = self.clean_type(from_type2)
             to_type = self.clean_type(to_type)
@@ -485,15 +532,15 @@ class Conversion():
             if from_type1 == from_type2:
                 return self.convert(value1 + value2, from_type1, to_type), to_type + addition
             else:
-                res = 0
+                res = 0.0
                 res += self.convert(value1, from_type1, to_type)
                 res += self.convert(value2, from_type2, to_type)
                 return res, to_type + addition
         else:
             if len(parts) != 4:
                 raise ConversionError("Expected: 10 km to mi")
-            value, from_type, _, to_type = parts
-            value = self._number(value)
+            text, from_type, _, to_type = parts
+            value = self._number(text)
             from_type = self.clean_type(from_type)
             to_type = self.clean_type(to_type)
             return self.convert(value, from_type, to_type), to_type + addition

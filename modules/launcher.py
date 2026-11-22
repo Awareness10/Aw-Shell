@@ -20,20 +20,22 @@ from fabric.widgets.image import Image
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 from gi.repository import Gdk, GLib
+from loguru import logger
 
-import config.data as data
 import modules.icons as icons
 import utils.apps as apps
 from config.paths import (
     APP_DIR,
     CALC_HISTORY,
     CONVERSION_HISTORY,
+    DOCK_FILE,
     ensure_dir,
     self_updatable,
 )
+from config.settings_constants import APP_NAME_CAP
 from modules.dock import Dock
 
-tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"
+tooltip_settings = f"<b>Open {APP_NAME_CAP} Settings</b>"
 # The shell's own interpreter: a bare `python` is the system one, which
 # lacks the settings window's dependencies (PySide6, glaze)
 SETTINGS_COMMAND = shlex.join(
@@ -301,7 +303,7 @@ class AppLauncher(Box):
                     )
                 else:
                     exec_shell_command_async(shlex.join([
-                        "notify-send", data.APP_NAME_CAP,
+                        "notify-send", APP_NAME_CAP,
                         "Updates come from your package manager",
                     ]))
             case ":settings":
@@ -434,7 +436,7 @@ class AppLauncher(Box):
             "icon_name": selected_app.icon_name
         }.items() if v is not None}
 
-        dock_file = data.DOCK_FILE
+        dock_file = DOCK_FILE
         try:
             with open(dock_file, "r") as file:
                 pins = json.load(file)
@@ -490,8 +492,8 @@ class AppLauncher(Box):
 
     @property
     def converter(self):
-        """The unit converter, made on first use: utils.conversion imports
-        requests (~40 ms), which most starts never need."""
+        """The unit converter, made on first use: most starts never need
+        utils.conversion or the HTTP client it imports."""
         if self._converter is None:
             from utils.conversion import Conversion
 
@@ -502,7 +504,6 @@ class AppLauncher(Box):
         expr = text.lstrip("=").strip()
         if not expr:
             return
-        # Loaded here, not with the shell: it imports numpy (~40 ms)
         import utils.calculator as calculator
 
         result_str = calculator.evaluate(expr)
@@ -511,7 +512,6 @@ class AppLauncher(Box):
         self.update_calculator_viewport()
 
     def evaluate_conversion_expression(self, text: str):
-        print(f"Evaluating conversion expression: {text}")
         expr = text.lstrip(";").strip()
         if not expr:
             return
@@ -684,7 +684,7 @@ class AppLauncher(Box):
         try:
             subprocess.run(["wl-copy"], input=copy_text.encode(), check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Clipboard copy failed: {e}")
+            logger.error(f"Clipboard copy failed: {e}")
 
     def delete_selected_calc_history(self):
         if self.selected_index != -1 and self.selected_index < len(self.calc_history):

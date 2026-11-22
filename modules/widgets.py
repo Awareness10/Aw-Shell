@@ -4,14 +4,14 @@ gi.require_version("Gtk", "3.0")
 from fabric.widgets.box import Box
 from fabric.widgets.stack import Stack
 
-import config.data as data
+from config.shell_settings import settings
 from modules.bluetooth import BluetoothConnections
 from modules.buttons import Buttons
 from modules.calendar import Calendar
 from modules.controls import ControlSliders
 from modules.metrics import Metrics
 from modules.network import NetworkConnections
-from modules.notifications import NotificationHistory
+from modules.notification_history_view import NotificationHistory
 from modules.player import Player
 
 
@@ -28,10 +28,7 @@ class Widgets(Box):
         )
 
         vertical_layout = False
-        if data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"]
-            or data.PANEL_POSITION in ["Start", "End"]
-        ):
+        if settings.vertical_panel:
             vertical_layout = True
 
         calendar_view_mode = "week" if vertical_layout else "month"

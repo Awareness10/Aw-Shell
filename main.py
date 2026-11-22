@@ -1,10 +1,6 @@
 # ruff: noqa: E402
 import sys
 
-from utils.typelibs import add_private_typelibs
-
-add_private_typelibs()  # before anything imports gi (see utils/typelibs.py)
-
 if __name__ == "__main__" and sys.argv[1:] == ["--migrate"]:
     # Before the widget imports below: they need a display and Hyprland
     from config.migrate import main as migrate
@@ -19,28 +15,62 @@ import setproctitle
 from fabric import Application
 from fabric.utils import exec_shell_command_async, get_relative_path
 from gi.repository import GLib
+from loguru import logger
 
-from config.data import APP_NAME, CACHE_DIR, CONFIG_FILE, GTK_THEMING
-from config.gtk_theme import apply_gtk_theme
 from config.legacy import move_legacy_files
 from config.migrate import fix_hyprlock_config, old_install_notice
-from config.paths import APP_DIR, USER_DIR, self_updatable
+from config.paths import APP_DIR, CACHE_DIR, CONFIG_FILE, USER_DIR, self_updatable
+from config.settings_constants import APP_NAME
 from config.settings_utils import ensure_current_wallpaper
+from config.shell_settings import settings
 from modules.bar import Bar
 from modules.corners import Corners
 from modules.dock import Dock
 from modules.notch import Notch
 from modules.notifications import NotificationPopup
-from utils.stylesheet import build_stylesheet
+from utils.commands import ShellCommands, install_legacy_aliases
+from utils.global_keybinds import init_global_keybind_objects
+from utils.monitor_manager import get_monitor_manager, select_monitors
 from utils.tooltips import install_tooltip_dedup
 
 fonts_updated_file = f"{CACHE_DIR}/fonts_updated"
+
+
+def build_monitor_components(monitor_id, monitor_manager, corners_visible):
+    """Corners, bar, notch and dock for one monitor, registered with the
+    monitor manager; returns them by name."""
+    corners = Corners(monitor_id=monitor_id)
+    bar = Bar(monitor_id=monitor_id)
+    notch = Notch(monitor_id=monitor_id)
+    dock = Dock(monitor_id=monitor_id)
+
+    # Layer surfaces are per-output, so each monitor needs its own corners
+    corners.set_visible(corners_visible)
+
+    bar.notch = notch
+    notch.bar = bar
+
+    components = {"bar": bar, "notch": notch, "dock": dock, "corners": corners}
+    monitor_manager.register_monitor_instances(monitor_id, components)
+    return components
+
+
+def build_notification_popup(notches, primary_monitor_id):
+    """One notification popup, sharing the main monitor's notch widgets; the
+    first shown monitor stands in if the main one isn't selected. It starts
+    there and follows focus to any shown monitor as notifications arrive."""
+    popup_monitor_id = primary_monitor_id if primary_monitor_id in notches else next(iter(notches))
+    return NotificationPopup(
+        widgets=notches[popup_monitor_id].dashboard.widgets,
+        monitor=popup_monitor_id,
+        follow_focus_monitors=list(notches),
+    )
 
 if __name__ == "__main__":
     setproctitle.setproctitle(APP_NAME)
     move_legacy_files()  # before any widget reads kanban, pins or history
     for line in fix_hyprlock_config():  # --migrate does it too; AUR installs don't run that
-        print(line)
+        logger.info(line)
     install_tooltip_dedup()
 
     if not os.path.isfile(CONFIG_FILE):
@@ -50,11 +80,6 @@ if __name__ == "__main__":
 
     ensure_current_wallpaper()
 
-    # Load configuration
-    from config.data import load_config
-
-    config = load_config()
-
     def _launch_updater(force=False):
         """Launch the PySide6 updater in a separate process."""
         cmd = [sys.executable, "-m", "modules.updater"]
@@ -63,125 +88,52 @@ if __name__ == "__main__":
         try:
             _sp.Popen(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
         except Exception as e:
-            print(f"Error launching updater: {e}")
+            logger.error(f"Error launching updater: {e}")
 
     # Package installs (AUR, Nix) update through their package manager
     if self_updatable():
         GLib.idle_add(_launch_updater)
         GLib.timeout_add(3600000, _launch_updater)
 
-    # Initialize multi-monitor services
-    try:
-        from utils.global_keybinds import init_global_keybind_objects
-        from utils.monitor_manager import get_monitor_manager
-        
-        monitor_manager = get_monitor_manager()
-        init_global_keybind_objects()
-        
-        # Get all available monitors
-        all_monitors = monitor_manager.get_monitors()
-        multi_monitor_enabled = True
-    except ImportError:
-        # Fallback to single monitor mode
-        all_monitors = [{'id': 0, 'name': 'default'}]
-        monitor_manager = None
-        multi_monitor_enabled = False
-    
-    # Filter monitors based on selected_monitors configuration
-    selected_monitors_config = config.get("selected_monitors", [])
-    
-    # If selected_monitors is empty, show on all monitors (current behavior)
-    if not selected_monitors_config:
-        monitors = all_monitors
-        print("Aw-Shell: No specific monitors selected, showing on all monitors")
-    else:
-        # Filter monitors to only include selected ones
-        monitors = []
-        selected_monitor_names = set(selected_monitors_config)
-        
-        for monitor in all_monitors:
-            monitor_name = monitor.get('name', f'monitor-{monitor.get("id", 0)}')
-            if monitor_name in selected_monitor_names:
-                monitors.append(monitor)
-                print(f"Aw-Shell: Including monitor '{monitor_name}' (selected)")
-            else:
-                print(f"Aw-Shell: Excluding monitor '{monitor_name}' (not selected)")
-        
-        # Fallback: if no valid monitors found, use all monitors
-        if not monitors:
-            print("Aw-Shell: No valid selected monitors found, falling back to all monitors")
-            monitors = all_monitors
-    
-    # Create application components list
-    app_components = []
-    notches = {}
+    # Multi-monitor services
+    monitor_manager = get_monitor_manager()
+    init_global_keybind_objects()
+    monitors = select_monitors(monitor_manager.get_monitors(), settings.selected_monitors)
 
     # The main monitor holds workspace 1; notifications start there
-    primary_monitor_id = monitor_manager.get_primary_monitor_id() if monitor_manager else 0
-    
-    # Create components for each monitor
+    primary_monitor_id = monitor_manager.get_primary_monitor_id()
+
+    app_components = []
+    notches = {}
     for monitor in monitors:
-        monitor_id = monitor['id']
-        
-        # Create monitor-specific components
-        if multi_monitor_enabled:
-            corners = Corners(monitor_id=monitor_id)
-            bar = Bar(monitor_id=monitor_id)
-            notch = Notch(monitor_id=monitor_id)
-            dock = Dock(monitor_id=monitor_id)
-        else:
-            # Single monitor fallback
-            corners = Corners()
-            bar = Bar()
-            notch = Notch()
-            dock = Dock()
+        components = build_monitor_components(
+            monitor["id"], monitor_manager, settings.corners_visible)
+        app_components.extend(components[name] for name in ("corners", "bar", "notch", "dock"))
+        notches[monitor["id"]] = components["notch"]
 
-        # Layer surfaces are per-output, so each monitor needs its own corners
-        corners.set_visible(config.get("corners_visible", True))
-        app_components.append(corners)
-        
-        # Connect bar and notch
-        bar.notch = notch
-        notch.bar = bar
-        
-        notches[monitor_id] = notch
+    # The last monitor's notch, as before: older configs' `notch.open_notch(...)`
+    # binds use it (open_notch moves to the focused monitor's notch itself)
+    notch = components["notch"]
 
-        # Register instances in monitor manager if available
-        if multi_monitor_enabled and monitor_manager:
-            monitor_manager.register_monitor_instances(monitor_id, {
-                'bar': bar,
-                'notch': notch,
-                'dock': dock,
-                'corners': corners
-            })
-        
-        # Add components to app list
-        app_components.extend([bar, notch, dock])
-
-    # One notification popup, sharing the main monitor's notch widgets; the
-    # first shown monitor stands in if the main one isn't selected. It starts
-    # there and follows focus to any shown monitor as notifications arrive
-    popup_monitor_id = primary_monitor_id if primary_monitor_id in notches else next(iter(notches))
-    app_components.append(NotificationPopup(
-        widgets=notches[popup_monitor_id].dashboard.widgets,
-        monitor=popup_monitor_id if multi_monitor_enabled else None,
-        follow_focus_monitors=list(notches) if multi_monitor_enabled else None,
-    ))
+    app_components.append(build_notification_popup(notches, primary_monitor_id))
 
     # Create the application with all components
     app = Application(f"{APP_NAME}", *app_components)
 
-    def set_css():
-        app.set_stylesheet_from_string(build_stylesheet(), base_path=str(APP_DIR))
+    # `fabric-cli exec aw-shell 'shell.<command>()'` (keybinds, matugen
+    # post_hooks) runs in this module's namespace; see utils/commands.py
+    shell = ShellCommands(app, notch)
 
-    app.set_css = set_css
+    # Older generated aw-shell.lua / matugen configs call `app.set_css()`,
+    # `app.apply_gtk_theme()` and `notch....`, so `app` and `notch` stay
+    # module globals too
+    install_legacy_aliases(app, shell)
 
-    app.set_css()
+    shell.reload_css()
 
     # GTK apps in the shell's colors (or put the user's files back when off);
     # matugen's post_hook calls it again after a wallpaper change
-    app.apply_gtk_theme = lambda: apply_gtk_theme(GTK_THEMING)
-    app.apply_gtk_theme()
+    shell.apply_gtk_theme()
 
     # Package installs: point users with an old clone at --migrate, once the
     # shell's notification server is up

@@ -2,7 +2,6 @@
 
 import json
 import os
-from types import SimpleNamespace
 
 import pytest
 from conftest import pump_until
@@ -113,7 +112,8 @@ def test_double_click_opens_file(sandbox, board, tmp_path):
     before = len(sandbox.commands())
     _press(cell, 1)  # a single click does nothing
     _press(cell, 1, double=True)
-    assert pump_until(lambda: sandbox.commands()[before:] == [f"xdg-open {document}"])
+    assert pump_until(lambda: [c for c in sandbox.commands()[before:] if c.startswith("xdg-open")]
+                      == [f"xdg-open {document}"])
 
 
 def test_right_click_clears_pin(board, save_file):
@@ -130,7 +130,8 @@ def test_click_on_text_copies_it(sandbox, board):
     before = len(sandbox.commands())
     _press(cell, 1)
     assert _clipboard().wait_for_text() == "ssh me@host"
-    assert sandbox.commands()[before:] == []
+    # only xdg-open matters; the metrics widget's GPU poll may run meanwhile
+    assert not [c for c in sandbox.commands()[before:] if "xdg-open" in c]
 
 
 def test_click_on_url_copies_and_opens(sandbox, board, no_favicon_download):
@@ -140,7 +141,7 @@ def test_click_on_url_copies_and_opens(sandbox, board, no_favicon_download):
     before = len(sandbox.commands())
     _press(cell, 1)
     assert _clipboard().wait_for_text() == "https://example.com/docs"
-    assert pump_until(lambda: sandbox.commands()[before:] == ["xdg-open https://example.com/docs"])
+    assert pump_until(lambda: "xdg-open https://example.com/docs" in sandbox.commands()[before:])
 
 
 def test_ctrl_click_on_url_only_copies(sandbox, board):
@@ -150,7 +151,8 @@ def test_ctrl_click_on_url_only_copies(sandbox, board):
     _press(cell, 1, state=Gdk.ModifierType.CONTROL_MASK)
     assert _clipboard().wait_for_text() == "https://example.com"
     pump_until(lambda: False, timeout=0.3)  # give a wrongly spawned xdg-open time to log
-    assert sandbox.commands()[before:] == []
+    # only xdg-open matters; the metrics widget's GPU poll may run meanwhile
+    assert not [c for c in sandbox.commands()[before:] if "xdg-open" in c]
 
 
 class _FakeNotch(Gtk.Window):
@@ -239,8 +241,9 @@ def test_deleted_file_is_unpinned_on_every_board(board, tmp_path):
     document.write_text("hi")
     first, second = board(), board()
     _pin(first.cells[0], str(document), "file")
-    first.store.on_file_event(SimpleNamespace(event_type="deleted", src_path=str(document)))
-    assert first.cells[0].content is None and second.cells[0].content is None
+    document.unlink()
+    assert pump_until(lambda: first.cells[0].content is None)
+    assert second.cells[0].content is None
 
 
 def test_moved_file_stays_pinned_at_its_new_path(board, save_file, tmp_path):
@@ -249,11 +252,28 @@ def test_moved_file_stays_pinned_at_its_new_path(board, save_file, tmp_path):
     widget = board()
     _pin(widget.cells[0], str(old), "file")
     old.rename(new)
-    widget.store.on_file_event(
-        SimpleNamespace(event_type="moved", src_path=str(old), dest_path=str(new))
-    )
-    assert widget.cells[0].content == str(new)
+    assert pump_until(lambda: widget.cells[0].content == str(new))
     assert json.loads(save_file.read_text())[0]["content"] == str(new)
+
+
+def test_file_moved_to_another_folder_is_unpinned(board, tmp_path):
+    (tmp_path / "elsewhere").mkdir()
+    document = tmp_path / "leaving.txt"
+    document.write_text("hi")
+    widget = board()
+    _pin(widget.cells[0], str(document), "file")
+    document.rename(tmp_path / "elsewhere" / "leaving.txt")
+    assert pump_until(lambda: widget.cells[0].content is None)
+
+
+def test_stopped_store_no_longer_follows_files(board, tmp_path):
+    document = tmp_path / "kept.txt"
+    document.write_text("hi")
+    widget = board()
+    _pin(widget.cells[0], str(document), "file")
+    widget.store.stop()
+    document.unlink()
+    assert not pump_until(lambda: widget.cells[0].content is None, timeout=0.5)
 
 
 def test_a_closed_board_stops_listening(board, run_pending):
@@ -295,3 +315,19 @@ def test_favicon_download_reports_the_saved_file(monkeypatch):
     assert fetched == ["https://example.org/favicon.ico"]
     assert results[0].endswith(".ico")
     os.remove(results[0])
+
+
+@pytest.mark.parametrize("panel_theme", ["Notch", "Panel"])
+@pytest.mark.parametrize("bar_position", ["Top", "Bottom", "Left", "Right"])
+@pytest.mark.parametrize("panel_position", ["Start", "Center", "End"])
+def test_icon_size_follows_the_grid(panel_theme, bar_position, panel_position):
+    """Small icons exactly when the grid has the side panel's 3 columns. A
+    Start/End position left over from the Panel theme used to shrink them
+    under the Notch theme too."""
+    from config.shell_settings import Settings
+
+    s = Settings.from_config({"panel_theme": panel_theme, "bar_position": bar_position,
+                              "panel_position": panel_position})
+    side_panel = panel_theme == "Panel" and (
+        bar_position in ("Left", "Right") or panel_position in ("Start", "End"))
+    assert pins._icon_size(s) == (36 if side_panel else 80)

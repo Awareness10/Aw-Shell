@@ -10,6 +10,7 @@ from pathlib import Path
 from loguru import logger
 
 from . import paths
+from .settings_constants import APP_NAME
 
 LEGACY_FILES: list[tuple[Path, Path]] = [
     (Path.home() / ".kanban.json", paths.KANBAN_FILE),
@@ -17,7 +18,7 @@ LEGACY_FILES: list[tuple[Path, Path]] = [
     (paths.CACHE_DIR / "calc.json", paths.CALC_HISTORY),
     (paths.CACHE_DIR / "conversion.json", paths.CONVERSION_HISTORY),
     # In the shared /tmp before; the cached images it lists stay valid until reboot
-    (Path("/tmp") / paths.APP_NAME / "notifications" / "notification_history.json",
+    (Path("/tmp") / APP_NAME / "notifications" / "notification_history.json",
      paths.NOTIFICATION_HISTORY),
 ]
 

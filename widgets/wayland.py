@@ -16,10 +16,10 @@ gi.require_version("Gtk", "3.0")
 try:
     gi.require_version("GtkLayerShell", "0.1")
     from gi.repository import GtkLayerShell
-except:
+except Exception as e:
     raise ImportError(
         "looks like we don't have gtk-layer-shell installed, make sure to install it first (as well as using wayland)"
-    )
+    ) from e
 
 
 class WaylandWindowExclusivity(Enum):

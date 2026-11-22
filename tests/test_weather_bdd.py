@@ -10,12 +10,6 @@ import sys
 import types
 from unittest.mock import patch
 
-# Ensure config.data has VERTICAL attr (conftest mocks may not include it)
-import config.data as _data
-
-if not hasattr(_data, "VERTICAL"):
-    _data.VERTICAL = False
-
 # ── Extra fabric.widgets mocks needed by modules/weather.py ──
 _widgets = types.ModuleType("fabric.widgets")
 _button_mod = types.ModuleType("fabric.widgets.button")

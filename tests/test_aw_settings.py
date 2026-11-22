@@ -499,7 +499,7 @@ class TestReloadWidgets:
         settings._reload_widgets()
 
         # Find the restart keybind entry
-        for prefix_key, suffix_key, prefix_entry, suffix_entry in settings.keybind_entries:
+        for prefix_key, _suffix_key, prefix_entry, suffix_entry in settings.keybind_entries:
             if prefix_key == "prefix_restart":
                 assert prefix_entry.text() == "CTRL ALT"
                 assert suffix_entry.text() == "R"

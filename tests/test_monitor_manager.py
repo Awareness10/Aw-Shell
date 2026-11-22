@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from utils.monitor_manager import MonitorManager, Signal, get_monitor_manager
+from utils.monitor_manager import MonitorManager, Signal, get_monitor_manager, select_monitors
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -290,7 +290,7 @@ class TestMonitorManagerSignalClass:
         sig.emit(42)
         assert results == [42]
 
-    def test_error_doesnt_stop_others(self, capsys):
+    def test_error_doesnt_stop_others(self, logs):
         sig = Signal()
         results = []
 
@@ -301,7 +301,7 @@ class TestMonitorManagerSignalClass:
         sig.connect(lambda: results.append("ok"))
         sig.emit()
         assert results == ["ok"]
-        assert "Error in signal callback" in capsys.readouterr().out
+        assert any("Error in signal callback" in m for m in logs)
 
 
 # =========================================================================
@@ -665,3 +665,30 @@ class TestQueryFocusedMonitor:
     def test_hyprctl_failure(self):
         mgr = _make_manager(LATE_MAIN_MONITORS, GDK_PLUG_NAMES)
         assert self._query(mgr, error=FileNotFoundError) is None
+
+
+# ── select_monitors ───────────────────────────────────────────────────
+
+ALL = [{"id": 0, "name": "HDMI-A-1"}, {"id": 1, "name": "DP-3"}, {"id": 2}]
+
+
+@pytest.mark.parametrize("selected", [[], None])
+def test_select_monitors_empty_selection_shows_all(selected, logs):
+    assert select_monitors(ALL, selected) is ALL
+    assert any("No specific monitors selected" in m for m in logs)
+
+
+def test_select_monitors_keeps_selected_in_monitor_order(logs):
+    assert select_monitors(ALL, ["DP-3", "HDMI-A-1"]) == ALL[:2]
+    out = "\n".join(logs)
+    assert "Including monitor 'HDMI-A-1' (selected)" in out
+    assert "Excluding monitor 'monitor-2' (not selected)" in out
+
+
+def test_select_monitors_unnamed_monitor_matches_fallback_name():
+    assert select_monitors(ALL, ["monitor-2"]) == [ALL[2]]
+
+
+def test_select_monitors_none_existing_falls_back_to_all(logs):
+    assert select_monitors(ALL, ["DP-9"]) is ALL
+    assert any("falling back to all monitors" in m for m in logs)

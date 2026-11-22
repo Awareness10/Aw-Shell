@@ -37,10 +37,10 @@ echo "==> Bundled libraries load (with the launcher's paths)"
 eval "$(grep '^export ' /usr/bin/aw-shell)"
 python - <<'PY'
 import gi
-gi.require_version("Gray", "0.1")
-from gi.repository import Gray  # bundled, built by the PKGBUILD
+gi.require_version("DbusmenuGtk3", "0.4")
+from gi.repository import DbusmenuGtk3  # tray menus (libdbusmenu-gtk3)
 import fabric.widgets.wayland, glaze  # bundled, PyGObject 3.51+ fix included
-print("OK: Gray", Gray.Watcher.__gtype__, "| glaze", glaze.__version__, "| fabric", fabric.__file__)
+print("OK: DbusmenuGtk3", DbusmenuGtk3.Menu.__gtype__, "| glaze", glaze.__version__, "| fabric", fabric.__file__)
 PY
 
 echo "==> aw-shell --migrate on a fresh home"

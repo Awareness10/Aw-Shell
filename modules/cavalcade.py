@@ -257,7 +257,7 @@ class Spectrum:
         dx = 3
 
         center_y = self.sizes.area.height / 2  # center vertical of the drawing area
-        for i, value in enumerate(self.audio_sample):
+        for _i, value in enumerate(self.audio_sample):
             width = self.sizes.area.width / self.sizes.number - self.sizes.padding
             radius = width / 2
             height = max(self.sizes.bar.height * min(value, 1), self.sizes.zero) / 2

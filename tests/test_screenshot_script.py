@@ -9,7 +9,6 @@ check delay) so the script can't rely on hyprshot having finished.
 import os
 import shutil
 import subprocess
-import time
 from pathlib import Path
 
 import pytest

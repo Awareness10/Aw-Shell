@@ -25,6 +25,14 @@ def _xdg_dir(var: str, fallback: str) -> Path:
 
 APP_DIR = Path(__file__).resolve().parent.parent
 
+HOME_DIR = Path.home()
+FACE_ICON = HOME_DIR / ".face.icon"
+try:
+    USERNAME = os.getlogin()
+except OSError:
+    USERNAME = os.environ.get("USER", "unknown")
+HOSTNAME = os.uname().nodename
+
 CONFIG_HOME = _xdg_dir("XDG_CONFIG_HOME", ".config")
 USER_DIR = CONFIG_HOME / APP_NAME
 CACHE_DIR = _xdg_dir("XDG_CACHE_HOME", ".cache") / APP_NAME

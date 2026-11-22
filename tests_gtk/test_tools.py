@@ -117,3 +117,11 @@ def test_emoji_opens_picker_in_notch(toolbox, run):
     toolbox.btn_emoji.clicked()
     toolbox.notch.open_notch.assert_called_once_with("emoji")
     assert run == []
+
+
+def test_gamemode_button_is_highlighted_while_active(toolbox):
+    style = toolbox.btn_gamemode.get_style_context()
+    toolbox._update_gamemode_ui(True)
+    assert style.has_class("gamemode")
+    toolbox._update_gamemode_ui(False)
+    assert not style.has_class("gamemode")

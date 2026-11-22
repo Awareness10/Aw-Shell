@@ -4,33 +4,31 @@ import re
 import shlex
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
-import toml
 from fabric.utils.helpers import exec_shell_command_async
 
-from . import terminal
-from .data import (
+from . import terminal, toml_writer
+from .paths import (
+    APP_DIR,
     AW_CONFIG_DIR,
-    CONFIG_DIR,
     CONFIG_FILE,
+    CSS_COLORS,
     DEFAULT_FACE_ICON,
     DEFAULT_WALLPAPER,
     FACE_ICON,
     HOME_DIR,
-    USERNAME,
-    get_default,
-)
-from .paths import (
-    APP_DIR,
-    CSS_COLORS,
     HYPR_DIR,
     HYPRLOCK_TEMPLATE,
     MATUGEN_TEMPLATES,
     SCRIPTS_DIR,
+    USERNAME,
     launch_command,
 )
+from .paths import CONFIG_HOME as CONFIG_DIR  # $XDG_CONFIG_HOME: hypr, matugen
 from .settings_constants import APP_NAME, APP_NAME_CAP, DEFAULTS  # noqa: E402
+from .shell_settings import get_default
 
 CURRENT_WALL = HOME_DIR / ".current.wall"
 HYPR_COLORS = HYPR_DIR / "colors.conf"
@@ -100,10 +98,12 @@ def get_available_monitors() -> list:
     return [{"id": 0, "name": "default"}]
 
 
-# A dofile() of aw-shell.lua, however the path is written (a literal, or
-# os.getenv("HOME") .. "..."); not one that's commented out
-_AW_LUA_DOFILE = re.compile(
-    rf"""^[ \t]*dofile\b.*/{re.escape(APP_NAME)}/config/hypr/{re.escape(APP_NAME)}\.lua["']""",
+# hyprland.lua loading aw-shell.lua, not commented out: a require() of the
+# module (the current way), or a dofile() of its path, however the path is
+# written (configs from before the switch to require())
+_AW_LUA_LOAD = re.compile(
+    rf"""^[ \t]*(?:local\b.*=\s*)?require\s*\(?\s*["']{re.escape(APP_NAME)}["']"""
+    rf"""|^[ \t]*dofile\b.*/{re.escape(APP_NAME)}/config/hypr/{re.escape(APP_NAME)}\.lua["']""",
     re.MULTILINE,
 )
 
@@ -112,21 +112,30 @@ def lua_str(s: str) -> str:
     return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def aw_lua_dofile(aw_lua: Path, home: Path | None = None) -> str:
-    """The line hyprland.lua loads aw-shell.lua with: from $HOME when it's in
-    there, so the user's config has no user name in it."""
+def aw_lua_require(aw_lua: Path, home: Path | None = None) -> str:
+    """The lines hyprland.lua loads aw-shell.lua with: its folder appended to
+    package.path (appended, so its colors.lua can't shadow a user's module),
+    then require(), the way Hyprland's example config splits files. The
+    folder is from $HOME when it's in there, so the user's config has no
+    user name in it."""
     home = Path.home() if home is None else home
+    pattern = aw_lua.parent / "?.lua"
     try:
-        relative = aw_lua.relative_to(home)
+        relative = pattern.relative_to(home)
     except ValueError:
-        return f"dofile({lua_str(aw_lua)})"
-    return f'dofile(os.getenv("HOME") .. {lua_str("/" + relative.as_posix())})'
+        search = lua_str(pattern.as_posix())
+    else:
+        search = f'os.getenv("HOME") .. {lua_str("/" + relative.as_posix())}'
+    return (
+        f'package.path = package.path .. ";" .. {search}\n'
+        f"require({lua_str(aw_lua.stem)})"
+    )
 
 
 def loads_aw_lua(hyprland_lua: str) -> bool:
     """Whether hyprland.lua already loads aw-shell.lua. A second load doubles
     every shell bind, and toggle binds then cancel themselves out."""
-    return bool(_AW_LUA_DOFILE.search(hyprland_lua))
+    return bool(_AW_LUA_LOAD.search(hyprland_lua))
 
 
 def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) -> None:
@@ -162,7 +171,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
 
     if get_bind_var("auto_append_hyprland"):
         hypr_path = CONFIG_DIR / "hypr" / "hyprland.lua"
-        dofile_string = aw_lua_dofile(AW_CONFIG_DIR / "hypr" / f"{APP_NAME}.lua")
+        load_lines = aw_lua_require(AW_CONFIG_DIR / "hypr" / f"{APP_NAME}.lua")
         try:
             needs_append = True
             if hypr_path.exists():
@@ -172,7 +181,7 @@ def apply_and_restart(replace_lock: bool = False, replace_idle: bool = False) ->
                 hypr_path.parent.mkdir(parents=True, exist_ok=True)
             if needs_append:
                 with open(hypr_path, "a") as f:
-                    f.write("\n" + dofile_string + "\n")
+                    f.write("\n" + load_lines + "\n")
         except Exception as e:
             print(f"Error updating hyprland.lua: {e}")
 
@@ -270,12 +279,12 @@ def ensure_matugen_config(generate: bool = True):
                 "input_path": f"{MATUGEN_TEMPLATES}/colors.json",
                 "output_path": f"{str(AW_CONFIG_DIR)}/colors.json",
                 # GTK apps follow it too, when the gtk_theming setting is on
-                "post_hook": f"fabric-cli exec {APP_NAME} 'app.apply_gtk_theme()' &",
+                "post_hook": f"fabric-cli exec {APP_NAME} 'shell.apply_gtk_theme()' &",
             },
             f"{APP_NAME}": {
                 "input_path": f"{MATUGEN_TEMPLATES}/{APP_NAME}.css",
                 "output_path": str(CSS_COLORS),
-                "post_hook": f"fabric-cli exec {APP_NAME} 'app.set_css()' &",
+                "post_hook": f"fabric-cli exec {APP_NAME} 'shell.reload_css()' &",
             },
         },
     }
@@ -286,10 +295,10 @@ def ensure_matugen_config(generate: bool = True):
     existing_config = {}
     if os.path.exists(config_path):
         try:
-            with open(config_path, "r") as f:
-                existing_config = toml.load(f)
+            with open(config_path, "rb") as f:
+                existing_config = tomllib.load(f)
             shutil.copyfile(config_path, config_path + ".bak")
-        except toml.TomlDecodeError:
+        except tomllib.TOMLDecodeError:
             print(
                 f"Warning: Could not decode TOML from {config_path}. A new default config will be created."
             )
@@ -310,8 +319,9 @@ def ensure_matugen_config(generate: bool = True):
     )  # existing_config se modifica in-place
 
     try:
+        text = toml_writer.dumps(merged_config)  # before opening: a failure keeps the file
         with open(config_path, "w") as f:
-            toml.dump(merged_config, f)
+            f.write(text)
     except Exception as e:
         print(f"Error writing matugen config to {config_path}: {e}")
 
@@ -398,32 +408,29 @@ def generate_hyprlua() -> str:
             return None
         return f'hl.bind({lua_str(mods_and_key(prefix_key, suffix_key))}, {dispatcher}) -- {comment}'
 
-    def notch_bind(prefix_key: str, suffix_key: str, expr: str, comment: str) -> str | None:
+    def shell_bind(prefix_key: str, suffix_key: str, expr: str, comment: str) -> str | None:
         cmd = "fabricSend .. " + lua_str(f" '{expr}'")
         return bind(prefix_key, suffix_key, f"hl.dsp.exec_cmd({cmd})", comment)
 
-    notch_binds = [
-        ("prefix_dash", "suffix_dash", 'notch.open_notch("dashboard")', "Dashboard"),
-        ("prefix_bluetooth", "suffix_bluetooth", 'notch.open_notch("bluetooth")', "Bluetooth"),
-        ("prefix_pins", "suffix_pins", 'notch.open_notch("pins")', "Pins"),
-        ("prefix_kanban", "suffix_kanban", 'notch.open_notch("kanban")', "Kanban"),
-        ("prefix_launcher", "suffix_launcher", 'notch.open_notch("launcher")', "App Launcher"),
-        ("prefix_tmux", "suffix_tmux", 'notch.open_notch("tmux")', "Tmux"),
-        ("prefix_cliphist", "suffix_cliphist", 'notch.open_notch("cliphist")', "Clipboard History"),
-        ("prefix_toolbox", "suffix_toolbox", 'notch.open_notch("tools")', "Toolbox"),
-        ("prefix_overview", "suffix_overview", 'notch.open_notch("overview")', "Overview"),
-        ("prefix_wallpapers", "suffix_wallpapers", 'notch.open_notch("wallpapers")', "Wallpapers"),
-        ("prefix_randwall", "suffix_randwall",
-         'notch.dashboard.wallpapers.set_random_wallpaper(None, external=True)', "Random Wallpaper"),
-        ("prefix_mixer", "suffix_mixer", 'notch.open_notch("mixer")', "Audio Mixer"),
-        ("prefix_emoji", "suffix_emoji", 'notch.open_notch("emoji")', "Emoji Picker"),
-        ("prefix_power", "suffix_power", 'notch.open_notch("power")', "Power Menu"),
-        ("prefix_caffeine", "suffix_caffeine",
-         "notch.dashboard.widgets.buttons.caffeine_button.toggle_inhibit(external=True)", "Toggle Caffeine"),
-        ("prefix_toggle", "suffix_toggle",
-         "from utils.global_keybinds import get_global_keybind_handler; get_global_keybind_handler().toggle_bar()",
-         "Toggle Bar"),
-        ("prefix_css", "suffix_css", "app.set_css()", "Reload CSS"),
+    # `shell` is the command facade in the running shell (utils/commands.py)
+    shell_binds = [
+        ("prefix_dash", "suffix_dash", 'shell.open("dashboard")', "Dashboard"),
+        ("prefix_bluetooth", "suffix_bluetooth", 'shell.open("bluetooth")', "Bluetooth"),
+        ("prefix_pins", "suffix_pins", 'shell.open("pins")', "Pins"),
+        ("prefix_kanban", "suffix_kanban", 'shell.open("kanban")', "Kanban"),
+        ("prefix_launcher", "suffix_launcher", 'shell.open("launcher")', "App Launcher"),
+        ("prefix_tmux", "suffix_tmux", 'shell.open("tmux")', "Tmux"),
+        ("prefix_cliphist", "suffix_cliphist", 'shell.open("cliphist")', "Clipboard History"),
+        ("prefix_toolbox", "suffix_toolbox", 'shell.open("tools")', "Toolbox"),
+        ("prefix_overview", "suffix_overview", 'shell.open("overview")', "Overview"),
+        ("prefix_wallpapers", "suffix_wallpapers", 'shell.open("wallpapers")', "Wallpapers"),
+        ("prefix_randwall", "suffix_randwall", "shell.random_wallpaper()", "Random Wallpaper"),
+        ("prefix_mixer", "suffix_mixer", 'shell.open("mixer")', "Audio Mixer"),
+        ("prefix_emoji", "suffix_emoji", 'shell.open("emoji")', "Emoji Picker"),
+        ("prefix_power", "suffix_power", 'shell.open("power")', "Power Menu"),
+        ("prefix_caffeine", "suffix_caffeine", "shell.toggle_caffeine()", "Toggle Caffeine"),
+        ("prefix_toggle", "suffix_toggle", "shell.toggle_bar()", "Toggle Bar"),
+        ("prefix_css", "suffix_css", "shell.reload_css()", "Reload CSS"),
     ]
 
     bind_lines = [
@@ -432,7 +439,7 @@ def generate_hyprlua() -> str:
              f"Reload {APP_NAME_CAP}"),
         bind("prefix_axmsg", "suffix_axmsg", "hl.dsp.exec_cmd(axMessage)", "Message"),
     ]
-    bind_lines += [notch_bind(*spec) for spec in notch_binds]
+    bind_lines += [shell_bind(*spec) for spec in shell_binds]
     bind_lines.append(
         bind("prefix_restart_inspector", "suffix_restart_inspector",
              'hl.dsp.exec_cmd('

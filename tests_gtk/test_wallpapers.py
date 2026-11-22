@@ -72,14 +72,14 @@ def test_loads_every_wallpaper_and_normalises_names(run_pending, monkeypatch, tm
     first rename."""
     from PIL import Image
 
-    import config.data as data
+    from config.shell_settings import settings
     from modules.wallpapers import WallpaperSelector
 
     walls = tmp_path / "walls"
     walls.mkdir()
     for name in ("Big Sky.jpg", "Night City.PNG", "forest.jpg"):
         Image.new("RGB", (8, 8), "teal").save(walls / name, format="PNG")
-    monkeypatch.setattr(data, "WALLPAPERS_DIR", str(walls))
+    monkeypatch.setattr(settings, "wallpapers_dir", str(walls))
     monkeypatch.setattr(WallpaperSelector, "CACHE_DIR", str(tmp_path / "thumbs"))
 
     selector = WallpaperSelector()

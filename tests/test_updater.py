@@ -213,13 +213,13 @@ class TestConnectivity:
 
 def _changelog_text(window):
     from PySide6.QtWidgets import QLabel
-    return "\n".join(l.text() for l in window.changelog_widget.findChildren(QLabel))
+    return "\n".join(lbl.text() for lbl in window.changelog_widget.findChildren(QLabel))
 
 
 def _headers(window):
     from PySide6.QtWidgets import QLabel
-    return {l.text(): l.objectName() for l in window.changelog_widget.findChildren(QLabel)
-            if l.objectName().startswith("releaseHeader")}
+    return {lbl.text(): lbl.objectName() for lbl in window.changelog_widget.findChildren(QLabel)
+            if lbl.objectName().startswith("releaseHeader")}
 
 
 RELEASES = [
@@ -270,11 +270,11 @@ class TestChangeRows:
         from modules.updater import UpdaterWindow
         win = UpdaterWindow(latest_version="1.2.6", releases=RELEASES,
                             pkg_update=False, current_version="1.2.4")
-        tags = {l.text(): l.objectName() for l in win.changelog_widget.findChildren(QLabel)
-                if l.objectName().startswith("changeTag")}
+        tags = {lbl.text(): lbl.objectName() for lbl in win.changelog_widget.findChildren(QLabel)
+                if lbl.objectName().startswith("changeTag")}
         assert tags == {"feat": "changeTag_feat", "fix": "changeTag_fix"}
-        texts = [l.text() for l in win.changelog_widget.findChildren(QLabel)
-                 if l.objectName() == "changeText"]
+        texts = [lbl.text() for lbl in win.changelog_widget.findChildren(QLabel)
+                 if lbl.objectName() == "changeText"]
         assert texts == ["Newest", "Middle", "Installed"]
         win.close()
 
@@ -376,9 +376,9 @@ class TestPackageUpdateInTerminal:
         assert window.update_btn.isEnabled()
 
     def test_terminal_command_falls_back_when_configured_one_is_missing(self, monkeypatch):
-        import config.data
+        from config.shell_settings import settings
         from modules.updater import _terminal_command
-        monkeypatch.setattr(config.data, "TERMINAL_COMMAND", "missing-term -e")
+        monkeypatch.setattr(settings, "terminal_command", "missing-term -e")
         monkeypatch.setattr("modules.updater.shutil.which", lambda name: None)
         assert _terminal_command() == "kitty -e"  # conftest pins the fallback
 

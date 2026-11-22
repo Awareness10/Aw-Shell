@@ -1,3 +1,6 @@
+from loguru import logger
+
+
 class GlobalKeybindHandler:
     """Handler for global keybinds that act on every monitor (see the
     "Toggle Bar" bind in config/settings_utils.py)."""
@@ -45,27 +48,21 @@ class GlobalKeybindHandler:
                         # Bar is being shown - restore from occlusion
                         notch.restore_from_occlusion()
                         # Also restore docks on all monitors
-                        try:
-                            from modules.dock import Dock
-                            for dock_instance in Dock._instances:
-                                if hasattr(dock_instance, 'restore_from_occlusion'):
-                                    dock_instance.restore_from_occlusion()
-                        except ImportError:
-                            pass
+                        from modules.dock import Dock
+                        for dock_instance in Dock._instances:
+                            if hasattr(dock_instance, 'restore_from_occlusion'):
+                                dock_instance.restore_from_occlusion()
                     else:
                         # Bar is being hidden - force occlusion
                         notch.force_occlusion()
                         # Also force occlusion on docks on all monitors
-                        try:
-                            from modules.dock import Dock
-                            for dock_instance in Dock._instances:
-                                if hasattr(dock_instance, 'force_occlusion'):
-                                    dock_instance.force_occlusion()
-                        except ImportError:
-                            pass
+                        from modules.dock import Dock
+                        for dock_instance in Dock._instances:
+                            if hasattr(dock_instance, 'force_occlusion'):
+                                dock_instance.force_occlusion()
                     
                 except Exception as e:
-                    print(f"GlobalKeybindHandler: Error toggling bar: {e}")
+                    logger.error(f"GlobalKeybindHandler: Error toggling bar: {e}")
                     return False
         
         return True
@@ -83,14 +80,8 @@ def get_global_keybind_handler() -> GlobalKeybindHandler:
 
 def init_global_keybind_objects():
     """Initialize global keybind handler with monitor manager."""
-    try:
-        from utils.monitor_manager import get_monitor_manager
-        
-        handler = get_global_keybind_handler()
-        manager = get_monitor_manager()
-        handler.set_monitor_manager(manager)
-        
-        return handler
-    except ImportError as e:
-        print(f"Error initializing global keybind objects: {e}")
-        return None
+    from utils.monitor_manager import get_monitor_manager
+
+    handler = get_global_keybind_handler()
+    handler.set_monitor_manager(get_monitor_manager())
+    return handler

@@ -1,9 +1,7 @@
 # Thanks to https://github.com/muhchaudhary for the original code. You are a legend.
-import json
 
 import cairo
 import gi
-from fabric.hyprland.service import Hyprland
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.eventbox import EventBox
@@ -12,15 +10,17 @@ from fabric.widgets.label import Label
 from fabric.widgets.overlay import Overlay
 from loguru import logger
 
-import config.data as data
 import modules.icons as icons
 import utils.apps as apps
+from config.shell_settings import settings
 
 # WIP icon resolver (app_id to guessing the icon name)
 from utils.icon_resolver import IconResolver
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
+
+from services import hyprland
 
 
 def _screen_size() -> tuple[int, int]:
@@ -39,7 +39,7 @@ def _screen_size() -> tuple[int, int]:
 CURRENT_WIDTH, CURRENT_HEIGHT = _screen_size()
 
 icon_resolver = IconResolver()
-connection = Hyprland()
+connection = hyprland.connection()
 BASE_SCALE = 0.1  # Base scale factor for overview
 
 # Credit to Aylur for the drag and drop code
@@ -61,21 +61,16 @@ def createSurfaceFromWidget(widget: Gtk.Widget) -> cairo.ImageSurface:
     return surface
 
 
-# Hyprland 0.56+ (Lua config): `dispatch` takes a Lua expression
-def focus_window(address: str) -> None:
-    connection.send_command(f'/dispatch hl.dsp.focus({{ window = "address:{address}" }})')
-
-
-def close_window(address: str) -> None:
-    connection.send_command(f'/dispatch hl.dsp.window.close({{ window = "address:{address}" }})')
-
+focus_window = hyprland.focus_window
+close_window = hyprland.close_window
+move_window_to_workspace = hyprland.move_window_to_workspace
 
 # How long an app gets to close before we assume it's asking for confirmation
 CLOSE_CONFIRM_DELAY_MS = 400
 
 
 def window_exists(address: str) -> bool:
-    clients = json.loads(connection.send_command("j/clients").reply.decode())
+    clients = hyprland.query("clients")
     return any(client.get("address") == address for client in clients)
 
 
@@ -94,14 +89,6 @@ def request_close(address: str, notch) -> None:
         return False
 
     GLib.timeout_add(CLOSE_CONFIRM_DELAY_MS, focus_if_still_open)
-
-
-def move_window_to_workspace(address: str, workspace_id: int) -> None:
-    """Move without following the window (the old movetoworkspacesilent)."""
-    connection.send_command(
-        f'/dispatch hl.dsp.window.move({{ workspace = "{workspace_id}", '
-        f'window = "address:{address}", follow = false }})'
-    )
 
 
 class HyprlandWindowButton(Button):
@@ -286,14 +273,6 @@ class Overview(Box):
             pass
         
         # Get monitor dimensions
-        monitor_width = CURRENT_WIDTH
-        monitor_height = CURRENT_HEIGHT
-        
-        if self.monitor_manager:
-            monitor_info = self.monitor_manager.get_monitor_by_id(monitor_id)
-            if monitor_info:
-                monitor_width = monitor_info['width']
-                monitor_height = monitor_info['height']
         # Initialize as a Box instead of a PopupWindow.
         super().__init__(name="overview", orientation="v", spacing=8, **kwargs)
         self.workspace_boxes: dict[int, Box] = {}
@@ -416,7 +395,7 @@ class Overview(Box):
             workspace.destroy()
         self.workspace_boxes.clear()
 
-        if data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Left", "Right"]:
+        if settings.panel_theme == "Panel" and settings.bar_position in ["Left", "Right"]:
             rows = 5
             cols = 2
         else:
@@ -443,11 +422,11 @@ class Overview(Box):
 
         monitors = {
             monitor["id"]: (monitor["x"], monitor["y"], monitor["transform"])
-            for monitor in json.loads(connection.send_command("j/monitors").reply.decode())
+            for monitor in hyprland.query("monitors")
         }
         
         # Filter clients to only show those in this monitor's workspace range
-        for client in json.loads(connection.send_command("j/clients").reply.decode()):
+        for client in hyprland.query("clients"):
             workspace_id = client["workspace"].get("id", 0)  # none on special workspaces
             if workspace_id > 0 and self.workspace_start <= workspace_id <= self.workspace_end:
                 btn = HyprlandWindowButton(

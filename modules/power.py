@@ -2,9 +2,10 @@ from fabric.utils.helpers import exec_shell_command_async
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.label import Label
+from loguru import logger
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 
 tooltip_lock = "Lock"
 tooltip_suspend = "Suspend"
@@ -16,10 +17,7 @@ tooltip_shutdown = "Shutdown"
 class PowerMenu(Box):
     def __init__(self, **kwargs):
         orientation = "h"
-        if data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"]
-            or data.PANEL_POSITION in ["Start", "End"]
-        ):
+        if settings.vertical_panel:
             orientation = "v"
 
         super().__init__(
@@ -106,26 +104,26 @@ class PowerMenu(Box):
         self.notch.close_notch()
 
     def lock(self, *args):
-        print("Locking screen...")
+        logger.info("Locking screen...")
         exec_shell_command_async("loginctl lock-session")
         self.close_menu()
 
     def suspend(self, *args):
-        print("Suspending system...")
+        logger.info("Suspending system...")
         exec_shell_command_async("systemctl suspend")
         self.close_menu()
 
     def logout(self, *args):
-        print("Logging out...")
+        logger.info("Logging out...")
         exec_shell_command_async("hyprctl dispatch 'hl.dsp.exit()'")
         self.close_menu()
 
     def reboot(self, *args):
-        print("Rebooting system...")
+        logger.info("Rebooting system...")
         exec_shell_command_async("systemctl reboot")
         self.close_menu()
 
     def poweroff(self, *args):
-        print("Powering off...")
+        logger.info("Powering off...")
         exec_shell_command_async("systemctl poweroff")
         self.close_menu()

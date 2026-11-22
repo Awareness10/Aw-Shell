@@ -10,8 +10,9 @@ from fabric.widgets.button import Button
 from fabric.widgets.label import Label
 from gi.repository import Gdk, GLib, Gtk
 
-import config.data as data
 from config.paths import SCRIPTS_DIR
+from config.settings_constants import APP_NAME_CAP
+from config.shell_settings import settings
 
 gi.require_version('Gtk', '3.0')
 import modules.icons as icons
@@ -406,7 +407,7 @@ class CaffeineButton(Button):
 
         if external:
             message = "Enabled ☀️" if enabled else "Disabled 💤"
-            exec_shell_command_async(f"notify-send '☕ Caffeine' '{message}' -a '{data.APP_NAME_CAP}' -e")
+            exec_shell_command_async(f"notify-send '☕ Caffeine' '{message}' -a '{APP_NAME_CAP}' -e")
     
     def _add_disabled_style(self):
         """Helper to add disabled style to all widgets."""
@@ -447,7 +448,7 @@ class Buttons(Gtk.Grid):
         self.night_mode_button = NightModeButton()
         self.caffeine_button = CaffeineButton()
 
-        if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]):
+        if settings.vertical_panel:
 
             self.attach(self.network_button, 0, 0, 1, 1)
             self.attach(self.bluetooth_button, 1, 0, 1, 1)

@@ -352,6 +352,55 @@ def test_shell_colors_keep_an_existing_wrp(home):
     assert _calls(calls)[-1] == "wrp install bash"
 
 
+def _wrp_sees_bashrc(home: Path) -> None:
+    """The wrp stub also logs whether ~/.bashrc already puts its folder on
+    PATH when `wrp install bash` runs (matuwrap sources itself after it)."""
+    wrp = home / "tool-bin" / "wrp"
+    wrp.write_text(wrp.read_text() + '[[ -f "$HOME/.bashrc" && "$(<"$HOME/.bashrc")" == *tool-bin* ]] '
+                   f'&& echo "wrp saw PATH line" >> "{home / "calls"}"\n')
+
+
+def test_shell_colors_put_the_tool_folder_on_path_for_new_terminals(home):
+    """`uv tool install` puts wrp in a folder a fresh Arch doesn't have on
+    PATH; without this, matuwrap's script can't find wrp in new terminals."""
+    calls = _shell_colors_stubs(home)
+    _wrp_sees_bashrc(home)
+    (home / ".bashrc").write_text("alias ll='ls -l'\n")
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    bashrc = (home / ".bashrc").read_text()
+    assert bashrc.startswith("alias ll='ls -l'\n")  # appended, nothing else touched
+    assert '*":$HOME/tool-bin:"*' in bashrc and 'export PATH="$HOME/tool-bin:$PATH"' in bashrc
+    assert _calls(calls)[-2:] == ["wrp install bash", "wrp saw PATH line"]
+    # A second run adds nothing
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    assert (home / ".bashrc").read_text() == bashrc
+
+
+def test_shell_colors_create_bashrc_with_the_path_line(home):
+    _shell_colors_stubs(home)
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    assert 'export PATH="$HOME/tool-bin:$PATH"' in (home / ".bashrc").read_text()
+
+
+@pytest.mark.parametrize("existing", [
+    'export PATH="$HOME/tool-bin:$PATH"', "export PATH=~/tool-bin:$PATH",
+    'PATH="${HOME}/tool-bin:$PATH"', "export PATH={home}/tool-bin:$PATH",
+])
+def test_shell_colors_keep_a_bashrc_that_has_the_folder(home, existing):
+    _shell_colors_stubs(home)
+    (home / ".bashrc").write_text(existing.replace("{home}", str(home)) + "\n")
+    before = (home / ".bashrc").read_text()
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    assert (home / ".bashrc").read_text() == before
+
+
+def test_shell_colors_leave_bashrc_alone_with_an_existing_wrp(home):
+    """wrp was already on PATH, so the user's setup has it covered."""
+    _shell_colors_stubs(home, wrp=True)
+    assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0
+    assert not (home / ".bashrc").exists()
+
+
 def test_shell_colors_use_an_existing_cargo(home):
     calls = _shell_colors_stubs(home, cargo=True)
     assert _no_tty(home, STEPS.format(args="--shell-colors")).returncode == 0

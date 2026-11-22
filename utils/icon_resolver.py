@@ -8,11 +8,11 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 from loguru import logger
 
-import config.data as data
+from config.paths import CACHE_DIR
 
-ICON_CACHE_FILE = data.CACHE_DIR + "/icons.json"
-if not os.path.exists(data.CACHE_DIR):
-    os.makedirs(data.CACHE_DIR)
+ICON_CACHE_FILE = f"{CACHE_DIR}/icons.json"
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
 
 
 class IconResolver:

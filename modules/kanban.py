@@ -7,12 +7,13 @@ from fabric.widgets.centerbox import CenterBox
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 
-import config.data as data
 import modules.icons as icons
 from config.paths import KANBAN_FILE, ensure_dir
+from config.shell_settings import settings
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gdk, GLib, GObject, Gtk
+from loguru import logger
 
 
 def createSurfaceFromWidget(widget: Gtk.Widget) -> cairo.ImageSurface:
@@ -159,7 +160,7 @@ class KanbanStore(GObject.Object):
         except FileNotFoundError:
             pass
         except Exception as e:
-            print(f"Error loading kanban: {e}")
+            logger.error(f"Error loading kanban: {e}")
 
     def _save(self):
         state = {"columns": [{"title": t, "notes": n} for t, n in self.columns.items()]}
@@ -168,7 +169,7 @@ class KanbanStore(GObject.Object):
             with open(KANBAN_FILE, "w") as f:
                 json.dump(state, f, indent=2)
         except Exception as e:
-            print(f"Error saving kanban: {e}")
+            logger.error(f"Error saving kanban: {e}")
 
 
 _store = None
@@ -396,10 +397,10 @@ class Kanban(Gtk.Box):
         
         self.columns = [KanbanColumn(self.store, title) for title in COLUMNS]
 
-        vertical_mode = True if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]) else False
+        vertical_mode = settings.vertical_panel
         
         for i, column in enumerate(self.columns):
-            if vertical_mode == False:
+            if not vertical_mode:
                 self.grid.attach(column, i, 0, 1, 1)
             else:
                 self.grid.attach(column, 0, i, 1, 1)

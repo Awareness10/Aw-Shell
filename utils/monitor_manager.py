@@ -6,6 +6,7 @@ import gi
 
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
+from loguru import logger
 
 # The main monitor is the one holding this workspace. Monitor IDs follow
 # connection order, which changes with how fast each screen wakes up, while
@@ -29,7 +30,7 @@ class Signal:
             try:
                 callback(*args, **kwargs)
             except Exception as e:
-                print(f"Error in signal callback: {e}")
+                logger.error(f"Error in signal callback: {e}")
 
 
 def _hyprctl_json(command: str):
@@ -51,7 +52,7 @@ def _gdk_ids_by_connector() -> Dict[str, int]:
             if isinstance(name, str) and name:
                 ids[name] = i
     except Exception as e:
-        print(f"MonitorManager: could not read GDK monitors: {e}")
+        logger.error(f"MonitorManager: could not read GDK monitors: {e}")
     return ids
 
 
@@ -64,6 +65,29 @@ def _match_monitor_rule(selector: str, monitors: List[Dict]) -> Optional[str]:
         elif monitor.get("name") == selector:
             return monitor.get("name")
     return None
+
+
+def select_monitors(all_monitors: List[Dict], selected_names) -> List[Dict]:
+    """The monitors the shell shows on: those named in the selected_monitors
+    setting, or all of them when it's empty or names none that exist."""
+    if not selected_names:
+        logger.info("Aw-Shell: No specific monitors selected, showing on all monitors")
+        return all_monitors
+
+    selected = set(selected_names)
+    monitors = []
+    for monitor in all_monitors:
+        monitor_name = monitor.get('name', f'monitor-{monitor.get("id", 0)}')
+        if monitor_name in selected:
+            monitors.append(monitor)
+            logger.info(f"Aw-Shell: Including monitor '{monitor_name}' (selected)")
+        else:
+            logger.info(f"Aw-Shell: Excluding monitor '{monitor_name}' (not selected)")
+
+    if not monitors:
+        logger.info("Aw-Shell: No valid selected monitors found, falling back to all monitors")
+        return all_monitors
+    return monitors
 
 
 class MonitorManager:
@@ -120,7 +144,7 @@ class MonitorManager:
                             'scale': scale_factor
                         })
         except Exception as e:
-            print(f"Error getting GTK monitor info: {e}")
+            logger.error(f"Error getting GTK monitor info: {e}")
         
         return gtk_monitors
 
@@ -153,7 +177,7 @@ class MonitorManager:
                 elif monitor_name in gdk_ids:
                     monitor_id = gdk_ids[monitor_name]
                 else:
-                    print(f"MonitorManager: skipping {monitor_name}, unknown to GDK")
+                    logger.warning(f"MonitorManager: skipping {monitor_name}, unknown to GDK")
                     continue
 
                 self._monitors.append({
@@ -253,7 +277,7 @@ class MonitorManager:
                     return _match_monitor_rule(rule["monitor"], _hyprctl_json("monitors"))
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
                 json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"MonitorManager: could not resolve primary monitor: {e}")
+            logger.error(f"MonitorManager: could not resolve primary monitor: {e}")
         return None
 
     def get_primary_monitor_id(self) -> int:
@@ -275,7 +299,7 @@ class MonitorManager:
                     return self.get_monitor_id_by_name(monitor.get("name"))
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
                 json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"MonitorManager: could not query focused monitor: {e}")
+            logger.error(f"MonitorManager: could not query focused monitor: {e}")
         return None
 
     def get_monitor_id_by_name(self, name: Optional[str]) -> Optional[int]:
@@ -324,14 +348,7 @@ class MonitorManager:
             Monitor ID where the workspace is, or None if not found
         """
         try:
-            result = subprocess.run(
-                ["hyprctl", "workspaces", "-j"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            workspaces = json.loads(result.stdout)
-            for ws in workspaces:
+            for ws in _hyprctl_json("workspaces"):
                 if ws.get('id') == workspace_id:
                     # Find our monitor by name
                     ws_monitor = ws.get('monitor', '')

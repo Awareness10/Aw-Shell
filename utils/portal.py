@@ -9,6 +9,7 @@ import secrets
 from collections.abc import Callable
 
 from gi.repository import Gio, GLib
+from loguru import logger
 
 PORTAL = "org.freedesktop.portal.Desktop"
 PORTAL_PATH = "/org/freedesktop/portal/desktop"
@@ -19,7 +20,7 @@ def pick_file(title: str, on_done: Callable[[str | None], None]) -> None:
     try:
         bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     except GLib.Error as e:
-        print(f"File picker: no session bus: {e.message}")
+        logger.warning(f"File picker: no session bus: {e.message}")
         on_done(None)
         return
 
@@ -45,7 +46,7 @@ def pick_file(title: str, on_done: Callable[[str | None], None]) -> None:
             bus.call_finish(result)
         except GLib.Error as e:
             bus.signal_unsubscribe(subscription)
-            print(f"File picker: the portal failed: {e.message}")
+            logger.error(f"File picker: the portal failed: {e.message}")
             on_done(None)
 
     options = {"handle_token": GLib.Variant("s", token), "modal": GLib.Variant("b", True)}

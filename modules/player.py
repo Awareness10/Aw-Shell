@@ -12,14 +12,14 @@ from fabric.widgets.overlay import Overlay
 from fabric.widgets.stack import Stack
 from gi.repository import Gdk, Gio, GLib, Gtk
 
-import config.data as data
 import modules.icons as icons
+from config.shell_settings import settings
 from modules.cavalcade import SpectrumRender
 from services.mpris import MprisPlayer, MprisPlayerManager
 from widgets.circle_image import CircleImage
 
 vertical_mode = False
-if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]):
+if settings.vertical_panel:
     vertical_mode = True
 
 def get_player_icon_markup_by_name(player_name):

@@ -4,7 +4,6 @@ State is recomputed over Hyprland's IPC socket when window or workspace
 events arrive, rather than by polling hyprctl subprocesses.
 """
 
-import json
 
 from gi.repository import GLib
 from loguru import logger
@@ -99,9 +98,9 @@ class OcclusionWatcher:
         return cls._instance
 
     def __init__(self):
-        from fabric.hyprland.widgets import get_hyprland_connection
+        from services import hyprland
 
-        self._conn = get_hyprland_connection()
+        self._conn = hyprland.connection()
         self._occluded: dict[str, bool] = {}
         self._focused: str | None = None
         self._listeners = []
@@ -125,8 +124,8 @@ class OcclusionWatcher:
         return self._occluded.get(monitor_name, False)
 
     def refresh(self) -> None:
-        monitors = self._query("j/monitors")
-        clients = self._query("j/clients")
+        monitors = self._query("monitors")
+        clients = self._query("clients")
         if monitors is None or clients is None:
             return
 
@@ -143,8 +142,10 @@ class OcclusionWatcher:
                 callback()
 
     def _query(self, command: str):
+        from services import hyprland
+
         try:
-            return json.loads(self._conn.send_command(command).reply.decode())
+            return hyprland.query(command)
         except (ValueError, AttributeError) as e:
             logger.warning(f"[Occlusion] {command} failed: {e}")
             return None

@@ -6,8 +6,10 @@ from fabric.widgets.label import Label
 from gi.repository import GLib
 
 gi.require_version("Gtk", "3.0")
-import config.data as data
+from loguru import logger
+
 import modules.icons as icons
+from config.shell_settings import settings
 
 
 class Weather(Button):
@@ -59,7 +61,7 @@ class Weather(Button):
     def _fetch_weather_thread(self, user_data):
         url = (
             "https://wttr.in/?format=%c+%t"
-            if not data.VERTICAL
+            if not settings.vertical
             else "https://wttr.in/?format=%c"
         )
 
@@ -101,7 +103,7 @@ class Weather(Button):
                 GLib.idle_add(self._update_visibility)
         except Exception as e:
             self.has_weather_data = False
-            print(f"Error fetching weather: {e}")
+            logger.error(f"Error fetching weather: {e}")
             GLib.idle_add(self.label.set_markup, f"{icons.cloud_off} Error")
             GLib.idle_add(self._update_visibility)
         finally:

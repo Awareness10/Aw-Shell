@@ -18,6 +18,10 @@
   color: var(--yellow-dim);
 }
 
+#toolbox-button.gamemode label {
+  color: var(--green-dim);
+}
+
 #toolbox-button:hover,
 #toolbox-button:focus {
   border-radius: 20px;
@@ -39,6 +43,11 @@
   color: var(--yellow-dim);
 }
 
+#toolbox-button.gamemode:hover label,
+#toolbox-button.gamemode:focus label {
+  color: var(--green-dim);
+}
+
 #toolbox-button:active {
   border-radius: 40px;
   background-color: var(--primary);
@@ -56,11 +65,19 @@
   background-color: var(--yellow-dim);
 }
 
+#toolbox-button.gamemode:active {
+  background-color: var(--green-dim);
+}
+
 #toolbox-button.recording:active label {
   color: var(--shadow);
 }
 
 #toolbox-button.pomodoro:active label {
+  color: var(--shadow);
+}
+
+#toolbox-button.gamemode:active label {
   color: var(--shadow);
 }
 
