@@ -58,7 +58,7 @@ def _elementwise(function: Callable[[Any], Any]) -> Callable[[Any], Any]:
             return -math.inf if x == 0 else math.nan
         except OverflowError:
             return math.inf
-    apply.__name__ = function.__name__
+    apply.__name__ = getattr(function, "__name__", apply.__name__)
     return apply
 
 

@@ -72,7 +72,7 @@ def parse_timestamp(text: Any) -> datetime:
 class HistoryStore:
     """The history file's notes, newest first, at most HISTORY_LIMIT."""
 
-    def __init__(self, path: str):
+    def __init__(self, path: str) -> None:
         self.path = path
         self.notes: list[dict[str, Any]] = []
 

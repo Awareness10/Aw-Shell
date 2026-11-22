@@ -35,7 +35,9 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.0",
-    "mypy>=2.4.1",
+    "ty>=0.0.107",
+    # Also a runtime dependency; here so ty resolves it in CI's dev-only environment
+    "loguru>=0.7.0",
 ]
 
 [tool.ruff]
@@ -43,24 +45,31 @@ target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B"]
+select = ["E", "F", "I", "B", "ANN"]
 ignore = [
     # gi.require_version() has to run before the gi.repository imports
     "E402",
     # Long f-strings, CSS and markup; wrapping them would only churn the files
     "E501",
+    # Any is deliberate where values really are dynamic (JSON, calculator values)
+    "ANN401",
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Annotations required only in the modules ty checks ([tool.ty.src] include)
+"!{config/legacy.py,config/gtk_theme.py,config/migrate.py,config/paths.py,config/shell_settings.py,config/terminal.py,config/toml_writer.py,utils/bar_layout.py,utils/calculator.py,utils/commands.py,utils/conversion.py,utils/dock_layout.py,utils/dock_model.py,utils/notch_layout.py,utils/notification_history.py,utils/stylesheet.py,utils/wifi.py}" = ["ANN"]
 # The old dock code, copied verbatim as the test oracle
 "tests/test_dock_model.py" = ["E701", "E702"]
 
-[tool.mypy]
-# GTK-free modules only: fabric and gi ship no type information. Add a module
-# here once it passes; `uv run --only-group dev mypy` checks the list.
-python_version = "3.14"
-strict = true
-files = [
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+# GTK-free modules only: gi.repository is generated at runtime and fabric's
+# widgets take loose keyword arguments, so the rest would be mostly noise.
+# Add a module here once it passes; ruff's ANN rules (per-file-ignores) require
+# annotations in the same files.
+include = [
     "config/legacy.py",
     "config/gtk_theme.py",
     "config/migrate.py",
@@ -79,13 +88,9 @@ files = [
     "utils/stylesheet.py",
     "utils/wifi.py",
 ]
-# Imported modules outside the list are read for types but not reported on
-follow_imports = "silent"
 
-[[tool.mypy.overrides]]
-# No type information (or not installed in the dev-only environment)
-module = ["fabric.*", "gi.*", "loguru.*", "PySide6.*", "glaze.*", "psutil.*", "setproctitle.*"]
-ignore_missing_imports = true
+[tool.ty.terminal]
+error-on-warning = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

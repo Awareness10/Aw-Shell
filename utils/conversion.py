@@ -329,7 +329,7 @@ class _BadJSON(_NoAnswer, ValueError):
 class _Reply:
     """An HTTP answer: its status code and body."""
 
-    def __init__(self, status_code: int, body: bytes):
+    def __init__(self, status_code: int, body: bytes) -> None:
         self.status_code = status_code
         self.body = body
 
